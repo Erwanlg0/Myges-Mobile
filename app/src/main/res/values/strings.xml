@@ -1,3 +1,159 @@
 <resources>
-    <string name="app_name">Myges</string>
+    <string name="app_name">MyGES</string>
+
+    <string name="action_cancel">Annuler</string>
+    <string name="action_retry">Réessayer</string>
+    <string name="action_sync_now">Synchroniser maintenant</string>
+    <string name="cd_open_navigation">Ouvrir la navigation</string>
+
+    <string name="common_date">Date</string>
+    <string name="common_no_period">Période non précisée</string>
+    <string name="common_period">Période</string>
+    <string name="common_untitled">Sans titre</string>
+
+    <string name="state_error_title">Action impossible</string>
+    <string name="state_offline">Mode hors ligne : les données affichées proviennent du cache local.</string>
+    <string name="state_offline_empty_title">Hors ligne</string>
+    <string name="state_offline_empty_body">Aucune donnée locale n’est encore disponible. Reconnectez-vous au réseau pour synchroniser MyGES.</string>
+    <string name="state_refreshing">Synchronisation en cours</string>
+
+    <string name="error_empty_response">La réponse reçue est vide.</string>
+    <string name="error_network">Connexion impossible. Vérifiez votre réseau.</string>
+    <string name="error_offline">Aucune connexion disponible.</string>
+    <string name="error_permission_denied">L’autorisation nécessaire a été refusée.</string>
+    <string name="error_remote">Le service MyGES a refusé la requête.</string>
+    <string name="error_storage">Le stockage local est indisponible.</string>
+    <string name="error_unauthorized">La session a expiré. Reconnectez-vous.</string>
+    <string name="error_unexpected">Une erreur inattendue est survenue.</string>
+
+    <string name="auth_title">Connexion MyGES</string>
+    <string name="auth_subtitle">Connectez-vous via Kordis pour récupérer un jeton d’accès sécurisé.</string>
+    <string name="auth_username">Identifiant</string>
+    <string name="auth_password">Mot de passe</string>
+    <string name="auth_enable_biometric">Activer le déverrouillage biométrique</string>
+    <string name="auth_login">Se connecter</string>
+    <string name="auth_login_kordis">Se connecter avec Kordis</string>
+    <string name="auth_biometric_unlock">Déverrouiller avec la biométrie</string>
+    <string name="auth_biometric_title">Déverrouillage MyGES</string>
+    <string name="auth_biometric_subtitle">Confirmez votre identité pour ouvrir votre session.</string>
+
+    <string name="dashboard_title">Tableau de bord</string>
+    <string name="dashboard_empty_title">Aucune donnée synchronisée</string>
+    <string name="dashboard_empty_body">Connectez-vous au réseau pour récupérer votre profil, votre agenda et vos informations de scolarité.</string>
+    <string name="dashboard_next_course">Prochain cours</string>
+    <string name="dashboard_no_next_course">Aucun cours à venir dans le cache local.</string>
+    <string name="dashboard_latest_grades">Dernières notes</string>
+    <string name="dashboard_recent_absences">Absences récentes</string>
+    <string name="dashboard_due_projects">Échéances de projets</string>
+
+    <string name="profile_email">E-mail</string>
+    <string name="profile_program">Formation</string>
+    <string name="profile_school">École</string>
+    <string name="profile_year">Année</string>
+
+    <string name="agenda_title">Agenda</string>
+    <string name="agenda_empty_title">Agenda vide</string>
+    <string name="agenda_empty_body">Aucun événement n’est disponible dans le cache local.</string>
+    <string name="agenda_sync_calendar">Synchroniser le calendrier</string>
+    <string name="agenda_end">Fin</string>
+    <string name="agenda_filter_empty">Aucun événement pour cette vue.</string>
+    <string name="agenda_mode_day">Jour</string>
+    <string name="agenda_mode_list">Liste</string>
+    <string name="agenda_mode_week">Semaine</string>
+    <string name="agenda_modality">Modalité</string>
+    <string name="agenda_room">Salle</string>
+    <string name="agenda_teacher">Intervenant</string>
+
+    <string name="grades_title">Notes</string>
+    <string name="grades_empty_title">Aucune note</string>
+    <string name="grades_empty_body">Les notes synchronisées apparaîtront ici dès que MyGES les renverra.</string>
+    <string name="grades_average">Moyenne</string>
+    <string name="grades_coefficient">Coefficient</string>
+    <string name="grades_value_format">%1$s/%2$s</string>
+
+    <string name="absences_title">Absences</string>
+    <string name="absences_empty_title">Aucune absence</string>
+    <string name="absences_empty_body">Aucune absence n’est présente dans le cache local.</string>
+    <string name="absences_end">Fin</string>
+    <string name="absences_justified">Justifiée</string>
+    <string name="absences_reason">Motif</string>
+    <string name="absences_status">Statut</string>
+    <string name="absences_unjustified">Non justifiée</string>
+
+    <plurals name="absences_count">
+        <item quantity="one">%d absence</item>
+        <item quantity="other">%d absences</item>
+    </plurals>
+    <plurals name="absences_unjustified_count">
+        <item quantity="one">%d non justifiée</item>
+        <item quantity="other">%d non justifiées</item>
+    </plurals>
+
+    <string name="courses_title">Cours</string>
+    <string name="courses_empty_title">Aucun cours</string>
+    <string name="courses_empty_body">Les cours de l’année synchronisée apparaîtront ici.</string>
+    <string name="courses_files">Fichiers</string>
+    <string name="courses_teacher">Intervenant</string>
+
+    <string name="projects_title">Projets</string>
+    <string name="projects_empty_title">Aucun projet</string>
+    <string name="projects_empty_body">Aucun projet n’est disponible dans le cache local.</string>
+    <string name="projects_course">Cours</string>
+    <string name="projects_deadline">Échéance</string>
+    <string name="projects_files">Fichiers</string>
+    <string name="projects_group">Groupe</string>
+    <string name="projects_status">Statut</string>
+
+    <string name="practicals_title">Travaux pratiques</string>
+    <string name="practicals_empty_title">Aucun travail pratique</string>
+    <string name="practicals_empty_body">Les travaux pratiques synchronisés apparaîtront ici.</string>
+    <string name="practicals_course">Cours</string>
+    <string name="practicals_end">Fin</string>
+    <string name="practicals_start">Début</string>
+
+    <string name="documents_title">Documents</string>
+    <string name="documents_empty_title">Aucun document</string>
+    <string name="documents_empty_body">Les documents annuels et fichiers téléchargés apparaîtront ici.</string>
+    <string name="documents_category">Catégorie</string>
+    <string name="documents_open">Télécharger et ouvrir</string>
+    <string name="documents_updated_at">Mis à jour</string>
+
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_empty_title">Aucune actualité</string>
+    <string name="notifications_empty_body">Les actualités et alertes synchronisées apparaîtront ici.</string>
+    <string name="notifications_grant_permission">Autoriser les notifications</string>
+    <string name="notifications_channel_student">Suivi étudiant</string>
+    <string name="notifications_channel_student_description">Notes, absences, agenda, documents et projets.</string>
+    <string name="notifications_sync_failed_title">Synchronisation impossible</string>
+    <string name="notifications_sync_failed_body">MyGES sera resynchronisé automatiquement dès que possible.</string>
+    <string name="notifications_new_grade_title">Nouvelle note</string>
+    <string name="notifications_new_grade_body">%1$s : %2$s</string>
+    <string name="notifications_new_absence_title">Nouvelle absence</string>
+    <string name="notifications_new_absence_body">%1$s le %2$s</string>
+    <string name="notifications_agenda_changed_title">Agenda mis à jour</string>
+    <string name="notifications_agenda_changed_body">%1$s le %2$s</string>
+    <string name="notifications_project_deadline_title">Nouvelle échéance de projet</string>
+    <string name="notifications_project_deadline_body">%1$s : %2$s</string>
+    <string name="notifications_new_document_title">Nouveau document</string>
+    <string name="notifications_new_document_body">%1$s est disponible.</string>
+
+    <string name="settings_title">Réglages</string>
+    <string name="settings_calendar_sync">Synchronisation calendrier</string>
+    <string name="settings_clear_cache">Vider le cache</string>
+    <string name="settings_language">Langue</string>
+    <string name="settings_language_english">Anglais</string>
+    <string name="settings_language_french">Français</string>
+    <string name="settings_language_system">Système</string>
+    <string name="settings_last_sync">Dernière synchronisation</string>
+    <string name="settings_logout">Se déconnecter</string>
+    <string name="settings_notifications">Préférences de notifications</string>
+    <string name="settings_notify_absences">Absences</string>
+    <string name="settings_notify_agenda">Agenda</string>
+    <string name="settings_notify_documents">Documents</string>
+    <string name="settings_notify_grades">Notes</string>
+    <string name="settings_notify_projects">Projets</string>
+    <string name="settings_session">Session et cache</string>
+
+    <string name="calendar_event_marker_prefix" translatable="false">MyGES:</string>
+    <string name="calendar_event_description">MyGES:%1$s</string>
 </resources>

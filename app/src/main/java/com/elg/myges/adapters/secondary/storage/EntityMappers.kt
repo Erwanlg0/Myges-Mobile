@@ -1,0 +1,216 @@
+package com.elg.myges.adapters.secondary.storage
+
+import com.elg.myges.domain.model.Absence
+import com.elg.myges.domain.model.AcademicDocument
+import com.elg.myges.domain.model.AgendaEvent
+import com.elg.myges.domain.model.Course
+import com.elg.myges.domain.model.Grade
+import com.elg.myges.domain.model.NewsItem
+import com.elg.myges.domain.model.Practical
+import com.elg.myges.domain.model.Project
+import com.elg.myges.domain.model.ProjectStep
+import com.elg.myges.domain.model.StudentProfile
+import java.time.Instant
+import java.time.LocalDate
+
+fun StudentProfile.toEntity() = StudentProfileEntity(
+    id = id,
+    displayName = displayName,
+    email = email,
+    school = school,
+    program = program,
+    academicYear = academicYear,
+    avatarUrl = avatarUrl
+)
+
+fun StudentProfileEntity.toDomain() = StudentProfile(
+    id = id,
+    displayName = displayName,
+    email = email,
+    school = school,
+    program = program,
+    academicYear = academicYear,
+    avatarUrl = avatarUrl
+)
+
+fun AgendaEvent.toEntity() = AgendaEventEntity(
+    id = id,
+    title = title,
+    startsAtEpochMillis = startsAt.toEpochMilli(),
+    endsAtEpochMillis = endsAt.toEpochMilli(),
+    room = room,
+    teacher = teacher,
+    type = type,
+    modality = modality,
+    courseId = courseId
+)
+
+fun AgendaEventEntity.toDomain() = AgendaEvent(
+    id = id,
+    title = title,
+    startsAt = Instant.ofEpochMilli(startsAtEpochMillis),
+    endsAt = Instant.ofEpochMilli(endsAtEpochMillis),
+    room = room,
+    teacher = teacher,
+    type = type,
+    modality = modality,
+    courseId = courseId
+)
+
+fun Grade.toEntity() = GradeEntity(
+    id = id,
+    courseName = courseName,
+    subject = subject,
+    value = value,
+    scale = scale,
+    coefficient = coefficient,
+    average = average,
+    dateIso = date?.toString(),
+    period = period
+)
+
+fun GradeEntity.toDomain() = Grade(
+    id = id,
+    courseName = courseName,
+    subject = subject,
+    value = value,
+    scale = scale,
+    coefficient = coefficient,
+    average = average,
+    date = dateIso?.let { LocalDate.parse(it) },
+    period = period
+)
+
+fun Absence.toEntity() = AbsenceEntity(
+    id = id,
+    courseName = courseName,
+    startsAtEpochMillis = startsAt.toEpochMilli(),
+    endsAtEpochMillis = endsAt.toEpochMilli(),
+    justified = justified,
+    status = status,
+    reason = reason
+)
+
+fun AbsenceEntity.toDomain() = Absence(
+    id = id,
+    courseName = courseName,
+    startsAt = Instant.ofEpochMilli(startsAtEpochMillis),
+    endsAt = Instant.ofEpochMilli(endsAtEpochMillis),
+    justified = justified,
+    status = status,
+    reason = reason
+)
+
+fun Course.toEntity() = CourseEntity(
+    id = id,
+    name = name,
+    teacher = teacher,
+    year = year,
+    period = period,
+    syllabus = syllabus,
+    fileCount = fileCount
+)
+
+fun CourseEntity.toDomain() = Course(
+    id = id,
+    name = name,
+    teacher = teacher,
+    year = year,
+    period = period,
+    syllabus = syllabus,
+    fileCount = fileCount
+)
+
+fun Project.toEntity() = ProjectEntity(
+    id = id,
+    name = name,
+    courseName = courseName,
+    groupName = groupName,
+    status = status,
+    deadlineEpochMillis = deadline?.toEpochMilli(),
+    fileCount = fileCount
+)
+
+fun Project.toStepEntities() = steps.map { step ->
+    ProjectStepEntity(
+        projectId = id,
+        id = step.id,
+        title = step.title,
+        deadlineEpochMillis = step.deadline?.toEpochMilli(),
+        status = step.status
+    )
+}
+
+fun ProjectEntity.toDomain(steps: List<ProjectStepEntity>) = Project(
+    id = id,
+    name = name,
+    courseName = courseName,
+    groupName = groupName,
+    status = status,
+    deadline = deadlineEpochMillis?.let { Instant.ofEpochMilli(it) },
+    steps = steps.map { it.toDomain() },
+    fileCount = fileCount
+)
+
+fun ProjectStepEntity.toDomain() = ProjectStep(
+    id = id,
+    title = title,
+    deadline = deadlineEpochMillis?.let { Instant.ofEpochMilli(it) },
+    status = status
+)
+
+fun Practical.toEntity() = PracticalEntity(
+    id = id,
+    name = name,
+    courseName = courseName,
+    startsAtEpochMillis = startsAt?.toEpochMilli(),
+    endsAtEpochMillis = endsAt?.toEpochMilli(),
+    room = room,
+    status = status
+)
+
+fun PracticalEntity.toDomain() = Practical(
+    id = id,
+    name = name,
+    courseName = courseName,
+    startsAt = startsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
+    endsAt = endsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
+    room = room,
+    status = status
+)
+
+fun AcademicDocument.toEntity() = AcademicDocumentEntity(
+    id = id,
+    title = title,
+    category = category,
+    year = year,
+    mimeType = mimeType,
+    fileName = fileName,
+    downloadUrl = downloadUrl,
+    updatedAtEpochMillis = updatedAt?.toEpochMilli()
+)
+
+fun AcademicDocumentEntity.toDomain() = AcademicDocument(
+    id = id,
+    title = title,
+    category = category,
+    year = year,
+    mimeType = mimeType,
+    fileName = fileName,
+    downloadUrl = downloadUrl,
+    updatedAt = updatedAtEpochMillis?.let { Instant.ofEpochMilli(it) }
+)
+
+fun NewsItem.toEntity() = NewsEntity(
+    id = id,
+    title = title,
+    body = body,
+    publishedAtEpochMillis = publishedAt?.toEpochMilli()
+)
+
+fun NewsEntity.toDomain() = NewsItem(
+    id = id,
+    title = title,
+    body = body,
+    publishedAt = publishedAtEpochMillis?.let { Instant.ofEpochMilli(it) }
+)
