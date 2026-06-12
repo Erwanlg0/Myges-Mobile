@@ -15,26 +15,35 @@ import javax.inject.Singleton
 class MygesSessionRepository @Inject constructor(
     private val secureSessionStore: SecureSessionStore
 ) : SessionRepository {
-    private var storedSession: Session? = runCatching { secureSessionStore.read() }
-        .getOrElse {
-            secureSessionStore.clear()
-            null
-        }
+    private var storedSession: Session? = readUsableSession()
     private val unlockedSession = MutableStateFlow(storedSession?.takeUnless { it.biometricEnabled })
     private val lockedBiometricSession = MutableStateFlow(storedSession?.biometricEnabled == true)
 
     override val session: StateFlow<Session?> = unlockedSession
     override val hasLockedBiometricSession: StateFlow<Boolean> = lockedBiometricSession
 
+    override fun currentSession(): Session? = storedSession
+
+    override fun invalidateSession() {
+        secureSessionStore.clear()
+        storedSession = null
+        lockedBiometricSession.value = false
+        unlockedSession.value = null
+    }
+
     override suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) {
         try {
             if (accessToken.isBlank()) throw AppException(AppError.Unauthorized)
+            val issuedAt = Instant.now()
+            val resolvedExpiresAt = expiresAt ?: issuedAt.plusSeconds(TOKEN_VALIDITY_SECONDS)
             val session = Session(
                 username = KORDIS_SESSION_USERNAME,
                 accessToken = accessToken,
                 refreshToken = null,
-                expiresAt = expiresAt,
-                biometricEnabled = enableBiometric
+                expiresAt = resolvedExpiresAt,
+                biometricEnabled = enableBiometric,
+                issuedAt = issuedAt,
+                refreshAfter = minOf(issuedAt.plusSeconds(TOKEN_REFRESH_SECONDS), resolvedExpiresAt)
             )
             secureSessionStore.save(session)
             storedSession = session
@@ -47,6 +56,10 @@ class MygesSessionRepository @Inject constructor(
 
     override suspend fun unlockWithBiometrics() {
         val session = secureSessionStore.read() ?: throw AppException(AppError.Unauthorized)
+        if (session.isExpired || session.requiresRefresh) {
+            invalidateSession()
+            throw AppException(AppError.Unauthorized)
+        }
         storedSession = session
         lockedBiometricSession.value = false
         unlockedSession.value = session
@@ -66,7 +79,22 @@ class MygesSessionRepository @Inject constructor(
         }
     }
 
+    private fun readUsableSession(): Session? {
+        return runCatching { secureSessionStore.read() }
+            .getOrElse {
+                secureSessionStore.clear()
+                null
+            }
+            ?.takeUnless { session ->
+                (session.isExpired || session.requiresRefresh).also { shouldInvalidate ->
+                    if (shouldInvalidate) secureSessionStore.clear()
+                }
+            }
+    }
+
     private companion object {
         const val KORDIS_SESSION_USERNAME = "Kordis"
+        const val TOKEN_REFRESH_SECONDS = 5L * 24L * 60L * 60L
+        const val TOKEN_VALIDITY_SECONDS = 7L * 24L * 60L * 60L
     }
 }

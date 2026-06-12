@@ -9,7 +9,6 @@ import com.elg.myges.adapters.secondary.network.AndroidNetworkMonitor
 import com.elg.myges.adapters.secondary.notification.AndroidNotificationScheduler
 import com.elg.myges.adapters.secondary.repository.MygesSessionRepository
 import com.elg.myges.adapters.secondary.repository.OfflineFirstStudentDataRepository
-import com.elg.myges.adapters.secondary.security.SecureSessionStore
 import com.elg.myges.adapters.secondary.settings.AppSettingsRepository
 import com.elg.myges.adapters.secondary.storage.MygesDatabase
 import com.elg.myges.adapters.secondary.storage.StudentDao
@@ -28,6 +27,9 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -72,7 +74,7 @@ object DependencyModule {
     @Singleton
     fun provideOkHttpClient(
         appConfig: AppConfig,
-        secureSessionStore: SecureSessionStore
+        sessionRepository: SessionRepository
     ): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
@@ -86,10 +88,23 @@ object DependencyModule {
                 val requestBuilder = chain.request().newBuilder()
                     .header("Accept", "application/json")
                     .header("User-Agent", appConfig.userAgent)
-                runCatching { secureSessionStore.read()?.accessToken }.getOrNull()?.let { token ->
+                val session = sessionRepository.currentSession()
+                if (session?.isExpired == true || session?.requiresRefresh == true) {
+                    sessionRepository.invalidateSession()
+                    return@addInterceptor Response.Builder()
+                        .request(chain.request())
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(401)
+                        .message("Session refresh required")
+                        .body("".toResponseBody(null))
+                        .build()
+                }
+                session?.accessToken?.let { token ->
                     requestBuilder.header("Authorization", token)
                 }
-                chain.proceed(requestBuilder.build())
+                chain.proceed(requestBuilder.build()).also { response ->
+                    if (response.code == 401) sessionRepository.invalidateSession()
+                }
             }
             .addInterceptor(logging)
             .build()

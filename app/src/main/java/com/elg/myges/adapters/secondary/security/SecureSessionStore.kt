@@ -29,12 +29,19 @@ class SecureSessionStore @Inject constructor(
             val username = preferences.getString(KEY_USERNAME, null) ?: return null
             val encryptedToken = preferences.getString(KEY_ACCESS_TOKEN, null) ?: return null
             val accessToken = decrypt(encryptedToken)
+            val expiresAt = preferences.getLong(KEY_EXPIRES_AT, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+            val issuedAt = preferences.getLong(KEY_ISSUED_AT, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+                ?: expiresAt?.minusSeconds(TOKEN_VALIDITY_SECONDS)
+                ?: Instant.now()
             Session(
                 username = username,
                 accessToken = accessToken,
                 refreshToken = preferences.getString(KEY_REFRESH_TOKEN, null)?.let(::decrypt),
-                expiresAt = preferences.getLong(KEY_EXPIRES_AT, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli),
-                biometricEnabled = preferences.getBoolean(KEY_BIOMETRIC, false)
+                expiresAt = expiresAt,
+                biometricEnabled = preferences.getBoolean(KEY_BIOMETRIC, false),
+                issuedAt = issuedAt,
+                refreshAfter = preferences.getLong(KEY_REFRESH_AFTER, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+                    ?: issuedAt.plusSeconds(TOKEN_REFRESH_SECONDS)
             )
         }.getOrElse {
             throw AppException(AppError.Storage)
@@ -49,6 +56,8 @@ class SecureSessionStore @Inject constructor(
                 .putString(KEY_REFRESH_TOKEN, session.refreshToken?.let(::encrypt))
                 .putLong(KEY_EXPIRES_AT, session.expiresAt?.toEpochMilli() ?: 0L)
                 .putBoolean(KEY_BIOMETRIC, session.biometricEnabled)
+                .putLong(KEY_ISSUED_AT, session.issuedAt.toEpochMilli())
+                .putLong(KEY_REFRESH_AFTER, session.refreshAfter.toEpochMilli())
                 .apply()
         }.getOrElse {
             throw AppException(AppError.Storage)
@@ -99,8 +108,12 @@ class SecureSessionStore @Inject constructor(
         const val KEY_ALIAS = "myges_session_key"
         const val KEY_BIOMETRIC = "biometric_enabled"
         const val KEY_EXPIRES_AT = "expires_at"
+        const val KEY_ISSUED_AT = "issued_at"
+        const val KEY_REFRESH_AFTER = "refresh_after"
         const val KEY_REFRESH_TOKEN = "refresh_token"
         const val KEY_USERNAME = "username"
+        const val TOKEN_REFRESH_SECONDS = 5L * 24L * 60L * 60L
+        const val TOKEN_VALIDITY_SECONDS = 7L * 24L * 60L * 60L
         const val TRANSFORMATION = "AES/GCM/NoPadding"
     }
 }

@@ -71,6 +71,10 @@ class AppSettingsRepository @Inject constructor(
         context.settingsDataStore.edit { preferences -> preferences[LAST_SYNC] = Instant.now().toEpochMilli() }
     }
 
+    override suspend fun clearSyncMetadata() {
+        context.settingsDataStore.edit { preferences -> preferences.remove(LAST_SYNC) }
+    }
+
     private companion object {
         val CALENDAR_SYNC = booleanPreferencesKey("calendar_sync")
         val LANGUAGE_TAG = stringPreferencesKey("language_tag")

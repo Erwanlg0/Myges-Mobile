@@ -59,48 +59,59 @@ fun JsonElement.toYears(): List<String> {
 }
 
 fun JsonElement.toAgendaEvents(): List<AgendaEvent> {
-    return arrayOrNested("agenda", "events", "items", "data").map { element ->
+    return arrayOrNested("agenda", "events", "items", "data").mapNotNull { element ->
         val root = element.objectOrData()
-        val startsAt = root.instant("startsAt", "start", "startDate", "dateStart", "begin")
-            ?: Instant.now()
-        val endsAt = root.instant("endsAt", "end", "endDate", "dateEnd")
+        val discipline = root["discipline"] as? JsonObject
+        val startsAt = root.instant("startsAt", "start", "startDate", "dateStart", "begin", "start_date")
+            ?: return@mapNotNull null
+        val endsAt = root.instant("endsAt", "end", "endDate", "dateEnd", "end_date")
             ?: startsAt.plusSeconds(3600)
         AgendaEvent(
-            id = root.text("id", "eventId", "uid") ?: stableId(root),
-            title = root.text("title", "name", "courseName", "matiere") ?: "",
+            id = root.text("id", "eventId", "uid", "reservation_id") ?: stableId(root),
+            title = root.text("title", "name", "courseName", "matiere")
+                ?: discipline?.text("name")
+                ?: "",
             startsAt = startsAt,
             endsAt = endsAt,
-            room = root.text("room", "classroom", "salle"),
-            teacher = root.text("teacher", "intervenant", "professor"),
+            room = root.text("room", "classroom", "salle") ?: root.arrayText("rooms", "name"),
+            teacher = root.text("teacher", "intervenant", "professor") ?: discipline?.text("teacher"),
             type = root.text("type", "kind"),
             modality = root.text("modality", "mode", "campus"),
-            courseId = root.text("courseId", "rcId", "moduleId")
+            courseId = root.text("courseId", "rcId", "rc_id", "moduleId") ?: discipline?.text("rc_id")
         )
     }
 }
 
 fun JsonElement.toGrades(): List<Grade> {
-    return arrayOrNested("grades", "items", "data").map { element ->
+    return arrayOrNested("grades", "items", "data").flatMap { element ->
         val root = element.objectOrData()
-        Grade(
-            id = root.text("id", "gradeId", "uid") ?: stableId(root),
-            courseName = root.text("courseName", "course", "module", "matiere") ?: "",
-            subject = root.text("subject", "title", "name", "evaluation") ?: "",
-            value = root.number("value", "grade", "note"),
-            scale = root.number("scale", "outOf", "bareme") ?: 20.0,
-            coefficient = root.number("coefficient", "coef"),
-            average = root.number("average", "moyenne"),
-            date = root.localDate("date", "createdAt", "publishedAt"),
-            period = root.text("period", "trimester", "semester")
-        )
+        val nestedGrades = root.array("grades")
+        if (nestedGrades.isNotEmpty()) {
+            nestedGrades.mapIndexedNotNull { index, gradeElement ->
+                val gradeRoot = gradeElement as? JsonObject
+                val value = gradeRoot?.number("value", "grade", "note") ?: gradeElement.numberOrNull()
+                value?.let {
+                    root.toGrade(
+                        idSuffix = "grade-$index",
+                        subject = gradeRoot?.text("subject", "title", "name", "evaluation"),
+                        value = it,
+                        scale = gradeRoot?.number("scale", "outOf", "bareme"),
+                        date = gradeRoot?.localDate("date", "createdAt", "publishedAt")
+                    )
+                }
+            }
+        } else {
+            val value = root.number("value", "grade", "note", "exam", "average", "ccaverage")
+            value?.let { listOf(root.toGrade(value = it)) }.orEmpty()
+        }
     }
 }
 
 fun JsonElement.toAbsences(): List<Absence> {
-    return arrayOrNested("absences", "items", "data").map { element ->
+    return arrayOrNested("absences", "items", "data").mapNotNull { element ->
         val root = element.objectOrData()
         val startsAt = root.instant("startsAt", "start", "startDate", "dateStart")
-            ?: Instant.now()
+            ?: return@mapNotNull null
         val endsAt = root.instant("endsAt", "end", "endDate", "dateEnd")
             ?: startsAt.plusSeconds(3600)
         Absence(
@@ -208,7 +219,7 @@ private fun JsonElement.objectOrData(): JsonObject {
 private fun JsonElement.arrayOrNested(vararg keys: String): List<JsonElement> {
     if (this is JsonArray) return this.toList()
     val root = this as? JsonObject ?: return emptyList()
-    keys.forEach { key ->
+    (keys.toList() + listOf("result", "data", "items", "results")).distinct().forEach { key ->
         val value = root[key]
         if (value is JsonArray) return value.toList()
         if (value is JsonObject) {
@@ -261,6 +272,13 @@ private fun JsonObject.array(vararg keys: String): List<JsonElement> {
     return emptyList()
 }
 
+private fun JsonObject.arrayText(key: String, vararg textKeys: String): String? {
+    return array(key)
+        .mapNotNull { (it as? JsonObject)?.text(*textKeys) }
+        .takeIf { it.isNotEmpty() }
+        ?.joinToString(", ")
+}
+
 private fun JsonObject.instant(vararg keys: String): Instant? {
     keys.forEach { key ->
         val value = this[key]
@@ -279,6 +297,32 @@ private fun JsonObject.localDate(vararg keys: String): LocalDate? {
         }
     }
     return null
+}
+
+private fun JsonElement.numberOrNull(): Double? {
+    val primitive = this as? JsonPrimitive ?: return null
+    return primitive.doubleOrNull ?: primitive.contentOrNull?.replace(',', '.')?.toDoubleOrNull()
+}
+
+private fun JsonObject.toGrade(
+    idSuffix: String? = null,
+    subject: String? = null,
+    value: Double,
+    scale: Double? = null,
+    date: LocalDate? = null
+): Grade {
+    val baseId = text("id", "gradeId", "uid", "rc_id") ?: stableId(this)
+    return Grade(
+        id = listOfNotNull(baseId, idSuffix).joinToString("-"),
+        courseName = text("courseName", "course", "module", "matiere") ?: "",
+        subject = subject ?: text("subject", "title", "name", "evaluation", "trimester_name") ?: "",
+        value = value,
+        scale = scale ?: number("scale", "outOf", "bareme") ?: 20.0,
+        coefficient = number("coefficient", "coef"),
+        average = number("average", "moyenne", "ccaverage"),
+        date = date ?: localDate("date", "createdAt", "publishedAt"),
+        period = text("period", "trimester", "semester", "trimester_name")
+    )
 }
 
 private fun parseInstant(value: JsonElement?): Instant? {

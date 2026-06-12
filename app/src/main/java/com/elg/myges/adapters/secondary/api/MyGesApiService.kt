@@ -13,37 +13,37 @@ interface MyGesApiService {
     suspend fun profile(): JsonElement
 
     @GET("me/years")
-    suspend fun years(): JsonElement
+    suspend fun years(): JsonElement?
 
     @GET("me/agenda")
     suspend fun agenda(
         @Query("start") start: Long?,
         @Query("end") end: Long?
-    ): JsonElement
+    ): JsonElement?
 
     @GET("me/{year}/courses")
-    suspend fun courses(@Path("year") year: String): JsonElement
+    suspend fun courses(@Path("year") year: String): JsonElement?
 
     @GET("me/{year}/grades")
-    suspend fun grades(@Path("year") year: String): JsonElement
+    suspend fun grades(@Path("year") year: String): JsonElement?
 
     @GET("me/{year}/absences")
-    suspend fun absences(@Path("year") year: String): JsonElement
+    suspend fun absences(@Path("year") year: String): JsonElement?
 
     @GET("me/{year}/annualDocuments")
-    suspend fun annualDocuments(@Path("year") year: String): JsonElement
+    suspend fun annualDocuments(@Path("year") year: String): JsonElement?
 
     @GET("me/{year}/projects")
-    suspend fun projects(@Path("year") year: String): JsonElement
+    suspend fun projects(@Path("year") year: String): JsonElement?
 
     @GET("me/{year}/practicals")
-    suspend fun practicals(@Path("year") year: String): JsonElement
+    suspend fun practicals(@Path("year") year: String): JsonElement?
 
     @GET("me/news")
-    suspend fun news(): JsonElement
+    suspend fun news(): JsonElement?
 
     @GET("me/news/banners")
-    suspend fun newsBanners(): JsonElement
+    suspend fun newsBanners(): JsonElement?
 
     @GET
     @Streaming

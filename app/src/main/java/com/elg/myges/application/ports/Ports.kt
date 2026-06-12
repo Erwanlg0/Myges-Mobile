@@ -18,6 +18,8 @@ import java.time.Instant
 interface SessionRepository {
     val session: Flow<Session?>
     val hasLockedBiometricSession: Flow<Boolean>
+    fun currentSession(): Session?
+    fun invalidateSession()
     suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean)
     suspend fun unlockWithBiometrics()
     suspend fun logout()
@@ -48,6 +50,7 @@ interface SettingsRepository {
     suspend fun setProjectNotificationsEnabled(enabled: Boolean)
     suspend fun setDocumentNotificationsEnabled(enabled: Boolean)
     suspend fun markSynced()
+    suspend fun clearSyncMetadata()
 }
 
 interface NetworkMonitor {

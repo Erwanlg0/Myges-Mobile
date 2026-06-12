@@ -41,6 +41,9 @@ private class RecordingSessionRepository : SessionRepository {
     override val session: StateFlow<Session?> = MutableStateFlow(null)
     override val hasLockedBiometricSession: StateFlow<Boolean> = MutableStateFlow(false)
 
+    override fun currentSession(): Session? = null
+    override fun invalidateSession() = Unit
+
     override suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) {
         this.accessToken = accessToken
         this.expiresAt = expiresAt

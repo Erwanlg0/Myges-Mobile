@@ -117,10 +117,15 @@ data class Session(
     val accessToken: String,
     val refreshToken: String?,
     val expiresAt: Instant?,
-    val biometricEnabled: Boolean
+    val biometricEnabled: Boolean,
+    val issuedAt: Instant,
+    val refreshAfter: Instant
 ) {
     val isExpired: Boolean
         get() = expiresAt?.isBefore(Instant.now()) == true
+
+    val requiresRefresh: Boolean
+        get() = refreshAfter.isBefore(Instant.now())
 }
 
 data class NotificationPreferences(

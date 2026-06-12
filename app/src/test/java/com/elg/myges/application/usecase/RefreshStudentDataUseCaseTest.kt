@@ -52,6 +52,18 @@ class RefreshStudentDataUseCaseTest {
         assertEquals(listOf("sync", "calendar:1", "markSynced"), events)
         assertEquals(agenda, calendarSyncPort.syncedEvents)
     }
+
+    @Test
+    fun clearCacheClearsLocalDataBeforeSyncMetadata() = runTest {
+        val events = mutableListOf<String>()
+        val repository = RecordingStudentDataRepository(events)
+        val settingsRepository = RecordingSettingsRepository(events)
+        val useCase = ClearCacheUseCase(repository, settingsRepository)
+
+        useCase()
+
+        assertEquals(listOf("clearCache", "clearSyncMetadata"), events)
+    }
 }
 
 private class RecordingStudentDataRepository(
@@ -73,7 +85,9 @@ private class RecordingStudentDataRepository(
         events += "sync"
     }
 
-    override suspend fun clearCache() = Unit
+    override suspend fun clearCache() {
+        events += "clearCache"
+    }
     override suspend fun downloadDocument(document: AcademicDocument): Uri = Uri.EMPTY
 }
 
@@ -100,6 +114,10 @@ private class RecordingSettingsRepository(
 
     override suspend fun markSynced() {
         events += "markSynced"
+    }
+
+    override suspend fun clearSyncMetadata() {
+        events += "clearSyncMetadata"
     }
 }
 

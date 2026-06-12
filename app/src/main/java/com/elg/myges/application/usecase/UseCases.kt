@@ -134,9 +134,13 @@ class RefreshStudentDataUseCase @Inject constructor(
 }
 
 class ClearCacheUseCase @Inject constructor(
-    private val repository: StudentDataRepository
+    private val repository: StudentDataRepository,
+    private val settingsRepository: SettingsRepository
 ) {
-    suspend operator fun invoke() = repository.clearCache()
+    suspend operator fun invoke() {
+        repository.clearCache()
+        settingsRepository.clearSyncMetadata()
+    }
 }
 
 class DownloadDocumentUseCase @Inject constructor(

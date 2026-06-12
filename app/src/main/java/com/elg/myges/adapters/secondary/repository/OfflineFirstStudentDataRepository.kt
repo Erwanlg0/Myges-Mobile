@@ -118,21 +118,15 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val profile = api.profile().toProfile()
-                val year = api.years().toYears().firstOrNull()
-                    ?: profile.academicYear
-                    ?: Year.now().value.toString()
+                val years = (api.years()?.toYears().orEmpty() + listOfNotNull(profile.academicYear, Year.now().value.toString()))
+                    .distinct()
                 val agendaWindow = AgendaWindow.fromToday()
                 val agenda = api.agenda(
                     start = agendaWindow.start,
                     end = agendaWindow.end
-                ).toAgendaEvents()
-                val courses = api.courses(year).toCourses()
-                val grades = api.grades(year).toGrades()
-                val absences = api.absences(year).toAbsences()
-                val documents = api.annualDocuments(year).toDocuments()
-                val projects = api.projects(year).toProjects()
-                val practicals = api.practicals(year).toPracticals()
-                val news = api.news().toNews() + runCatching { api.newsBanners().toNews() }.getOrDefault(emptyList())
+                )?.toAgendaEvents().orEmpty()
+                val yearData = firstNonEmptyYearData(years)
+                val news = api.news()?.toNews().orEmpty() + runCatching { api.newsBanners()?.toNews().orEmpty() }.getOrDefault(emptyList())
                 val previousIds = SyncedIds(
                     agenda = dao.agendaIds().toSet(),
                     grades = dao.gradeIds().toSet(),
@@ -143,16 +137,16 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 dao.replaceSyncedData(
                     profile = profile.toEntity(),
                     agenda = agenda.map { it.toEntity() },
-                    grades = grades.map { it.toEntity() },
-                    absences = absences.map { it.toEntity() },
-                    courses = courses.map { it.toEntity() },
-                    projects = projects.map { it.toEntity() },
-                    projectSteps = projects.flatMap { it.toStepEntities() },
-                    practicals = practicals.map { it.toEntity() },
-                    documents = documents.map { it.toEntity() },
+                    grades = yearData.grades.map { it.toEntity() },
+                    absences = yearData.absences.map { it.toEntity() },
+                    courses = yearData.courses.map { it.toEntity() },
+                    projects = yearData.projects.map { it.toEntity() },
+                    projectSteps = yearData.projects.flatMap { it.toStepEntities() },
+                    practicals = yearData.practicals.map { it.toEntity() },
+                    documents = yearData.documents.map { it.toEntity() },
                     news = news.distinctBy { it.id }.map { it.toEntity() }
                 )
-                notifyAboutChanges(previousIds, agenda, grades, absences, projects, documents)
+                notifyAboutChanges(previousIds, agenda, yearData.grades, yearData.absences, yearData.projects, yearData.documents)
             } catch (throwable: Throwable) {
                 throw throwable.toRepositoryException()
             }
@@ -200,6 +194,23 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "document" }
     }
 
+    private suspend fun firstNonEmptyYearData(years: List<String>): YearData {
+        var fallback: YearData? = null
+        years.forEach { year ->
+            val data = YearData(
+                courses = api.courses(year)?.toCourses().orEmpty(),
+                grades = api.grades(year)?.toGrades().orEmpty(),
+                absences = api.absences(year)?.toAbsences().orEmpty(),
+                documents = api.annualDocuments(year)?.toDocuments().orEmpty(),
+                projects = api.projects(year)?.toProjects().orEmpty(),
+                practicals = api.practicals(year)?.toPracticals().orEmpty()
+            )
+            if (fallback == null) fallback = data
+            if (data.hasAcademicData()) return data
+        }
+        return fallback ?: YearData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+    }
+
     private suspend fun notifyAboutChanges(
         previousIds: SyncedIds,
         agenda: List<AgendaEvent>,
@@ -239,15 +250,32 @@ private data class SyncedIds(
     val documents: Set<String>
 )
 
-private data class AgendaWindow(
+private data class YearData(
+    val courses: List<Course>,
+    val grades: List<Grade>,
+    val absences: List<Absence>,
+    val documents: List<AcademicDocument>,
+    val projects: List<Project>,
+    val practicals: List<Practical>
+) {
+    fun hasAcademicData(): Boolean {
+        return courses.isNotEmpty() ||
+            grades.isNotEmpty() ||
+            absences.isNotEmpty() ||
+            documents.isNotEmpty() ||
+            projects.isNotEmpty() ||
+            practicals.isNotEmpty()
+    }
+}
+
+internal data class AgendaWindow(
     val start: Long,
     val end: Long
 ) {
     companion object {
-        fun fromToday(): AgendaWindow {
-            val today = LocalDate.now(ZoneOffset.UTC)
+        fun fromToday(today: LocalDate = LocalDate.now(ZoneOffset.UTC)): AgendaWindow {
             val start = today.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
-            val end = today.plusDays(180)
+            val end = today.plusDays(27)
                 .atTime(23, 59, 59, 999_000_000)
                 .toInstant(ZoneOffset.UTC)
                 .toEpochMilli()
