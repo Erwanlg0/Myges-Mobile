@@ -3,15 +3,20 @@ package com.elg.myges.config
 import android.content.Context
 import androidx.room.Room
 import com.elg.myges.BuildConfig
+import com.elg.myges.adapters.secondary.api.ApiRetryInterceptor
+import com.elg.myges.adapters.secondary.api.MygesAuthInterceptor
 import com.elg.myges.adapters.secondary.api.MyGesApiService
+import com.elg.myges.adapters.secondary.api.NoContentAsEmptyJsonInterceptor
 import com.elg.myges.adapters.secondary.calendar.AndroidCalendarSyncAdapter
 import com.elg.myges.adapters.secondary.network.AndroidNetworkMonitor
 import com.elg.myges.adapters.secondary.notification.AndroidNotificationScheduler
 import com.elg.myges.adapters.secondary.repository.MygesSessionRepository
 import com.elg.myges.adapters.secondary.repository.OfflineFirstStudentDataRepository
+import com.elg.myges.adapters.secondary.security.DatabasePassphraseStore
 import com.elg.myges.adapters.secondary.settings.AppSettingsRepository
 import com.elg.myges.adapters.secondary.storage.MygesDatabase
 import com.elg.myges.adapters.secondary.storage.StudentDao
+import com.elg.myges.adapters.secondary.storage.deletePlaintextDatabaseIfPresent
 import com.elg.myges.application.ports.CalendarSyncPort
 import com.elg.myges.application.ports.NetworkMonitor
 import com.elg.myges.application.ports.NotificationScheduler
@@ -27,10 +32,8 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.Protocol
-import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import javax.inject.Singleton
@@ -84,29 +87,11 @@ object DependencyModule {
             }
         }
         return OkHttpClient.Builder()
-            .addInterceptor { chain ->
-                val requestBuilder = chain.request().newBuilder()
-                    .header("Accept", "application/json")
-                    .header("User-Agent", appConfig.userAgent)
-                val session = sessionRepository.currentSession()
-                if (session?.isExpired == true || session?.requiresRefresh == true) {
-                    sessionRepository.invalidateSession()
-                    return@addInterceptor Response.Builder()
-                        .request(chain.request())
-                        .protocol(Protocol.HTTP_1_1)
-                        .code(401)
-                        .message("Session refresh required")
-                        .body("".toResponseBody(null))
-                        .build()
-                }
-                session?.accessToken?.let { token ->
-                    requestBuilder.header("Authorization", token)
-                }
-                chain.proceed(requestBuilder.build()).also { response ->
-                    if (response.code == 401) sessionRepository.invalidateSession()
-                }
-            }
+            .addInterceptor(MygesAuthInterceptor(appConfig.userAgent, sessionRepository))
+            .addInterceptor(ApiRetryInterceptor())
+            .addInterceptor(NoContentAsEmptyJsonInterceptor())
             .addInterceptor(logging)
+            .certificatePinner(MygesCertificatePins.certificatePinner())
             .build()
     }
 
@@ -132,8 +117,13 @@ object DependencyModule {
 
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): MygesDatabase {
-        return Room.databaseBuilder(context, MygesDatabase::class.java, "myges.db")
+    fun provideDatabase(
+        @ApplicationContext context: Context,
+        databasePassphraseStore: DatabasePassphraseStore
+    ): MygesDatabase {
+        deletePlaintextDatabaseIfPresent(context, DATABASE_NAME)
+        return Room.databaseBuilder(context, MygesDatabase::class.java, DATABASE_NAME)
+            .openHelperFactory(SupportOpenHelperFactory(databasePassphraseStore.readOrCreate()))
             .build()
     }
 
@@ -141,4 +131,6 @@ object DependencyModule {
     fun provideStudentDao(database: MygesDatabase): StudentDao {
         return database.studentDao()
     }
+
+    private const val DATABASE_NAME = "myges.db"
 }

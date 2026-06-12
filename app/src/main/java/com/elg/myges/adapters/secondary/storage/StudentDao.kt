@@ -1,6 +1,7 @@
 package com.elg.myges.adapters.secondary.storage
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
@@ -53,6 +54,36 @@ abstract class StudentDao {
     @Query("SELECT id FROM documents")
     abstract suspend fun documentIds(): List<String>
 
+    @Query("SELECT * FROM student_profile LIMIT 1")
+    abstract suspend fun profile(): StudentProfileEntity?
+
+    @Query("SELECT * FROM agenda_events")
+    abstract suspend fun agenda(): List<AgendaEventEntity>
+
+    @Query("SELECT * FROM grades")
+    abstract suspend fun grades(): List<GradeEntity>
+
+    @Query("SELECT * FROM absences")
+    abstract suspend fun absences(): List<AbsenceEntity>
+
+    @Query("SELECT * FROM courses")
+    abstract suspend fun courses(): List<CourseEntity>
+
+    @Query("SELECT * FROM projects")
+    abstract suspend fun projects(): List<ProjectEntity>
+
+    @Query("SELECT * FROM project_steps")
+    abstract suspend fun projectSteps(): List<ProjectStepEntity>
+
+    @Query("SELECT * FROM practicals")
+    abstract suspend fun practicals(): List<PracticalEntity>
+
+    @Query("SELECT * FROM documents")
+    abstract suspend fun documents(): List<AcademicDocumentEntity>
+
+    @Query("SELECT * FROM news")
+    abstract suspend fun news(): List<NewsEntity>
+
     @Upsert
     abstract suspend fun upsertProfile(profile: StudentProfileEntity)
 
@@ -82,6 +113,33 @@ abstract class StudentDao {
 
     @Upsert
     abstract suspend fun upsertNews(news: List<NewsEntity>)
+
+    @Delete
+    abstract suspend fun deleteAgenda(events: List<AgendaEventEntity>)
+
+    @Delete
+    abstract suspend fun deleteGrades(grades: List<GradeEntity>)
+
+    @Delete
+    abstract suspend fun deleteAbsences(absences: List<AbsenceEntity>)
+
+    @Delete
+    abstract suspend fun deleteCourses(courses: List<CourseEntity>)
+
+    @Delete
+    abstract suspend fun deleteProjects(projects: List<ProjectEntity>)
+
+    @Delete
+    abstract suspend fun deleteProjectSteps(steps: List<ProjectStepEntity>)
+
+    @Delete
+    abstract suspend fun deletePracticals(practicals: List<PracticalEntity>)
+
+    @Delete
+    abstract suspend fun deleteDocuments(documents: List<AcademicDocumentEntity>)
+
+    @Delete
+    abstract suspend fun deleteNews(news: List<NewsEntity>)
 
     @Query("DELETE FROM student_profile")
     abstract suspend fun clearProfile()
@@ -126,26 +184,16 @@ abstract class StudentDao {
         documents: List<AcademicDocumentEntity>,
         news: List<NewsEntity>
     ) {
-        clearProfile()
-        clearAgenda()
-        clearGrades()
-        clearAbsences()
-        clearCourses()
-        clearProjects()
-        clearProjectSteps()
-        clearPracticals()
-        clearDocuments()
-        clearNews()
-        upsertProfile(profile)
-        upsertAgenda(agenda)
-        upsertGrades(grades)
-        upsertAbsences(absences)
-        upsertCourses(courses)
-        upsertProjects(projects)
-        upsertProjectSteps(projectSteps)
-        upsertPracticals(practicals)
-        upsertDocuments(documents)
-        upsertNews(news)
+        replaceProfile(profile)
+        replaceAgenda(agenda)
+        replaceGrades(grades)
+        replaceAbsences(absences)
+        replaceCourses(courses)
+        replaceProjects(projects)
+        replaceProjectSteps(projectSteps)
+        replacePracticals(practicals)
+        replaceDocuments(documents)
+        replaceNews(news)
     }
 
     @Transaction
@@ -160,5 +208,65 @@ abstract class StudentDao {
         clearPracticals()
         clearDocuments()
         clearNews()
+    }
+
+    private suspend fun replaceProfile(profile: StudentProfileEntity) {
+        val current = profile()
+        if (current?.id != profile.id) clearProfile()
+        if (current != profile) upsertProfile(profile)
+    }
+
+    private suspend fun replaceAgenda(incoming: List<AgendaEventEntity>) {
+        val plan = entitySyncPlan(agenda(), incoming, AgendaEventEntity::id)
+        if (plan.deletes.isNotEmpty()) deleteAgenda(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertAgenda(plan.upserts)
+    }
+
+    private suspend fun replaceGrades(incoming: List<GradeEntity>) {
+        val plan = entitySyncPlan(grades(), incoming, GradeEntity::id)
+        if (plan.deletes.isNotEmpty()) deleteGrades(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertGrades(plan.upserts)
+    }
+
+    private suspend fun replaceAbsences(incoming: List<AbsenceEntity>) {
+        val plan = entitySyncPlan(absences(), incoming, AbsenceEntity::id)
+        if (plan.deletes.isNotEmpty()) deleteAbsences(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertAbsences(plan.upserts)
+    }
+
+    private suspend fun replaceCourses(incoming: List<CourseEntity>) {
+        val plan = entitySyncPlan(courses(), incoming, CourseEntity::id)
+        if (plan.deletes.isNotEmpty()) deleteCourses(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertCourses(plan.upserts)
+    }
+
+    private suspend fun replaceProjects(incoming: List<ProjectEntity>) {
+        val plan = entitySyncPlan(projects(), incoming, ProjectEntity::id)
+        if (plan.deletes.isNotEmpty()) deleteProjects(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertProjects(plan.upserts)
+    }
+
+    private suspend fun replaceProjectSteps(incoming: List<ProjectStepEntity>) {
+        val plan = entitySyncPlan(projectSteps(), incoming) { "${it.projectId}:${it.id}" }
+        if (plan.deletes.isNotEmpty()) deleteProjectSteps(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertProjectSteps(plan.upserts)
+    }
+
+    private suspend fun replacePracticals(incoming: List<PracticalEntity>) {
+        val plan = entitySyncPlan(practicals(), incoming, PracticalEntity::id)
+        if (plan.deletes.isNotEmpty()) deletePracticals(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertPracticals(plan.upserts)
+    }
+
+    private suspend fun replaceDocuments(incoming: List<AcademicDocumentEntity>) {
+        val plan = entitySyncPlan(documents(), incoming, AcademicDocumentEntity::id)
+        if (plan.deletes.isNotEmpty()) deleteDocuments(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertDocuments(plan.upserts)
+    }
+
+    private suspend fun replaceNews(incoming: List<NewsEntity>) {
+        val plan = entitySyncPlan(news(), incoming, NewsEntity::id)
+        if (plan.deletes.isNotEmpty()) deleteNews(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertNews(plan.upserts)
     }
 }

@@ -86,7 +86,9 @@ private val destinations = listOf(
 @Composable
 fun MygesApp(
     oauthCallbackUri: Uri? = null,
-    onOAuthCallbackConsumed: () -> Unit = {}
+    onOAuthCallbackConsumed: () -> Unit = {},
+    notificationRoute: String? = null,
+    onNotificationRouteConsumed: () -> Unit = {}
 ) {
     val viewModel: AppViewModel = hiltViewModel()
     val session by viewModel.session.collectAsStateWithLifecycle()
@@ -103,13 +105,16 @@ fun MygesApp(
             onOAuthCallbackConsumed = onOAuthCallbackConsumed
         )
     } else {
-        StudentRoute()
+        StudentRoute(notificationRoute, onNotificationRouteConsumed)
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StudentRoute() {
+private fun StudentRoute(
+    notificationRoute: String?,
+    onNotificationRouteConsumed: () -> Unit
+) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
@@ -133,6 +138,20 @@ private fun StudentRoute() {
                 studentViewModel.reportOpenDocumentFailure()
             }
         }
+    }
+
+    LaunchedEffect(notificationRoute) {
+        val route = notificationRoute?.takeIf { requestedRoute ->
+            destinations.any { destination -> destination.route == requestedRoute }
+        } ?: return@LaunchedEffect
+        navController.navigate(route) {
+            launchSingleTop = true
+            restoreState = true
+            popUpTo(destinations.first().route) {
+                saveState = true
+            }
+        }
+        onNotificationRouteConsumed()
     }
 
     ModalNavigationDrawer(

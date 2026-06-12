@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import com.elg.myges.adapters.primary.navigation.MygesApp
 import com.elg.myges.ui.theme.MygesTheme
@@ -16,8 +17,10 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
     private var oauthCallbackUri by mutableStateOf<Uri?>(null)
+    private var notificationRoute by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleIntent(intent)
@@ -25,7 +28,9 @@ class MainActivity : FragmentActivity() {
             MygesTheme {
                 MygesApp(
                     oauthCallbackUri = oauthCallbackUri,
-                    onOAuthCallbackConsumed = { oauthCallbackUri = null }
+                    onOAuthCallbackConsumed = { oauthCallbackUri = null },
+                    notificationRoute = notificationRoute,
+                    onNotificationRouteConsumed = { notificationRoute = null }
                 )
             }
         }
@@ -40,6 +45,12 @@ class MainActivity : FragmentActivity() {
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == Intent.ACTION_VIEW) {
             oauthCallbackUri = intent.data
+        } else {
+            notificationRoute = intent?.getStringExtra(EXTRA_NOTIFICATION_ROUTE)
         }
+    }
+
+    companion object {
+        const val EXTRA_NOTIFICATION_ROUTE = "com.elg.myges.extra.NOTIFICATION_ROUTE"
     }
 }

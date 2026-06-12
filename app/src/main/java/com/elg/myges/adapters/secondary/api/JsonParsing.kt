@@ -29,18 +29,18 @@ import java.util.UUID
 
 fun JsonElement.toProfile(): StudentProfile {
     val root = objectOrData()
-    val id = root.text("id", "uid", "puid", "studentId") ?: "profile"
+    val id = root.text("id", "uid", "puid", "studentId", "student_id") ?: "profile"
     val firstName = root.text("firstName", "firstname", "prenom")
-    val lastName = root.text("lastName", "lastname", "nom")
-    val displayName = root.text("displayName", "fullName", "name", "nomComplet")
-        ?: listOfNotNull(firstName, lastName).joinToString(" ").ifBlank { id }
+    val lastName = root.text("lastName", "lastname", "name", "nom")
+    val displayName = root.text("displayName", "fullName", "nomComplet")
+        ?: listOfNotNull(firstName, lastName).joinToString(" ").ifBlank { root.text("name") ?: id }
     return StudentProfile(
         id = id,
         displayName = displayName,
         email = root.text("email", "mail"),
         school = root.text("school", "campus", "institution"),
         program = root.text("program", "programme", "formation", "className"),
-        academicYear = root.text("academicYear", "year", "annee"),
+        academicYear = root.text("academicYear", "year", "annee", "student_id")?.let(::academicYearFromProfile),
         avatarUrl = root.text("avatarUrl", "avatar", "picture")
     )
 }
@@ -110,18 +110,18 @@ fun JsonElement.toGrades(): List<Grade> {
 fun JsonElement.toAbsences(): List<Absence> {
     return arrayOrNested("absences", "items", "data").mapNotNull { element ->
         val root = element.objectOrData()
-        val startsAt = root.instant("startsAt", "start", "startDate", "dateStart")
+        val startsAt = root.instant("startsAt", "start", "startDate", "dateStart", "date")
             ?: return@mapNotNull null
         val endsAt = root.instant("endsAt", "end", "endDate", "dateEnd")
             ?: startsAt.plusSeconds(3600)
         Absence(
             id = root.text("id", "absenceId", "uid") ?: stableId(root),
-            courseName = root.text("courseName", "course", "module", "matiere") ?: "",
+            courseName = root.text("courseName", "course_name", "course", "module", "matiere") ?: "",
             startsAt = startsAt,
             endsAt = endsAt,
             justified = root.bool("justified", "isJustified", "justifiee") == true,
-            status = root.text("status", "state", "etat"),
-            reason = root.text("reason", "motif")
+            status = root.text("status", "state", "etat", "type"),
+            reason = root.text("reason", "motif", "type")
         )
     }
 }
@@ -131,13 +131,13 @@ fun JsonElement.toCourses(): List<Course> {
         val root = element.objectOrData()
         val files = root.array("files", "documents")
         Course(
-            id = root.text("id", "rcId", "courseId", "uid") ?: stableId(root),
-            name = root.text("name", "title", "courseName", "matiere") ?: "",
+            id = root.text("id", "rcId", "rc_id", "courseId", "uid") ?: stableId(root),
+            name = root.text("name", "title", "courseName", "course_name", "matiere") ?: "",
             teacher = root.text("teacher", "intervenant", "professor"),
             year = root.text("year", "academicYear"),
             period = root.text("period", "trimester", "semester"),
             syllabus = root.text("syllabus", "description", "summary"),
-            fileCount = files.size
+            fileCount = files.size.takeIf { it > 0 } ?: if (root.bool("has_documents") == true) 1 else 0
         )
     }
 }
@@ -148,21 +148,22 @@ fun JsonElement.toProjects(): List<Project> {
         val steps = root.array("steps", "projectSteps").map { step ->
             val stepRoot = step.objectOrData()
             ProjectStep(
-                id = stepRoot.text("id", "stepId", "uid") ?: stableId(stepRoot),
-                title = stepRoot.text("title", "name") ?: "",
-                deadline = stepRoot.instant("deadline", "dueDate", "endDate"),
+                id = stepRoot.text("id", "stepId", "psp_id", "uid") ?: stableId(stepRoot),
+                title = stepRoot.text("title", "name", "psp_desc", "psp_type") ?: "",
+                deadline = stepRoot.instant("deadline", "dueDate", "endDate", "psp_limit_date"),
                 status = stepRoot.text("status", "state")
             )
         }
+        val stepFileCount = root.array("steps", "projectSteps").sumOf { it.objectOrData().array("files").size }
         Project(
-            id = root.text("id", "projectId", "uid") ?: stableId(root),
+            id = root.text("id", "projectId", "project_id", "uid") ?: stableId(root),
             name = root.text("name", "title") ?: "",
-            courseName = root.text("courseName", "course", "module"),
+            courseName = root.text("courseName", "course_name", "course", "module"),
             groupName = root.text("groupName", "group", "projectGroup"),
             status = root.text("status", "state"),
-            deadline = root.instant("deadline", "dueDate", "endDate"),
+            deadline = root.instant("deadline", "dueDate", "endDate", "update_date") ?: steps.mapNotNull { it.deadline }.minOrNull(),
             steps = steps,
-            fileCount = root.array("files", "documents", "deliverables").size
+            fileCount = root.array("files", "project_files", "documents", "deliverables").size + stepFileCount
         )
     }
 }
@@ -170,12 +171,15 @@ fun JsonElement.toProjects(): List<Project> {
 fun JsonElement.toPracticals(): List<Practical> {
     return arrayOrNested("practicals", "items", "data").map { element ->
         val root = element.objectOrData()
+        val stepDates = root.array("steps", "projectSteps")
+            .mapNotNull { it.objectOrData().instant("deadline", "dueDate", "endDate", "psp_limit_date") }
+            .sorted()
         Practical(
-            id = root.text("id", "practicalId", "uid") ?: stableId(root),
+            id = root.text("id", "practicalId", "project_id", "uid") ?: stableId(root),
             name = root.text("name", "title") ?: "",
-            courseName = root.text("courseName", "course", "module"),
-            startsAt = root.instant("startsAt", "start", "startDate", "dateStart"),
-            endsAt = root.instant("endsAt", "end", "endDate", "dateEnd"),
+            courseName = root.text("courseName", "course_name", "course", "module"),
+            startsAt = root.instant("startsAt", "start", "startDate", "dateStart", "project_create_date") ?: stepDates.firstOrNull(),
+            endsAt = root.instant("endsAt", "end", "endDate", "dateEnd") ?: stepDates.lastOrNull(),
             room = root.text("room", "classroom", "salle"),
             status = root.text("status", "state")
         )
@@ -185,35 +189,43 @@ fun JsonElement.toPracticals(): List<Practical> {
 fun JsonElement.toDocuments(): List<AcademicDocument> {
     return arrayOrNested("annualDocuments", "documents", "items", "data").map { element ->
         val root = element.objectOrData()
-        val title = root.text("title", "name", "label") ?: ""
-        AcademicDocument(
-            id = root.text("id", "documentId", "uid") ?: stableId(root),
-            title = title,
-            category = root.text("category", "type"),
-            year = root.text("year", "academicYear"),
-            mimeType = root.text("mimeType", "contentType"),
-            fileName = root.text("fileName", "filename") ?: title.ifBlank { "document" },
-            downloadUrl = root.text("downloadUrl", "url", "href"),
-            updatedAt = root.instant("updatedAt", "date", "createdAt")
-        )
+        root.toDocument()
+    }
+}
+
+fun JsonElement.toProjectDocuments(): List<AcademicDocument> {
+    return arrayOrNested("projects", "items", "data").flatMap { element ->
+        val projectRoot = element.objectOrData()
+        val projectFiles = projectRoot.array("project_files").map { file ->
+            val root = file.objectOrData()
+            root.toDocument(parentTitle = projectRoot.text("name", "title"), parentYear = projectRoot.text("year", "academicYear"))
+        }
+        val stepFiles = projectRoot.array("steps", "projectSteps").flatMap { step ->
+            val stepRoot = step.objectOrData()
+            stepRoot.array("files").map { file ->
+                val root = file.objectOrData()
+                root.toDocument(parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"), parentYear = projectRoot.text("year", "academicYear"))
+            }
+        }
+        projectFiles + stepFiles
     }
 }
 
 fun JsonElement.toNews(): List<NewsItem> {
-    return arrayOrNested("news", "banners", "items", "data").map { element ->
+    return arrayOrNested("news", "banners", "content", "items", "data").map { element ->
         val root = element.objectOrData()
         NewsItem(
-            id = root.text("id", "newsId", "uid") ?: stableId(root),
+            id = root.text("id", "newsId", "ne_id", "uid") ?: stableId(root),
             title = root.text("title", "name") ?: "",
-            body = root.text("body", "content", "description"),
-            publishedAt = root.instant("publishedAt", "date", "createdAt")
+            body = root.text("body", "content", "summary", "text", "html", "description"),
+            publishedAt = root.instant("publishedAt", "date", "createdAt", "update_date")
         )
     }
 }
 
 private fun JsonElement.objectOrData(): JsonObject {
     val root = this as? JsonObject ?: return JsonObject(emptyMap())
-    return (root["data"] as? JsonObject) ?: root
+    return (root["result"] as? JsonObject) ?: (root["data"] as? JsonObject) ?: root
 }
 
 private fun JsonElement.arrayOrNested(vararg keys: String): List<JsonElement> {
@@ -223,11 +235,31 @@ private fun JsonElement.arrayOrNested(vararg keys: String): List<JsonElement> {
         val value = root[key]
         if (value is JsonArray) return value.toList()
         if (value is JsonObject) {
-            val nested = value.arrayOrNested("items", "data", "results")
+            val nested = value.arrayOrNested("content", "items", "data", "results")
             if (nested.isNotEmpty()) return nested
         }
     }
     return root.values.firstOrNull { it is JsonArray }?.jsonArray?.toList().orEmpty()
+}
+
+private fun academicYearFromProfile(value: String): String {
+    return Regex("\\d{4}").find(value)?.value ?: value
+}
+
+private fun String.toMimeType(): String? {
+    return when (trim().lowercase().removePrefix(".")) {
+        "pdf" -> "application/pdf"
+        "doc" -> "application/msword"
+        "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "xls" -> "application/vnd.ms-excel"
+        "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "zip" -> "application/zip"
+        "txt" -> "text/plain"
+        "md" -> "text/markdown"
+        "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
+        else -> takeIf { it.contains('/') }
+    }
 }
 
 private fun JsonObject.text(vararg keys: String): String? {
@@ -277,6 +309,29 @@ private fun JsonObject.arrayText(key: String, vararg textKeys: String): String? 
         .mapNotNull { (it as? JsonObject)?.text(*textKeys) }
         .takeIf { it.isNotEmpty() }
         ?.joinToString(", ")
+}
+
+private fun JsonObject.toDocument(
+    parentTitle: String? = null,
+    parentYear: String? = null
+): AcademicDocument {
+    val title = text("title", "name", "label", "pf_title") ?: parentTitle ?: ""
+    return AcademicDocument(
+        id = text("id", "documentId", "document_id", "oc_id", "pf_id", "psf_id", "uid") ?: stableId(this),
+        title = title,
+        category = text("category", "type"),
+        year = text("year", "academicYear") ?: parentYear,
+        mimeType = text("mimeType", "contentType", "extension", "psf_file_type")?.toMimeType(),
+        fileName = text("fileName", "filename", "file", "pf_file", "psf_file", "psf_name") ?: title.ifBlank { "document" },
+        downloadUrl = text("downloadUrl", "url", "href") ?: linkHref(),
+        updatedAt = instant("updatedAt", "last_update", "update_date", "pf_crea_date", "psf_end_upload", "psf_begin_upload", "date", "createdAt")
+    )
+}
+
+private fun JsonObject.linkHref(): String? {
+    return array("links")
+        .mapNotNull { (it as? JsonObject)?.text("href", "url") }
+        .firstOrNull()
 }
 
 private fun JsonObject.instant(vararg keys: String): Instant? {

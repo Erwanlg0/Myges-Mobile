@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -93,10 +94,12 @@ class StudentViewModel @Inject constructor(
 
     init {
         refresh()
+        observeNetworkRecovery(networkMonitor.isOnline)
     }
 
     fun refresh() {
         viewModelScope.launch {
+            if (refreshing.value) return@launch
             refreshing.value = true
             error.value = null
             runCatching { refreshStudentDataUseCase() }
@@ -128,6 +131,19 @@ class StudentViewModel @Inject constructor(
 
     fun reportOpenDocumentFailure() {
         error.value = AppError.Storage
+    }
+
+    private fun observeNetworkRecovery(online: Flow<Boolean>) {
+        viewModelScope.launch {
+            var previousOnline: Boolean? = null
+            online.distinctUntilChanged().collect { isOnline ->
+                val wasOnline = previousOnline
+                previousOnline = isOnline
+                if (wasOnline == false && isOnline) {
+                    refresh()
+                }
+            }
+        }
     }
 
     private fun <T> Flow<T>.asFeatureState(initialValue: T, online: Flow<Boolean>): StateFlow<FeatureUiState<T>> {

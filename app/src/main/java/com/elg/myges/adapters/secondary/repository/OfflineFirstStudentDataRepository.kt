@@ -12,6 +12,7 @@ import com.elg.myges.adapters.secondary.api.toGrades
 import com.elg.myges.adapters.secondary.api.toNews
 import com.elg.myges.adapters.secondary.api.toPracticals
 import com.elg.myges.adapters.secondary.api.toProfile
+import com.elg.myges.adapters.secondary.api.toProjectDocuments
 import com.elg.myges.adapters.secondary.api.toProjects
 import com.elg.myges.adapters.secondary.api.toYears
 import com.elg.myges.adapters.secondary.storage.StudentDao
@@ -117,9 +118,9 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     override suspend fun syncAll() {
         withContext(Dispatchers.IO) {
             try {
+                purgeExpiredDocumentCache(File(context.cacheDir, DOCUMENT_CACHE))
                 val profile = api.profile().toProfile()
-                val years = (api.years()?.toYears().orEmpty() + listOfNotNull(profile.academicYear, Year.now().value.toString()))
-                    .distinct()
+                val years = academicYearCandidates(api.years()?.toYears().orEmpty(), profile.academicYear)
                 val agendaWindow = AgendaWindow.fromToday()
                 val agenda = api.agenda(
                     start = agendaWindow.start,
@@ -166,10 +167,12 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 val remoteUrl = document.downloadUrl ?: "me/annualDocuments/${document.id}"
                 val response = api.download(remoteUrl)
                 val directory = File(context.cacheDir, DOCUMENT_CACHE).apply { mkdirs() }
+                purgeExpiredDocumentCache(directory)
                 val target = File(directory, document.fileName.sanitizedFileName())
                 response.byteStream().use { input ->
                     target.outputStream().use { output -> input.copyTo(output) }
                 }
+                target.setLastModified(Instant.now().toEpochMilli())
                 FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
             } catch (throwable: Throwable) {
                 throw throwable.toRepositoryException()
@@ -197,18 +200,31 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     private suspend fun firstNonEmptyYearData(years: List<String>): YearData {
         var fallback: YearData? = null
         years.forEach { year ->
+            val courses = api.courses(year)?.toCourses().orEmpty()
+            val projectsJson = api.projects(year)
+            val projects = projectsJson?.toProjects().orEmpty()
+            val documents = api.annualDocuments(year)?.toDocuments().orEmpty() +
+                courseDocuments(courses) +
+                projectsJson?.toProjectDocuments().orEmpty()
             val data = YearData(
-                courses = api.courses(year)?.toCourses().orEmpty(),
+                courses = courses,
                 grades = api.grades(year)?.toGrades().orEmpty(),
                 absences = api.absences(year)?.toAbsences().orEmpty(),
-                documents = api.annualDocuments(year)?.toDocuments().orEmpty(),
-                projects = api.projects(year)?.toProjects().orEmpty(),
+                documents = documents,
+                projects = projects,
                 practicals = api.practicals(year)?.toPracticals().orEmpty()
             )
             if (fallback == null) fallback = data
             if (data.hasAcademicData()) return data
         }
         return fallback ?: YearData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+    }
+
+    private suspend fun courseDocuments(courses: List<Course>): List<AcademicDocument> {
+        return courses.filter { it.fileCount > 0 }
+            .flatMap { course ->
+                runCatching { api.courseFiles(course.id)?.toDocuments().orEmpty() }.getOrDefault(emptyList())
+            }
     }
 
     private suspend fun notifyAboutChanges(
@@ -283,6 +299,25 @@ internal data class AgendaWindow(
         }
     }
 }
+
+internal fun academicYearCandidates(
+    apiYears: List<String>,
+    profileYear: String?,
+    currentYear: Int = Year.now().value
+): List<String> {
+    val declaredYears = (apiYears + listOfNotNull(profileYear, currentYear.toString()))
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+    val startYear = declaredYears.mapNotNull { it.toAcademicYearInt() }.maxOrNull() ?: currentYear
+    val descendingYears = (startYear downTo startYear - YEAR_FALLBACK_DEPTH).map { it.toString() }
+    return (descendingYears + declaredYears.sortedByDescending { it.toAcademicYearInt() ?: Int.MIN_VALUE }).distinct()
+}
+
+private fun String.toAcademicYearInt(): Int? {
+    return Regex("\\d{4}").find(this)?.value?.toIntOrNull()
+}
+
+private const val YEAR_FALLBACK_DEPTH = 10
 
 private data class DashboardLocalData(
     val profile: com.elg.myges.adapters.secondary.storage.StudentProfileEntity?,

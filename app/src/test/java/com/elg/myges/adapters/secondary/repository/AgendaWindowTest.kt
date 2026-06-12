@@ -20,4 +20,18 @@ class AgendaWindowTest {
             window.end
         )
     }
+
+    @Test
+    fun academicYearCandidatesContinueDescendingWhenCurrentYearIsEmpty() {
+        val years = academicYearCandidates(listOf("2026"), null, currentYear = 2026)
+
+        assertEquals(listOf("2026", "2025", "2024", "2023", "2022"), years.take(5))
+    }
+
+    @Test
+    fun academicYearCandidatesPreferNewestYearWhenApiOrderIsOldestFirst() {
+        val years = academicYearCandidates(listOf("2023", "2024"), "2025-ESGI-123", currentYear = 2026)
+
+        assertEquals(listOf("2026", "2025", "2024", "2023"), years.take(4))
+    }
 }

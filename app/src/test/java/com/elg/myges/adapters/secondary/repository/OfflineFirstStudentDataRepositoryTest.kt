@@ -1,0 +1,339 @@
+package com.elg.myges.adapters.secondary.repository
+
+import android.content.Context
+import com.elg.myges.adapters.secondary.api.MyGesApiService
+import com.elg.myges.adapters.secondary.storage.AbsenceEntity
+import com.elg.myges.adapters.secondary.storage.AcademicDocumentEntity
+import com.elg.myges.adapters.secondary.storage.AgendaEventEntity
+import com.elg.myges.adapters.secondary.storage.CourseEntity
+import com.elg.myges.adapters.secondary.storage.GradeEntity
+import com.elg.myges.adapters.secondary.storage.NewsEntity
+import com.elg.myges.adapters.secondary.storage.PracticalEntity
+import com.elg.myges.adapters.secondary.storage.ProjectEntity
+import com.elg.myges.adapters.secondary.storage.ProjectStepEntity
+import com.elg.myges.adapters.secondary.storage.StudentDao
+import com.elg.myges.adapters.secondary.storage.StudentProfileEntity
+import com.elg.myges.application.ports.NotificationScheduler
+import com.elg.myges.application.ports.SettingsRepository
+import com.elg.myges.domain.model.Absence
+import com.elg.myges.domain.model.AcademicDocument
+import com.elg.myges.domain.model.AgendaEvent
+import com.elg.myges.domain.model.Grade
+import com.elg.myges.domain.model.NewsItem
+import com.elg.myges.domain.model.NotificationPreferences
+import com.elg.myges.domain.model.Project
+import com.elg.myges.domain.model.UserSettings
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import okhttp3.ResponseBody
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.io.File
+import java.time.Duration
+import java.time.Instant
+
+class OfflineFirstStudentDataRepositoryTest {
+    @Test
+    fun syncAllPersistsRemotePayloadAndPurgesExpiredDocumentCache() = runTest {
+        val cacheDir = createTempDir()
+        val documentCache = File(cacheDir, "documents").apply { mkdirs() }
+        val expired = File(documentCache, "expired.pdf").apply {
+            writeText("expired")
+            setLastModified(Instant.now().minus(Duration.ofDays(31)).toEpochMilli())
+        }
+        val current = File(documentCache, "current.pdf").apply {
+            writeText("current")
+            setLastModified(Instant.now().minus(Duration.ofDays(2)).toEpochMilli())
+        }
+        val api = RepositoryApi()
+        val dao = RepositoryDao()
+        val repository = repository(cacheDir, api, dao, RepositoryNotificationScheduler())
+
+        repository.syncAll()
+
+        assertEquals("student-1", dao.profileState.value?.id)
+        assertEquals(listOf("agenda-1"), dao.agendaState.value.map { it.id })
+        assertEquals(listOf("grade-1"), dao.gradeState.value.map { it.id })
+        assertEquals(listOf("absence-1"), dao.absenceState.value.map { it.id })
+        assertEquals(listOf("course-1"), dao.courseState.value.map { it.id })
+        assertEquals(listOf("project-1"), dao.projectState.value.map { it.id })
+        assertEquals(listOf("step-1"), dao.projectStepState.value.map { it.id })
+        assertEquals(listOf("practical-1"), dao.practicalState.value.map { it.id })
+        assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1"), dao.documentState.value.map { it.id }.toSet())
+        assertEquals(setOf("news-1", "banner-1"), dao.newsState.value.map { it.id }.toSet())
+        assertEquals(listOf("course-1"), api.courseFileRequests)
+        assertFalse(expired.exists())
+        assertTrue(current.exists())
+    }
+
+    @Test
+    fun syncAllNotifiesOnlyNewRemoteItemsWhenPreviousLocalIdsExist() = runTest {
+        val dao = RepositoryDao().apply {
+            agendaState.value = listOf(agendaEntity("old-agenda"))
+            gradeState.value = listOf(gradeEntity("old-grade"))
+            absenceState.value = listOf(absenceEntity("old-absence"))
+            projectState.value = listOf(projectEntity("old-project"))
+            documentState.value = listOf(documentEntity("old-document"))
+        }
+        val notifications = RepositoryNotificationScheduler()
+        val repository = repository(createTempDir(), RepositoryApi(), dao, notifications)
+
+        repository.syncAll()
+
+        assertEquals(listOf("agenda-1"), notifications.agendaChanges)
+        assertEquals(listOf("grade-1"), notifications.grades)
+        assertEquals(listOf("absence-1"), notifications.absences)
+        assertEquals(listOf("project-1"), notifications.projects)
+        assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1"), notifications.documents.toSet())
+    }
+
+    private fun repository(
+        cacheDir: File,
+        api: RepositoryApi,
+        dao: RepositoryDao,
+        notificationScheduler: RepositoryNotificationScheduler
+    ): OfflineFirstStudentDataRepository {
+        val context = mockk<Context> {
+            every { this@mockk.cacheDir } returns cacheDir
+            every { packageName } returns "com.elg.myges"
+        }
+        return OfflineFirstStudentDataRepository(
+            context = context,
+            api = api,
+            dao = dao,
+            settingsRepository = RepositorySettingsRepository(),
+            notificationScheduler = notificationScheduler
+        )
+    }
+}
+
+private class RepositoryApi : MyGesApiService {
+    val courseFileRequests = mutableListOf<String>()
+
+    override suspend fun profile(): JsonElement = jsonElement(
+        """{"result":{"id":"student-1","displayName":"Student One","email":"student@example.com","academicYear":"2026"}}"""
+    )
+
+    override suspend fun years(): JsonElement = jsonElement("""{"result":["2026"]}""")
+
+    override suspend fun agenda(start: Long?, end: Long?): JsonElement = jsonElement(
+        """{"result":[{"id":"agenda-1","title":"Math","start_date":"2026-06-12T08:00:00Z","end_date":"2026-06-12T10:00:00Z","room":"A101","teacher":"Teacher","type":"Course","rc_id":"course-1"}]}"""
+    )
+
+    override suspend fun courses(year: String): JsonElement = jsonElement(
+        """{"result":[{"id":"course-1","name":"Algorithms","teacher":"Teacher","year":"2026","has_documents":true}]}"""
+    )
+
+    override suspend fun courseFiles(rcId: String): JsonElement {
+        courseFileRequests += rcId
+        return jsonElement(
+            """{"result":[{"oc_id":"course-doc-1","title":"Course file","fileName":"course.pdf","extension":"pdf","url":"https://example.com/course.pdf"}]}"""
+        )
+    }
+
+    override suspend fun grades(year: String): JsonElement = jsonElement(
+        """{"result":[{"id":"grade-1","courseName":"Algorithms","subject":"Exam","value":15.5,"scale":20,"date":"2026-06-10"}]}"""
+    )
+
+    override suspend fun absences(year: String): JsonElement = jsonElement(
+        """{"result":[{"id":"absence-1","courseName":"Algorithms","start":"2026-06-11T08:00:00Z","end":"2026-06-11T10:00:00Z","justified":false,"status":"pending"}]}"""
+    )
+
+    override suspend fun annualDocuments(year: String): JsonElement = jsonElement(
+        """{"result":[{"id":"annual-doc-1","title":"Certificate","fileName":"certificate.pdf","extension":"pdf","year":"2026","updatedAt":"2026-06-01T12:00:00Z"}]}"""
+    )
+
+    override suspend fun projects(year: String): JsonElement = jsonElement(
+        """{"result":[{"id":"project-1","name":"Project","courseName":"Algorithms","deadline":"2026-06-30T23:59:00Z","steps":[{"id":"step-1","title":"Submit","deadline":"2026-06-30T23:59:00Z"}],"project_files":[{"pf_id":"project-doc-1","pf_title":"Project brief","pf_file":"brief.pdf","extension":"pdf"}]}]}"""
+    )
+
+    override suspend fun practicals(year: String): JsonElement = jsonElement(
+        """{"result":[{"id":"practical-1","name":"Lab","courseName":"Algorithms","start":"2026-06-13T08:00:00Z","end":"2026-06-13T10:00:00Z","room":"B201"}]}"""
+    )
+
+    override suspend fun news(): JsonElement = jsonElement(
+        """{"result":[{"id":"news-1","title":"News","body":"Body","publishedAt":"2026-06-01T08:00:00Z"}]}"""
+    )
+
+    override suspend fun newsBanners(): JsonElement = jsonElement(
+        """{"result":[{"id":"banner-1","title":"Banner","body":"Important","publishedAt":"2026-06-02T08:00:00Z"}]}"""
+    )
+
+    override suspend fun download(url: String): ResponseBody {
+        error("unused")
+    }
+}
+
+private class RepositoryDao : StudentDao() {
+    val profileState = MutableStateFlow<StudentProfileEntity?>(null)
+    val agendaState = MutableStateFlow(emptyList<AgendaEventEntity>())
+    val gradeState = MutableStateFlow(emptyList<GradeEntity>())
+    val absenceState = MutableStateFlow(emptyList<AbsenceEntity>())
+    val courseState = MutableStateFlow(emptyList<CourseEntity>())
+    val projectState = MutableStateFlow(emptyList<ProjectEntity>())
+    val projectStepState = MutableStateFlow(emptyList<ProjectStepEntity>())
+    val practicalState = MutableStateFlow(emptyList<PracticalEntity>())
+    val documentState = MutableStateFlow(emptyList<AcademicDocumentEntity>())
+    val newsState = MutableStateFlow(emptyList<NewsEntity>())
+
+    override fun observeProfile(): Flow<StudentProfileEntity?> = profileState
+    override fun observeAgenda(): Flow<List<AgendaEventEntity>> = agendaState
+    override fun observeGrades(): Flow<List<GradeEntity>> = gradeState
+    override fun observeAbsences(): Flow<List<AbsenceEntity>> = absenceState
+    override fun observeCourses(): Flow<List<CourseEntity>> = courseState
+    override fun observeProjects(): Flow<List<ProjectEntity>> = projectState
+    override fun observeProjectSteps(): Flow<List<ProjectStepEntity>> = projectStepState
+    override fun observePracticals(): Flow<List<PracticalEntity>> = practicalState
+    override fun observeDocuments(): Flow<List<AcademicDocumentEntity>> = documentState
+    override fun observeNews(): Flow<List<NewsEntity>> = newsState
+    override suspend fun agendaIds(): List<String> = agendaState.value.map { it.id }
+    override suspend fun gradeIds(): List<String> = gradeState.value.map { it.id }
+    override suspend fun absenceIds(): List<String> = absenceState.value.map { it.id }
+    override suspend fun projectIds(): List<String> = projectState.value.map { it.id }
+    override suspend fun documentIds(): List<String> = documentState.value.map { it.id }
+    override suspend fun profile(): StudentProfileEntity? = profileState.value
+    override suspend fun agenda(): List<AgendaEventEntity> = agendaState.value
+    override suspend fun grades(): List<GradeEntity> = gradeState.value
+    override suspend fun absences(): List<AbsenceEntity> = absenceState.value
+    override suspend fun courses(): List<CourseEntity> = courseState.value
+    override suspend fun projects(): List<ProjectEntity> = projectState.value
+    override suspend fun projectSteps(): List<ProjectStepEntity> = projectStepState.value
+    override suspend fun practicals(): List<PracticalEntity> = practicalState.value
+    override suspend fun documents(): List<AcademicDocumentEntity> = documentState.value
+    override suspend fun news(): List<NewsEntity> = newsState.value
+    override suspend fun upsertProfile(profile: StudentProfileEntity) {
+        profileState.value = profile
+    }
+    override suspend fun upsertAgenda(events: List<AgendaEventEntity>) {
+        agendaState.value = events
+    }
+    override suspend fun upsertGrades(grades: List<GradeEntity>) {
+        gradeState.value = grades
+    }
+    override suspend fun upsertAbsences(absences: List<AbsenceEntity>) {
+        absenceState.value = absences
+    }
+    override suspend fun upsertCourses(courses: List<CourseEntity>) {
+        courseState.value = courses
+    }
+    override suspend fun upsertProjects(projects: List<ProjectEntity>) {
+        projectState.value = projects
+    }
+    override suspend fun upsertProjectSteps(steps: List<ProjectStepEntity>) {
+        projectStepState.value = steps
+    }
+    override suspend fun upsertPracticals(practicals: List<PracticalEntity>) {
+        practicalState.value = practicals
+    }
+    override suspend fun upsertDocuments(documents: List<AcademicDocumentEntity>) {
+        documentState.value = documents
+    }
+    override suspend fun upsertNews(news: List<NewsEntity>) {
+        newsState.value = news
+    }
+    override suspend fun deleteAgenda(events: List<AgendaEventEntity>) = Unit
+    override suspend fun deleteGrades(grades: List<GradeEntity>) = Unit
+    override suspend fun deleteAbsences(absences: List<AbsenceEntity>) = Unit
+    override suspend fun deleteCourses(courses: List<CourseEntity>) = Unit
+    override suspend fun deleteProjects(projects: List<ProjectEntity>) = Unit
+    override suspend fun deleteProjectSteps(steps: List<ProjectStepEntity>) = Unit
+    override suspend fun deletePracticals(practicals: List<PracticalEntity>) = Unit
+    override suspend fun deleteDocuments(documents: List<AcademicDocumentEntity>) = Unit
+    override suspend fun deleteNews(news: List<NewsEntity>) = Unit
+    override suspend fun clearProfile() {
+        profileState.value = null
+    }
+    override suspend fun clearAgenda() {
+        agendaState.value = emptyList()
+    }
+    override suspend fun clearGrades() {
+        gradeState.value = emptyList()
+    }
+    override suspend fun clearAbsences() {
+        absenceState.value = emptyList()
+    }
+    override suspend fun clearCourses() {
+        courseState.value = emptyList()
+    }
+    override suspend fun clearProjects() {
+        projectState.value = emptyList()
+    }
+    override suspend fun clearProjectSteps() {
+        projectStepState.value = emptyList()
+    }
+    override suspend fun clearPracticals() {
+        practicalState.value = emptyList()
+    }
+    override suspend fun clearDocuments() {
+        documentState.value = emptyList()
+    }
+    override suspend fun clearNews() {
+        newsState.value = emptyList()
+    }
+}
+
+private class RepositorySettingsRepository : SettingsRepository {
+    override val settings = MutableStateFlow(
+        UserSettings(
+            languageTag = null,
+            notifications = NotificationPreferences(true, true, true, true, true),
+            calendarSyncEnabled = false,
+            lastSyncAt = null
+        )
+    )
+
+    override suspend fun setLanguageTag(languageTag: String?) = Unit
+    override suspend fun setCalendarSyncEnabled(enabled: Boolean) = Unit
+    override suspend fun setGradeNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setAbsenceNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setAgendaNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setProjectNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun markSynced() = Unit
+    override suspend fun clearSyncMetadata() = Unit
+}
+
+private class RepositoryNotificationScheduler : NotificationScheduler {
+    val agendaChanges = mutableListOf<String>()
+    val grades = mutableListOf<String>()
+    val absences = mutableListOf<String>()
+    val projects = mutableListOf<String>()
+    val documents = mutableListOf<String>()
+
+    override fun ensureChannels() = Unit
+    override suspend fun scheduleStudentSync() = Unit
+    override suspend fun cancelStudentSync() = Unit
+    override suspend fun showSyncFailure() = Unit
+    override suspend fun showNewGrade(grade: Grade) {
+        grades += grade.id
+    }
+    override suspend fun showNewAbsence(absence: Absence) {
+        absences += absence.id
+    }
+    override suspend fun showAgendaChange(event: AgendaEvent) {
+        agendaChanges += event.id
+    }
+    override suspend fun showProjectDeadline(project: Project) {
+        projects += project.id
+    }
+    override suspend fun showNewDocument(document: AcademicDocument) {
+        documents += document.id
+    }
+}
+
+private fun jsonElement(value: String): JsonElement {
+    return Json.parseToJsonElement(value)
+}
+
+private fun agendaEntity(id: String) = AgendaEventEntity(id, "Old", 1L, 2L, null, null, null, null, null)
+private fun gradeEntity(id: String) = GradeEntity(id, "Old", "Old", 10.0, 20.0, null, null, null, null)
+private fun absenceEntity(id: String) = AbsenceEntity(id, "Old", 1L, 2L, false, null, null)
+private fun projectEntity(id: String) = ProjectEntity(id, "Old", null, null, null, null, 0)
+private fun documentEntity(id: String) = AcademicDocumentEntity(id, "Old", null, null, null, "old.pdf", null, null)

@@ -24,6 +24,9 @@ interface MyGesApiService {
     @GET("me/{year}/courses")
     suspend fun courses(@Path("year") year: String): JsonElement?
 
+    @GET("me/{rcId}/files")
+    suspend fun courseFiles(@Path("rcId") rcId: String): JsonElement?
+
     @GET("me/{year}/grades")
     suspend fun grades(@Path("year") year: String): JsonElement?
 

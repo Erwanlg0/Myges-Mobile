@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import javax.inject.Inject
 
@@ -92,7 +94,10 @@ class AuthViewModel @Inject constructor(
     private fun Uri.oauthParameter(name: String): String? {
         getQueryParameter(name)?.let { return it }
         val fragment = encodedFragment ?: return null
-        return Uri.parse("oauth://callback?$fragment").getQueryParameter(name)
+        return fragment.split('&')
+            .firstOrNull { parameter -> parameter.substringBefore('=') == name }
+            ?.substringAfter('=', "")
+            ?.let { value -> URLDecoder.decode(value, StandardCharsets.UTF_8.name()) }
     }
 
     private fun String.withAuthorizationScheme(tokenType: String?): String {

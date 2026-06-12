@@ -3,17 +3,21 @@ package com.elg.myges.adapters.secondary.notification
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.elg.myges.MainActivity
 import com.elg.myges.R
 import com.elg.myges.application.ports.NotificationScheduler
 import com.elg.myges.domain.model.Absence
@@ -54,8 +58,10 @@ class AndroidNotificationScheduler @Inject constructor(
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiresBatteryNotLow(true)
                     .build()
             )
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_STUDENT_SYNC,
@@ -72,7 +78,8 @@ class AndroidNotificationScheduler @Inject constructor(
         showNotification(
             id = NOTIFICATION_SYNC_FAILURE,
             title = context.getString(R.string.notifications_sync_failed_title),
-            body = context.getString(R.string.notifications_sync_failed_body)
+            body = context.getString(R.string.notifications_sync_failed_body),
+            route = ROUTE_DASHBOARD
         )
     }
 
@@ -84,7 +91,8 @@ class AndroidNotificationScheduler @Inject constructor(
                 R.string.notifications_new_grade_body,
                 grade.courseName.ifBlank { context.getString(R.string.common_untitled) },
                 formatGrade(grade)
-            )
+            ),
+            route = ROUTE_GRADES
         )
     }
 
@@ -96,7 +104,8 @@ class AndroidNotificationScheduler @Inject constructor(
                 R.string.notifications_new_absence_body,
                 absence.courseName.ifBlank { context.getString(R.string.common_untitled) },
                 formatInstant(absence.startsAt)
-            )
+            ),
+            route = ROUTE_ABSENCES
         )
     }
 
@@ -108,7 +117,8 @@ class AndroidNotificationScheduler @Inject constructor(
                 R.string.notifications_agenda_changed_body,
                 event.title.ifBlank { context.getString(R.string.common_untitled) },
                 formatInstant(event.startsAt)
-            )
+            ),
+            route = ROUTE_AGENDA
         )
     }
 
@@ -122,7 +132,8 @@ class AndroidNotificationScheduler @Inject constructor(
                 R.string.notifications_project_deadline_body,
                 project.name.ifBlank { context.getString(R.string.common_untitled) },
                 deadline
-            )
+            ),
+            route = ROUTE_PROJECTS
         )
     }
 
@@ -133,11 +144,12 @@ class AndroidNotificationScheduler @Inject constructor(
             body = context.getString(
                 R.string.notifications_new_document_body,
                 document.title.ifBlank { context.getString(R.string.common_untitled) }
-            )
+            ),
+            route = ROUTE_DOCUMENTS
         )
     }
 
-    private fun showNotification(id: Int, title: String, body: String) {
+    private fun showNotification(id: Int, title: String, body: String, route: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -148,9 +160,23 @@ class AndroidNotificationScheduler @Inject constructor(
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentIntent(contentIntent(id, route))
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notify(id, notification)
+    }
+
+    private fun contentIntent(id: Int, route: String): PendingIntent {
+        val intent = (context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent())
+            .setPackage(context.packageName)
+            .putExtra(MainActivity.EXTRA_NOTIFICATION_ROUTE, route)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        return PendingIntent.getActivity(
+            context,
+            id,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     private fun formatGrade(grade: Grade): String {
@@ -185,5 +211,11 @@ class AndroidNotificationScheduler @Inject constructor(
         const val CHANNEL_STUDENT = "student"
         const val NOTIFICATION_SYNC_FAILURE = 1001
         const val WORK_STUDENT_SYNC = "student_sync"
+        const val ROUTE_DASHBOARD = "dashboard"
+        const val ROUTE_AGENDA = "agenda"
+        const val ROUTE_GRADES = "grades"
+        const val ROUTE_ABSENCES = "absences"
+        const val ROUTE_PROJECTS = "projects"
+        const val ROUTE_DOCUMENTS = "documents"
     }
 }

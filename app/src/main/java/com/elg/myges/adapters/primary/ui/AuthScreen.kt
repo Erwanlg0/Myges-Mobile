@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Fingerprint
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -129,12 +131,18 @@ private fun AuthScreen(
             )
             Spacer(Modifier.height(28.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = enableBiometric,
+                        role = Role.Checkbox,
+                        onValueChange = onBiometricEnabledChange
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Checkbox(
                     checked = enableBiometric,
-                    onCheckedChange = onBiometricEnabledChange
+                    onCheckedChange = null
                 )
                 Text(stringResource(R.string.auth_enable_biometric))
             }

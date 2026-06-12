@@ -16,11 +16,11 @@ Ce document présente l'ensemble des chantiers techniques et fonctionnels à ré
 - `[x]` Finaliser la centralisation et la gestion des dépendances via Gradle Version Catalog (`gradle/libs.versions.toml`)
 - `[x]` Valider l'implémentation de Dagger Hilt pour l'injection de dépendances (`@HiltAndroidApp`, `DependencyModule` et `PortBindingModule`)
 - `[x]` Garantir la bonne liaison des interfaces Ports avec leurs implémentations Adaptateurs secondaires via Hilt
-- `[ ]` Intégrer SQLCipher pour le chiffrement de la base de données Room (sécurisation impérative de l'ensemble des données académiques et personnelles hautement sensibles)
-- `[ ]` Mettre en œuvre le SSL Pinning (épinglage de clé publique) sur le client Retrofit pour prémunir l'application des attaques de type Man-In-The-Middle (MITM)
+- `[x]` Intégrer SQLCipher pour le chiffrement de la base de données Room (sécurisation impérative de l'ensemble des données académiques et personnelles hautement sensibles)
+- `[x]` Mettre en œuvre le SSL Pinning (épinglage de clé publique) sur le client Retrofit pour prémunir l'application des attaques de type Man-In-The-Middle (MITM)
 - `[x]` Configurer et tester les règles ProGuard/R8 pour l'obfuscation et la réduction du code (en veillant à préserver les classes sérialisables, de base de données Room et d'injection Hilt)
 - `[x]` Configurer un fichier de sécurité réseau (`network_security_config.xml`) restrictif pour interdire tout flux HTTP non chiffré
-- `[ ]` Mettre en place un système de rotation automatique des clés de chiffrement de l'Android Keystore
+- `[x]` Mettre en place un système de rotation automatique des clés de chiffrement de l'Android Keystore
 - `[x]` Mettre en œuvre une politique de masquage de logs en production (logs filtrés) empêchant toute écriture de jeton d'accès ou de données sensibles dans le Logcat (ex. intégration de Timber avec un arbre de release vide)
 - `[ ]` Évaluer l'opportunité d'une migration future vers Kotlin Multiplatform (KMP) pour isoler la logique métier dans un module partagé
 
@@ -89,7 +89,7 @@ Ce document présente l'ensemble des chantiers techniques et fonctionnels à ré
 - `[x]` Valider le DAO Room (`StudentDao`) définissant les requêtes d'observation réactive et d'écriture transactionnelle
 - `[x]` Valider les mappeurs de données (`EntityMappers.kt`) assurant la conversion entre les modèles de domaine et les entités Room
 - `[x]` Consolider le dépôt offline-first `OfflineFirstStudentDataRepository` coordonnant l'observation des flux locaux, la synchronisation avec l'API distante et le téléchargement des documents
-- `[ ]` Optimiser l'algorithme de mise à jour des données dans Room (`replaceSyncedData()`) :
+- `[x]` Optimiser l'algorithme de mise à jour des données dans Room (`replaceSyncedData()`) :
   - Actuellement, l'implémentation effectue une purge globale (DELETE ALL) suivie d'une insertion (UPSERT). Il convient d'adopter des requêtes de mise à jour incrémentale (comparaison d'entités par diff) afin de ne pas perturber les états d'affichage de l'interface et d'éviter les clignotements d'UI pour les données inchangées.
 - `[x]` Valider la gestion du cycle de vie des fichiers téléchargés localement (`cacheDir/documents`) via un `FileProvider` sécurisé
 - `[x]` Valider les cas d'utilisation associés : `RefreshStudentDataUseCase`, `ClearCacheUseCase`, `DownloadDocumentUseCase`
@@ -100,13 +100,13 @@ Ce document présente l'ensemble des chantiers techniques et fonctionnels à ré
 - `[x]` Valider l'adaptateur secondaire `AndroidCalendarSyncAdapter` utilisant le `ContentResolver` et `CalendarContract`
 - `[x]` Valider le nettoyage automatique des anciens événements synchronisés via un filtre sur la description contenant le préfixe de l'application
 - `[x]` Générer une fenêtre d'agenda stricte de 4 semaines pour couvrir l'alternance 3 semaines entreprise / 1 semaine école
-- `[ ]` Optimiser l'algorithme de synchronisation du calendrier pour éviter de vider et de réinsérer intégralement l'agenda à chaque cycle de synchronisation (mise à jour incrémentale / diff d'événements)
+- `[x]` Optimiser l'algorithme de synchronisation du calendrier pour éviter de vider et de réinsérer intégralement l'agenda à chaque cycle de synchronisation (mise à jour incrémentale / diff d'événements)
 
 ## 6. Tâches en Arrière-Plan & Gestion Énergétique
 
 - `[x]` Valider le Port `NetworkMonitor` et l'adaptateur `AndroidNetworkMonitor` émettant réactivement le statut de connectivité via les API système
 - `[x]` Valider la planification de la synchronisation périodique via WorkManager (`StudentSyncWorker`) déclenchée toutes les 6 heures avec contrainte de réseau connecté
-- `[ ]` Optimiser la planification des tâches WorkManager pour tenir compte de l'état de charge de l'appareil (économiseur de batterie) et s'adapter aux restrictions de veille imposées par le système (Doze mode)
+- `[x]` Optimiser la planification des tâches WorkManager pour tenir compte de l'état de charge de l'appareil (économiseur de batterie) et s'adapter aux restrictions de veille imposées par le système (Doze mode)
 
 ## 7. Système de Notifications Locales & Push
 
@@ -154,33 +154,33 @@ Ce document présente l'ensemble des chantiers techniques et fonctionnels à ré
 - `[ ]` Ajouter des micro-interactions de retours haptiques et d'animations lors de l'activation des boutons ou des commutateurs
 - `[x]` Prendre en charge le mode sombre et le mode clair natif de manière harmonieuse sans dépendre exclusivement de la palette dynamique Android 12+
 - `[ ]` Concevoir des layouts adaptatifs pour assurer un affichage optimal sur tablettes, écrans pliables et mode paysage (colonnes partagées)
-- `[ ]` Intégrer l'API Splash Screen native d'Android 12+ pour une transition propre au lancement
+- `[x]` Intégrer l'API Splash Screen native d'Android 12+ pour une transition propre au lancement
 
 ## 10. Internationalisation (i18n) & Accessibilité (a11y)
 
 - `[x]` Valider la séparation complète des chaînes de caractères de l'UI dans les fichiers de ressources (`res/values/strings.xml` et `res/values-en/strings.xml`)
 - `[x]` Auditer le code pour garantir l'absence totale de chaînes de caractères codées en dur (hardcoded) dans le code Kotlin Compose
 - `[x]` Garantir la bonne gestion des pluriels pour les compteurs d'absences dans toutes les langues
-- `[ ]` Améliorer l'accessibilité (a11y) : baliser sémantiquement les composants Compose pour TalkBack (contentDescription exhaustif, rôles d'éléments adaptés, fusion des sélecteurs)
+- `[x]` Améliorer l'accessibilité (a11y) : baliser sémantiquement les composants Compose pour TalkBack (contentDescription exhaustif, rôles d'éléments adaptés, fusion des sélecteurs)
 
 ## 11. Tests Globaux & Validation de Robustesse
 
-- `[ ]` Écrire des tests unitaires pour les ViewModels (`AuthViewModel`, `StudentViewModel`, `SettingsViewModel`)
-- `[ ]` Écrire des tests unitaires pour le dépôt `OfflineFirstStudentDataRepository`
-- `[ ]` Écrire des tests unitaires pour l'ensemble des mappeurs de données et utilitaires de parsing JSON
+- `[x]` Écrire des tests unitaires pour les ViewModels (`AuthViewModel`, `StudentViewModel`, `SettingsViewModel`)
+- `[x]` Écrire des tests unitaires pour le dépôt `OfflineFirstStudentDataRepository`
+- `[x]` Écrire des tests unitaires pour l'ensemble des mappeurs de données et utilitaires de parsing JSON
 - `[ ]` Implémenter des tests d'intégration instrumentés pour la base de données Room (`StudentDaoTest`)
 - `[ ]` Implémenter des tests d'intégration pour le magasin de session sécurisé (`SecureSessionStore`)
 - `[ ]` Écrire des tests Compose UI instrumentés supplémentaires pour valider le comportement dynamique de chaque écran fonctionnel
 - `[ ]` Configurer des tests d'interface de bout en bout (E2E) simulés à l'aide de MockWebServer pour tester l'intégralité du flux hors ligne et en ligne
 - `[ ]` Mettre en place des tests de non-régression visuelle (Screenshot Testing) sur les écrans Compose
 - `[ ]` Valider la robustesse de l'application face aux cas limites de l'API :
-  - `[ ]` Gestion du code HTTP `429 Too Many Requests` avec relance progressive (Exponential Backoff)
-  - `[ ]` Gestion du code HTTP `503 Service Unavailable` ou mode maintenance
-  - `[ ]` Reconnexion réseau automatique (re-déclenchement fluide du rafraîchissement d'UI dès que le réseau redevient disponible)
+  - `[x]` Gestion du code HTTP `429 Too Many Requests` avec relance progressive (Exponential Backoff)
+  - `[x]` Gestion du code HTTP `503 Service Unavailable` ou mode maintenance
+  - `[x]` Reconnexion réseau automatique (re-déclenchement fluide du rafraîchissement d'UI dès que le réseau redevient disponible)
 
 ## 12. Améliorations UX Avancées, Intégrations Plateforme & Qualité
 
-- `[ ]` Configurer des `PendingIntent` avec deeplinks de navigation explicites dans `AndroidNotificationScheduler` :
+- `[x]` Configurer des `PendingIntent` avec deeplinks de navigation explicites dans `AndroidNotificationScheduler` :
   - Permettre à l'étudiant d'ouvrir directement l'écran concerné (ex. écran des Notes pour une nouvelle note, écran des Absences pour une absence) lors du clic sur une notification système.
 - `[ ]` Intégrer la bibliothèque de chargement d'images Coil pour afficher l'avatar de l'étudiant :
   - Ajouter la dépendance Coil dans Gradle.
@@ -194,7 +194,7 @@ Ce document présente l'ensemble des chantiers techniques et fonctionnels à ré
 - `[ ]` Intégrer les API Google Play Store de qualité :
   - `[ ]` **Google Play In-App Review API** : proposer discrètement à l'étudiant de noter l'application après une interaction réussie (ex. une synchronisation complète des notes).
   - `[ ]` **Google Play In-App Updates API** : détecter la présence d'une nouvelle version sur le store au lancement de l'application et proposer une mise à jour flexible ou immédiate.
-- `[ ]` Mettre en place un système de purge automatisée du cache des fichiers locaux :
+- `[x]` Mettre en place un système de purge automatisée du cache des fichiers locaux :
   - Supprimer automatiquement les fichiers de documents stockés dans `cacheDir/documents` après une période d'inactivité ou une durée définie (ex. 30 jours) pour optimiser l'espace disque de l'appareil de l'utilisateur.
 - `[ ]` Intégrer un indicateur de progression de téléchargement dans la carte des documents pour donner un feedback visuel précis lors de la récupération locale.
 - `[ ]` Établir des retours tactiles (Haptic Feedback) lors des actions réussies ou d'erreurs (ex. déconnexion réussie, échec de synchronisation).
