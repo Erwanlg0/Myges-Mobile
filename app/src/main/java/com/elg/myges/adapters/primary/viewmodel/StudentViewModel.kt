@@ -33,6 +33,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -71,6 +72,8 @@ class StudentViewModel @Inject constructor(
     val downloadingDocumentIds: StateFlow<Set<String>> = _downloadingDocumentIds
     val documentDownloadProgress: StateFlow<Map<String, Float?>> = _documentDownloadProgress
     val documentOpenRequests = MutableSharedFlow<DocumentOpenRequest>()
+    private val _refreshSucceeded = MutableSharedFlow<Unit>()
+    val refreshSucceeded: SharedFlow<Unit> = _refreshSucceeded
 
     val dashboard: StateFlow<FeatureUiState<DashboardSummary?>> = observeDashboard()
         .asFeatureState(null, networkMonitor.isOnline)
@@ -110,6 +113,7 @@ class StudentViewModel @Inject constructor(
             refreshing.value = true
             error.value = null
             runCatching { refreshStudentDataUseCase() }
+                .onSuccess { _refreshSucceeded.emit(Unit) }
                 .onFailure { handleFailure(it) }
             refreshing.value = false
         }

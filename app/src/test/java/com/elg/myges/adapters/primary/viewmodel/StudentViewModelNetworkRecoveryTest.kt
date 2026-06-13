@@ -1,5 +1,6 @@
 package com.elg.myges.adapters.primary.viewmodel
 
+import app.cash.turbine.test
 import android.net.Uri
 import com.elg.myges.application.ports.CalendarSyncPort
 import com.elg.myges.application.ports.NetworkMonitor
@@ -171,6 +172,24 @@ class StudentViewModelNetworkRecoveryTest {
 
         assertTrue(sessionRepository.loggedOut)
         assertTrue(notificationScheduler.syncCancelled)
+    }
+
+    @Test
+    fun refreshSuccessSignalIsOnlyEmittedAfterSuccessfulSync() = runTest(dispatcher) {
+        val repository = FakeStudentDataRepository()
+        repository.syncFailure = IllegalStateException("sync failed")
+        val viewModel = studentViewModel(repository, FakeSettingsRepository(), FakeNetworkMonitor(true))
+        viewModel.refreshSucceeded.test {
+            advanceUntilIdle()
+            expectNoEvents()
+
+            repository.syncFailure = null
+            viewModel.refresh()
+            advanceUntilIdle()
+
+            awaitItem()
+            expectNoEvents()
+        }
     }
 
     private fun studentViewModel(

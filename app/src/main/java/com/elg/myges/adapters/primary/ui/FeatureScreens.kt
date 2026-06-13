@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,12 +48,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -119,7 +124,7 @@ fun DashboardScreen(viewModel: StudentViewModel) {
         if (dashboard.latestGrades.isEmpty()) {
             item { CompactCard { Text(stringResource(R.string.grades_empty_title)) } }
         } else {
-            items(dashboard.latestGrades, key = { it.id }) { GradeCard(it) }
+            items(dashboard.latestGrades, key = { it.id }) { GradeCard(it, onOpen = {}) }
         }
         item { SectionTitle(R.string.dashboard_recent_absences) }
         if (dashboard.recentAbsences.isEmpty()) {
@@ -147,10 +152,14 @@ fun DashboardScreen(viewModel: StudentViewModel) {
 fun AgendaScreen(viewModel: StudentViewModel) {
     val state by viewModel.agenda.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     var selectedMode by remember { mutableStateOf(AgendaMode.List) }
     var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
     val calendarLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
-        if (grants.values.all { it }) viewModel.syncAgendaToCalendar(state.data)
+        if (grants.values.all { it }) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            viewModel.syncAgendaToCalendar(state.data)
+        }
     }
     selectedEvent?.let { event ->
         AgendaEventDetailsDialog(
@@ -172,6 +181,7 @@ fun AgendaScreen(viewModel: StudentViewModel) {
         item {
             OutlinedButton(
                 onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (context.hasCalendarPermissions()) {
                         viewModel.syncAgendaToCalendar(events)
                     } else {
@@ -190,7 +200,10 @@ fun AgendaScreen(viewModel: StudentViewModel) {
             items(filteredEvents, key = { it.id }) { event ->
                 AgendaEventCard(
                     event = event,
-                    onOpen = { selectedEvent = event }
+                    onOpen = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        selectedEvent = event
+                    }
                 )
             }
         }
@@ -201,6 +214,13 @@ fun AgendaScreen(viewModel: StudentViewModel) {
 fun GradesScreen(viewModel: StudentViewModel) {
     val state by viewModel.grades.collectAsStateWithLifecycle()
     val noPeriod = stringResource(R.string.common_no_period)
+    var selectedGrade by remember { mutableStateOf<Grade?>(null) }
+    selectedGrade?.let { grade ->
+        GradeDetailsDialog(
+            grade = grade,
+            onDismiss = { selectedGrade = null }
+        )
+    }
     FeatureStateContent(
         state = state,
         empty = List<Grade>::isEmpty,
@@ -209,9 +229,15 @@ fun GradesScreen(viewModel: StudentViewModel) {
         onRetry = viewModel::refresh
     ) { grades ->
         item { GradeSummaryCard(grades) }
+        item { GradeSimulationCard(grades) }
         grades.groupBy { it.period ?: noPeriod }.forEach { (period, periodGrades) ->
             item { SectionTitleText(period) }
-            items(periodGrades, key = { it.id }) { grade -> GradeCard(grade) }
+            items(periodGrades, key = { it.id }) { grade ->
+                GradeCard(
+                    grade = grade,
+                    onOpen = { selectedGrade = grade }
+                )
+            }
         }
     }
 }
@@ -352,7 +378,9 @@ fun SettingsScreen(
     val agendaState by studentViewModel.agenda.collectAsStateWithLifecycle()
     val settings = state.settings
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val enableCalendarSync = {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         settingsViewModel.setCalendarSync(true)
         if (agendaState.data.isNotEmpty()) studentViewModel.syncAgendaToCalendar(agendaState.data)
     }
@@ -405,6 +433,7 @@ fun SettingsScreen(
                     title = R.string.settings_calendar_sync,
                     checked = settings.calendarSyncEnabled,
                     onCheckedChange = { enabled ->
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (!enabled) {
                             settingsViewModel.setCalendarSync(false)
                         } else if (context.hasCalendarPermissions()) {
@@ -417,17 +446,32 @@ fun SettingsScreen(
                 settings.lastSyncAt?.let {
                     LabelValue(R.string.settings_last_sync, formatInstant(it))
                 }
-                OutlinedButton(onClick = studentViewModel::refresh) {
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        studentViewModel.refresh()
+                    }
+                ) {
                     Icon(Icons.Rounded.Refresh, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.action_sync_now))
                 }
-                OutlinedButton(onClick = settingsViewModel::clearCache) {
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        settingsViewModel.clearCache()
+                    }
+                ) {
                     Icon(Icons.Rounded.Delete, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.settings_clear_cache))
                 }
-                Button(onClick = settingsViewModel::logout) {
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        settingsViewModel.logout()
+                    }
+                ) {
                     Icon(Icons.Rounded.Logout, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.settings_logout))
@@ -472,11 +516,15 @@ internal fun LanguageSelector(
     selectedLanguageTag: String?,
     onLanguageSelected: (String?) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         LanguageOption.entries.forEach { option ->
             FilterChip(
                 selected = selectedLanguageTag == option.languageTag,
-                onClick = { onLanguageSelected(option.languageTag) },
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLanguageSelected(option.languageTag)
+                },
                 label = { Text(stringResource(option.title)) }
             )
         }
@@ -489,13 +537,17 @@ internal fun SwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .toggleable(
                 value = checked,
                 role = Role.Switch,
-                onValueChange = onCheckedChange
+                onValueChange = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onCheckedChange(it)
+                }
             ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -579,8 +631,11 @@ internal fun AgendaEventDetailsDialog(
 }
 
 @Composable
-private fun GradeCard(grade: Grade) {
-    CompactCard {
+private fun GradeCard(
+    grade: Grade,
+    onOpen: () -> Unit
+) {
+    CompactCard(modifier = Modifier.clickable(onClick = onOpen)) {
         Text(
             text = grade.courseName.orUntitled(),
             style = MaterialTheme.typography.titleMedium,
@@ -596,6 +651,12 @@ private fun GradeCard(grade: Grade) {
                 ),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            Text(
+                text = stringResource(R.string.grades_no_grade),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
@@ -613,8 +674,15 @@ internal fun GradeSummaryCard(grades: List<Grade>) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
-        LabelValue(R.string.grades_weighted_average, formatNumber(summary.weightedAverage))
-        LabelValue(R.string.grades_gpa, formatNumber(summary.gpa))
+        if (summary.gradedCount == 0) {
+            Text(
+                text = stringResource(R.string.grades_no_grade),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            LabelValue(R.string.grades_weighted_average, formatNumber(summary.weightedAverage))
+            LabelValue(R.string.grades_gpa, formatNumber(summary.gpa))
+        }
         LabelValue(R.string.grades_count, summary.gradedCount.toString())
         if (summary.incomplete) {
             Text(
@@ -623,6 +691,89 @@ internal fun GradeSummaryCard(grades: List<Grade>) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun GradeDetailsDialog(
+    grade: Grade,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.grades_detail_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = grade.courseName.orUntitled(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                LabelValue(R.string.common_period, grade.period.orEmpty())
+                LabelValue(R.string.grades_component, grade.subject.orUntitled())
+                if (grade.value == null) {
+                    LabelValue(R.string.grades_average, stringResource(R.string.grades_no_grade))
+                } else {
+                    LabelValue(
+                        R.string.grades_average,
+                        stringResource(R.string.grades_value_format, formatNumber(grade.value), formatNumber(grade.scale))
+                    )
+                }
+                LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
+                LabelValue(R.string.common_date, formatDate(grade.date))
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        }
+    )
+}
+
+@Composable
+private fun GradeSimulationCard(grades: List<Grade>) {
+    var valueText by remember { mutableStateOf("") }
+    var coefficientText by remember { mutableStateOf("1") }
+    val simulatedGrade = valueText.toGradeNumber()?.let { value ->
+        Grade(
+            id = "simulation",
+            courseName = stringResource(R.string.grades_simulation_title),
+            subject = stringResource(R.string.grades_simulation_value),
+            value = value,
+            scale = 20.0,
+            coefficient = coefficientText.toGradeNumber() ?: 1.0,
+            average = null,
+            date = null,
+            period = null
+        )
+    }
+    val summary = remember(grades, simulatedGrade) {
+        (grades + listOfNotNull(simulatedGrade)).toGradeSummary()
+    }
+    DataCard {
+        Text(
+            text = stringResource(R.string.grades_simulation_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = valueText,
+                onValueChange = { valueText = it },
+                label = { Text(stringResource(R.string.grades_simulation_value)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = coefficientText,
+                onValueChange = { coefficientText = it },
+                label = { Text(stringResource(R.string.grades_simulation_coefficient)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f)
+            )
+        }
+        LabelValue(R.string.grades_simulation_average, formatNumber(summary.weightedAverage))
     }
 }
 
@@ -738,6 +889,7 @@ internal fun DocumentCard(
     progress: Float?,
     onOpen: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     CompactCard {
         Text(
             text = document.title.orUntitled(),
@@ -748,7 +900,10 @@ internal fun DocumentCard(
         LabelValue(R.string.profile_year, document.year.orEmpty())
         LabelValue(R.string.documents_updated_at, formatInstant(document.updatedAt))
         OutlinedButton(
-            onClick = onOpen,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onOpen()
+            },
             enabled = !downloading
         ) {
             if (downloading) {
@@ -808,6 +963,10 @@ private fun DashboardSummary?.isDashboardEmpty(): Boolean {
 private fun Context.hasCalendarPermissions(): Boolean {
     return ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
         ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
+}
+
+private fun String.toGradeNumber(): Double? {
+    return trim().replace(',', '.').toDoubleOrNull()?.takeIf { it >= 0.0 }
 }
 
 private fun List<AgendaEvent>.filterForMode(mode: AgendaMode): List<AgendaEvent> {

@@ -27,8 +27,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -148,6 +151,10 @@ fun ErrorState(
     @StringRes message: Int,
     onRetry: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(message) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -178,6 +185,10 @@ fun ErrorState(
 
 @Composable
 fun StateBanner(@StringRes text: Int) {
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(text) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.secondaryContainer,

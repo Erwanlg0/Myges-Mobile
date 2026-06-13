@@ -2,6 +2,7 @@ package com.elg.myges.adapters.primary.ui
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
@@ -38,7 +39,7 @@ class AgendaEventDetailsTest {
 
         composeRule.setContent {
             MygesTheme {
-                var selectedEvent by mutableStateOf<AgendaEvent?>(null)
+                var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
                 AgendaEventCard(
                     event = event,
                     onOpen = { selectedEvent = event }

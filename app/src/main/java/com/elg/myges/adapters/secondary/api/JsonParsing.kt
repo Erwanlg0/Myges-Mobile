@@ -41,7 +41,7 @@ fun JsonElement.toProfile(): StudentProfile {
         school = root.text("school", "campus", "institution"),
         program = root.text("program", "programme", "formation", "className"),
         academicYear = root.text("academicYear", "year", "annee", "student_id")?.let(::academicYearFromProfile),
-        avatarUrl = root.text("avatarUrl", "avatar", "picture")
+        avatarUrl = root.text("avatarUrl", "avatar", "picture") ?: root.namedLinkHref("photo")
     )
 }
 
@@ -75,7 +75,7 @@ fun JsonElement.toAgendaEvents(): List<AgendaEvent> {
             endsAt = endsAt,
             room = root.text("room", "classroom", "salle") ?: root.arrayText("rooms", "name"),
             teacher = root.text("teacher", "intervenant", "professor") ?: discipline?.text("teacher"),
-            type = root.text("type", "kind"),
+            type = root.text("type", "kind", "prestation_type"),
             modality = root.text("modality", "mode", "campus"),
             courseId = root.text("courseId", "rcId", "rc_id", "moduleId") ?: discipline?.text("rc_id")
         )
@@ -135,7 +135,7 @@ fun JsonElement.toCourses(): List<Course> {
             name = root.text("name", "title", "courseName", "course_name", "matiere") ?: "",
             teacher = root.text("teacher", "intervenant", "professor"),
             year = root.text("year", "academicYear"),
-            period = root.text("period", "trimester", "semester"),
+            period = root.text("period", "trimester_name", "semester", "trimester"),
             syllabus = root.text("syllabus", "description", "summary"),
             fileCount = files.size.takeIf { it > 0 } ?: if (root.bool("has_documents") == true) 1 else 0
         )
@@ -182,7 +182,7 @@ fun JsonElement.toProjects(): List<Project> {
             id = root.text("id", "projectId", "project_id", "uid") ?: stableId(root),
             name = root.text("name", "title") ?: "",
             courseName = root.text("courseName", "course_name", "course", "module"),
-            groupName = root.text("groupName", "group", "projectGroup"),
+            groupName = root.text("groupName", "group", "projectGroup") ?: root.arrayText("groups", "group_name", "name"),
             status = root.text("status", "state"),
             deadline = root.instant("deadline", "dueDate", "endDate", "update_date") ?: steps.mapNotNull { it.deadline }.minOrNull(),
             steps = steps,
@@ -293,7 +293,8 @@ private fun JsonElement.arrayOrNested(vararg keys: String): List<JsonElement> {
 }
 
 private fun academicYearFromProfile(value: String): String {
-    return Regex("\\d{4}").find(value)?.value ?: value
+    val startYear = Regex("\\d{4}").find(value)?.value?.toIntOrNull() ?: return value
+    return ((startYear + 1)..(startYear + 3)).joinToString(", ")
 }
 
 private fun String.toMimeType(): String? {
@@ -365,23 +366,40 @@ private fun JsonObject.toDocument(
     parentTitle: String? = null,
     parentYear: String? = null
 ): AcademicDocument {
-    val title = text("title", "name", "label", "pf_title") ?: parentTitle ?: ""
+    val title = text("title", "name", "label", "pf_title", "psf_name", "psf_desc") ?: parentTitle ?: ""
+    val extension = text("extension", "psf_file_type")
     return AcademicDocument(
         id = text("id", "documentId", "document_id", "oc_id", "pf_id", "psf_id", "uid") ?: stableId(this),
         title = title,
         category = text("category", "type"),
         year = text("year", "academicYear") ?: parentYear,
-        mimeType = text("mimeType", "contentType", "extension", "psf_file_type")?.toMimeType(),
-        fileName = text("fileName", "filename", "file", "pf_file", "psf_file", "psf_name") ?: title.ifBlank { "document" },
+        mimeType = text("mimeType", "contentType")?.toMimeType() ?: extension?.toMimeType(),
+        fileName = text("fileName", "filename", "file", "pf_file", "psf_file", "psf_name") ?: title.toDocumentFileName(extension),
         downloadUrl = text("downloadUrl", "url", "href") ?: linkHref(),
         updatedAt = instant("updatedAt", "last_update", "update_date", "pf_crea_date", "psf_end_upload", "psf_begin_upload", "date", "createdAt")
     )
+}
+
+private fun String.toDocumentFileName(extension: String?): String {
+    val name = ifBlank { "document" }
+    val suffix = extension
+        ?.trim()
+        ?.takeIf { it.isNotBlank() && !name.endsWith(it, ignoreCase = true) }
+        ?.let { if (it.startsWith(".")) it else ".$it" }
+        .orEmpty()
+    return name + suffix
 }
 
 private fun JsonObject.linkHref(): String? {
     return array("links")
         .mapNotNull { (it as? JsonObject)?.text("href", "url") }
         .firstOrNull()
+}
+
+private fun JsonObject.namedLinkHref(key: String): String? {
+    return (this["_links"] as? JsonObject)
+        ?.get(key)
+        ?.let { (it as? JsonObject)?.text("href", "url") }
 }
 
 private fun JsonObject.newsFallbackBody(): String? {
@@ -438,7 +456,7 @@ private fun JsonObject.toGrade(
         coefficient = number("coefficient", "coef"),
         average = number("average", "moyenne", "ccaverage"),
         date = date ?: localDate("date", "createdAt", "publishedAt"),
-        period = text("period", "trimester", "semester", "trimester_name")
+        period = text("period", "trimester_name", "semester", "trimester")
     )
 }
 

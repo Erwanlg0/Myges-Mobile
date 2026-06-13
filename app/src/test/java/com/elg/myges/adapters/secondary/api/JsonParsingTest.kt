@@ -20,7 +20,12 @@ class JsonParsingTest {
                 "student_id": "2023-ESGI-123",
                 "firstname": "Erwan",
                 "name": "Luce",
-                "email": "student@example.com"
+                "email": "student@example.com",
+                "_links": {
+                  "photo": {
+                    "href": "me/profile/photo"
+                  }
+                }
               }
             }
             """.trimIndent()
@@ -28,7 +33,8 @@ class JsonParsingTest {
 
         assertEquals("123", profile.id)
         assertEquals("Erwan Luce", profile.displayName)
-        assertEquals("2023", profile.academicYear)
+        assertEquals("2024, 2025, 2026", profile.academicYear)
+        assertEquals("me/profile/photo", profile.avatarUrl)
     }
 
     @Test
@@ -234,6 +240,7 @@ class JsonParsingTest {
 
         assertEquals(1, documents.size)
         assertEquals("42", documents.first().id)
+        assertEquals("attestation.pdf", documents.first().fileName)
         assertEquals("application/pdf", documents.first().mimeType)
         assertEquals(Instant.ofEpochMilli(1781222400000), documents.first().updatedAt)
     }
@@ -284,6 +291,7 @@ class JsonParsingTest {
 
         assertEquals(1, documents.size)
         assertEquals("593267", documents.first().id)
+        assertEquals("fiche listes chainées.pdf", documents.first().fileName)
         assertEquals("fiche listes chainées", documents.first().title)
         assertEquals("application/pdf", documents.first().mimeType)
         assertEquals("https://ges-dl.kordis.fr/private/file", documents.first().downloadUrl)
@@ -331,6 +339,11 @@ class JsonParsingTest {
                   "project_id": 22843,
                   "name": "Projet final ReactJS",
                   "course_name": "React",
+                  "groups": [
+                    {
+                      "group_name": "Groupe 4"
+                    }
+                  ],
                   "steps": [
                     {
                       "psp_id": 778,
@@ -353,6 +366,7 @@ class JsonParsingTest {
         ).toProjects()
 
         assertEquals(1, projects.size)
+        assertEquals("Groupe 4", projects.first().groupName)
         assertEquals(Instant.ofEpochMilli(1774653214127), projects.first().deadline)
         assertEquals("778", projects.first().steps.first().id)
         assertEquals("Rendu final", projects.first().steps.first().title)
@@ -425,7 +439,7 @@ class JsonParsingTest {
 
         assertEquals(1, documents.size)
         assertEquals("991", documents.first().id)
-        assertEquals("Rendu final", documents.first().title)
+        assertEquals("rendu.zip", documents.first().title)
         assertEquals("rendu.zip", documents.first().fileName)
         assertEquals("application/zip", documents.first().mimeType)
         assertEquals("https://ges-dl.kordis.fr/private/step-file", documents.first().downloadUrl)

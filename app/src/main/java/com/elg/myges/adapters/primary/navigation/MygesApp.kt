@@ -1,10 +1,14 @@
 package com.elg.myges.adapters.primary.navigation
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -27,6 +31,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -90,7 +96,8 @@ fun MygesApp(
     oauthCallbackUri: Uri? = null,
     onOAuthCallbackConsumed: () -> Unit = {},
     notificationRoute: String? = null,
-    onNotificationRouteConsumed: () -> Unit = {}
+    onNotificationRouteConsumed: () -> Unit = {},
+    onSuccessfulRefresh: (Activity) -> Unit = {}
 ) {
     val viewModel: AppViewModel = hiltViewModel()
     val session by viewModel.session.collectAsStateWithLifecycle()
@@ -107,7 +114,7 @@ fun MygesApp(
             onOAuthCallbackConsumed = onOAuthCallbackConsumed
         )
     } else {
-        StudentRoute(notificationRoute, onNotificationRouteConsumed)
+        StudentRoute(notificationRoute, onNotificationRouteConsumed, onSuccessfulRefresh)
     }
 }
 
@@ -115,7 +122,8 @@ fun MygesApp(
 @Composable
 private fun StudentRoute(
     notificationRoute: String?,
-    onNotificationRouteConsumed: () -> Unit
+    onNotificationRouteConsumed: () -> Unit,
+    onSuccessfulRefresh: (Activity) -> Unit
 ) {
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -129,6 +137,12 @@ private fun StudentRoute(
     val selectedDestination = destinations.firstOrNull { destination ->
         currentDestination?.hierarchy?.any { it.route == destination.route } == true
     } ?: destinations.first()
+
+    LaunchedEffect(studentViewModel) {
+        studentViewModel.refreshSucceeded.collect {
+            (context as? Activity)?.let(onSuccessfulRefresh)
+        }
+    }
 
     LaunchedEffect(studentViewModel) {
         studentViewModel.documentOpenRequests.collect { request ->
@@ -147,89 +161,137 @@ private fun StudentRoute(
         val route = notificationRoute?.takeIf { requestedRoute ->
             destinations.any { destination -> destination.route == requestedRoute }
         } ?: return@LaunchedEffect
-        navController.navigate(route) {
-            launchSingleTop = true
-            restoreState = true
-            popUpTo(destinations.first().route) {
-                saveState = true
-            }
-        }
+        navController.navigateTo(route)
         onNotificationRouteConsumed()
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet {
-                dashboardState.data?.profile?.let { profile ->
-                    StudentAvatar(
-                        avatarUrl = profile.avatarUrl,
-                        displayName = profile.displayName,
-                        modifier = Modifier
-                            .padding(start = 24.dp, top = 24.dp)
-                            .size(56.dp)
-                    )
-                    Text(
-                        text = profile.displayName,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(start = 24.dp, top = 12.dp, end = 24.dp)
-                    )
-                } ?: Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(24.dp)
-                )
-                destinations.forEach { destination ->
-                    NavigationDrawerItem(
-                        selected = selectedDestination.route == destination.route,
-                        onClick = {
-                            coroutineScope.launch { drawerState.close() }
-                            navController.navigate(destination.route) {
-                                launchSingleTop = true
-                                restoreState = true
-                                popUpTo(destinations.first().route) {
-                                    saveState = true
-                                }
-                            }
-                        },
-                        icon = { Icon(destination.icon, contentDescription = null) },
-                        label = { Text(stringResource(destination.title)) }
-                    )
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        if (maxWidth >= 840.dp) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                NavigationRail {
+                    destinations.forEach { destination ->
+                        NavigationRailItem(
+                            selected = selectedDestination.route == destination.route,
+                            onClick = { navController.navigateTo(destination.route) },
+                            icon = { Icon(destination.icon, contentDescription = null) },
+                            label = { Text(stringResource(destination.title)) }
+                        )
+                    }
                 }
+                StudentScaffold(
+                    navController = navController,
+                    selectedDestination = selectedDestination,
+                    showNavigationIcon = false,
+                    onNavigationClick = {},
+                    studentViewModel = studentViewModel,
+                    settingsViewModel = settingsViewModel,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    ModalDrawerSheet {
+                        dashboardState.data?.profile?.let { profile ->
+                            StudentAvatar(
+                                avatarUrl = profile.avatarUrl,
+                                displayName = profile.displayName,
+                                modifier = Modifier
+                                    .padding(start = 24.dp, top = 24.dp)
+                                    .size(56.dp)
+                            )
+                            Text(
+                                text = profile.displayName,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(start = 24.dp, top = 12.dp, end = 24.dp)
+                            )
+                        } ?: Text(
+                            text = stringResource(R.string.app_name),
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(24.dp)
+                        )
+                        destinations.forEach { destination ->
+                            NavigationDrawerItem(
+                                selected = selectedDestination.route == destination.route,
+                                onClick = {
+                                    coroutineScope.launch { drawerState.close() }
+                                    navController.navigateTo(destination.route)
+                                },
+                                icon = { Icon(destination.icon, contentDescription = null) },
+                                label = { Text(stringResource(destination.title)) }
+                            )
+                        }
+                    }
+                }
+            ) {
+                StudentScaffold(
+                    navController = navController,
+                    selectedDestination = selectedDestination,
+                    showNavigationIcon = true,
+                    onNavigationClick = { coroutineScope.launch { drawerState.open() } },
+                    studentViewModel = studentViewModel,
+                    settingsViewModel = settingsViewModel
+                )
             }
         }
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(selectedDestination.title)) },
-                    navigationIcon = {
-                        IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
+    }
+}
+
+private fun androidx.navigation.NavHostController.navigateTo(route: String) {
+    navigate(route) {
+        launchSingleTop = true
+        restoreState = true
+        popUpTo(destinations.first().route) {
+            saveState = true
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StudentScaffold(
+    navController: androidx.navigation.NavHostController,
+    selectedDestination: Destination,
+    showNavigationIcon: Boolean,
+    onNavigationClick: () -> Unit,
+    studentViewModel: StudentViewModel,
+    settingsViewModel: SettingsViewModel,
+    modifier: Modifier = Modifier
+) {
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(selectedDestination.title)) },
+                navigationIcon = {
+                    if (showNavigationIcon) {
+                        IconButton(onClick = onNavigationClick) {
                             Icon(
                                 Icons.Rounded.Menu,
                                 contentDescription = stringResource(R.string.cd_open_navigation)
                             )
                         }
                     }
-                )
-            }
-        ) { padding ->
-            NavHost(
-                navController = navController,
-                startDestination = destinations.first().route,
-                modifier = Modifier.padding(padding)
-            ) {
-                composable("dashboard") { DashboardScreen(studentViewModel) }
-                composable("agenda") { AgendaScreen(studentViewModel) }
-                composable("grades") { GradesScreen(studentViewModel) }
-                composable("absences") { AbsencesScreen(studentViewModel) }
-                composable("courses") { CoursesScreen(studentViewModel) }
-                composable("projects") { ProjectsScreen(studentViewModel) }
-                composable("practicals") { PracticalsScreen(studentViewModel) }
-                composable("documents") { DocumentsScreen(studentViewModel) }
-                composable("notifications") { NotificationsScreen(studentViewModel, settingsViewModel) }
-                composable("settings") { SettingsScreen(settingsViewModel, studentViewModel) }
-            }
+                }
+            )
+        }
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = destinations.first().route,
+            modifier = Modifier.padding(padding)
+        ) {
+            composable("dashboard") { DashboardScreen(studentViewModel) }
+            composable("agenda") { AgendaScreen(studentViewModel) }
+            composable("grades") { GradesScreen(studentViewModel) }
+            composable("absences") { AbsencesScreen(studentViewModel) }
+            composable("courses") { CoursesScreen(studentViewModel) }
+            composable("projects") { ProjectsScreen(studentViewModel) }
+            composable("practicals") { PracticalsScreen(studentViewModel) }
+            composable("documents") { DocumentsScreen(studentViewModel) }
+            composable("notifications") { NotificationsScreen(studentViewModel, settingsViewModel) }
+            composable("settings") { SettingsScreen(settingsViewModel, studentViewModel) }
         }
     }
 }

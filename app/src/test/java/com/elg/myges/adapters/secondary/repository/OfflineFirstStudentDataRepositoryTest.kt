@@ -18,6 +18,8 @@ import com.elg.myges.application.ports.SettingsRepository
 import com.elg.myges.domain.model.Absence
 import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
+import com.elg.myges.domain.model.AppError
+import com.elg.myges.domain.model.AppException
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.NotificationPreferences
@@ -36,6 +38,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.io.IOException
 import java.time.Duration
 import java.time.Instant
 
@@ -96,6 +99,28 @@ class OfflineFirstStudentDataRepositoryTest {
         assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1"), notifications.documents.toSet())
     }
 
+    @Test
+    fun syncAllKeepsCachedDataWhenNetworkFailsBeforeRemoteSnapshot() = runTest {
+        val dao = RepositoryDao().apply {
+            profileState.value = StudentProfileEntity("cached-profile", "Cached Student", null, null, null, null, null)
+            agendaState.value = listOf(agendaEntity("cached-agenda"))
+            gradeState.value = listOf(gradeEntity("cached-grade"))
+            documentState.value = listOf(documentEntity("cached-document"))
+        }
+        val api = RepositoryApi().apply {
+            profileFailure = IOException("offline")
+        }
+        val repository = repository(createTempDir(), api, dao, RepositoryNotificationScheduler())
+
+        val failure = runCatching { repository.syncAll() }.exceptionOrNull()
+
+        assertEquals(AppError.Network, (failure as AppException).error)
+        assertEquals("cached-profile", dao.profileState.value?.id)
+        assertEquals(listOf("cached-agenda"), dao.agendaState.value.map { it.id })
+        assertEquals(listOf("cached-grade"), dao.gradeState.value.map { it.id })
+        assertEquals(listOf("cached-document"), dao.documentState.value.map { it.id })
+    }
+
     private fun repository(
         cacheDir: File,
         api: RepositoryApi,
@@ -118,10 +143,14 @@ class OfflineFirstStudentDataRepositoryTest {
 
 private class RepositoryApi : MyGesApiService {
     val courseFileRequests = mutableListOf<String>()
+    var profileFailure: Throwable? = null
 
-    override suspend fun profile(): JsonElement = jsonElement(
-        """{"result":{"id":"student-1","displayName":"Student One","email":"student@example.com","academicYear":"2026"}}"""
-    )
+    override suspend fun profile(): JsonElement {
+        profileFailure?.let { throw it }
+        return jsonElement(
+            """{"result":{"id":"student-1","displayName":"Student One","email":"student@example.com","academicYear":"2026"}}"""
+        )
+    }
 
     override suspend fun minimumVersion(): JsonElement = jsonElement(
         """{"result":{"type":"skolae_app_version","label":"Minimum app version","value":"3.5.0"}}"""
@@ -133,6 +162,14 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"tri_describe":"Semestre 1","tri_id":21,"tri_name":"S1","year":2026}]}"""
     )
 
+    override suspend fun cvec(): JsonElement = jsonElement("""{"result":{}}""")
+
+    override suspend fun internalRules(): JsonElement = jsonElement("""{"result":[]}""")
+
+    override suspend fun suggestions(): JsonElement = jsonElement("""{"result":[]}""")
+
+    override suspend fun submitSuggestion(suggestion: JsonElement): JsonElement = jsonElement("""{"result":{}}""")
+
     override suspend fun agenda(start: Long?, end: Long?): JsonElement = jsonElement(
         """{"result":[{"id":"agenda-1","title":"Math","start_date":"2026-06-12T08:00:00Z","end_date":"2026-06-12T10:00:00Z","room":"A101","teacher":"Teacher","type":"Course","rc_id":"course-1"}]}"""
     )
@@ -141,12 +178,22 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"id":"course-1","name":"Algorithms","teacher":"Teacher","year":"2026","has_documents":true}]}"""
     )
 
+    override suspend fun classes(year: String): JsonElement = jsonElement("""{"result":[]}""")
+
+    override suspend fun students(year: String): JsonElement = jsonElement("""{"result":[]}""")
+
+    override suspend fun teachers(year: String): JsonElement = jsonElement("""{"result":[]}""")
+
+    override suspend fun classStudents(puid: String, year: String): JsonElement = jsonElement("""{"result":[]}""")
+
     override suspend fun courseFiles(rcId: String): JsonElement {
         courseFileRequests += rcId
         return jsonElement(
             """{"result":[{"oc_id":"course-doc-1","title":"Course file","fileName":"course.pdf","extension":"pdf"}]}"""
         )
     }
+
+    override suspend fun courseFile(rcId: String, ocId: String): JsonElement = jsonElement("""{"result":{}}""")
 
     override suspend fun syllabus(rcId: String): JsonElement = jsonElement(
         """{"result":{"syllabus_name":"Algorithms","detail_plan":"Detailed syllabus"}}"""
@@ -164,17 +211,35 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"id":"annual-doc-1","title":"Certificate","fileName":"certificate.pdf","extension":"pdf","year":"2026","updatedAt":"2026-06-01T12:00:00Z"}]}"""
     )
 
+    override suspend fun annualDocument(id: String): JsonElement = jsonElement("""{"result":{}}""")
+
     override suspend fun projects(year: String): JsonElement = jsonElement(
         """{"result":[{"id":"project-1","name":"Project","courseName":"Algorithms","deadline":"2026-06-30T23:59:00Z","steps":[{"id":"step-1","title":"Submit","deadline":"2026-06-30T23:59:00Z"}],"project_files":[{"pf_id":"project-doc-1","pf_title":"Project brief","pf_file":"brief.pdf","extension":"pdf"}]}]}"""
     )
+
+    override suspend fun project(projectId: String): JsonElement = jsonElement("""{"result":{}}""")
 
     override suspend fun nextProjectSteps(): JsonElement = jsonElement(
         """{"result":[{"pro_id":"project-1","pro_name":"Project","course_name":"Algorithms","psp_id":"upcoming-step-1","psp_desc":"Oral","psp_limit_date":"2026-06-25T12:00:00Z"}]}"""
     )
 
+    override suspend fun projectFile(pfId: String): JsonElement = jsonElement("""{"result":{}}""")
+
+    override suspend fun projectStepFile(psfId: String): JsonElement = jsonElement("""{"result":{}}""")
+
+    override suspend fun courseProjects(rcId: String): JsonElement = jsonElement("""{"result":[]}""")
+
+    override suspend fun projectGroup(
+        rcId: String,
+        projectId: String,
+        projectGroupId: String
+    ): JsonElement = jsonElement("""{"result":{}}""")
+
     override suspend fun practicals(year: String): JsonElement = jsonElement(
         """{"result":[{"id":"practical-1","name":"Lab","courseName":"Algorithms","start":"2026-06-13T08:00:00Z","end":"2026-06-13T10:00:00Z","room":"B201"}]}"""
     )
+
+    override suspend fun coursePracticals(rcId: String): JsonElement = jsonElement("""{"result":[]}""")
 
     override suspend fun news(): JsonElement = jsonElement(
         """{"result":[{"id":"news-1","title":"News","body":"Body","publishedAt":"2026-06-01T08:00:00Z"}]}"""
@@ -187,6 +252,10 @@ private class RepositoryApi : MyGesApiService {
     override suspend fun partners(): JsonElement = jsonElement(
         """{"result":[{"partner_id":"partner-1","name":"Partner","content":"Student offer"}]}"""
     )
+
+    override suspend fun notificationDelays(): JsonElement = jsonElement("""{"result":[]}""")
+
+    override suspend fun notificationDelay(notificationTypeId: String): JsonElement = jsonElement("""{"result":{}}""")
 
     override suspend fun speedMeetingAppointments(): JsonElement = jsonElement(
         """{"result":[{"ss_id":"speed-1","title":"Speed meeting","corporate_name":"Company","location":"ONLINE","appointment_start":"2026-06-03T08:00:00Z"}]}"""

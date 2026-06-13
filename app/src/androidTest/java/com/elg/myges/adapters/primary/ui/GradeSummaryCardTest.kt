@@ -54,4 +54,31 @@ class GradeSummaryCardTest {
         composeRule.onNodeWithText(context.getString(R.string.grades_summary_incomplete)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.grades_count)).assertIsDisplayed()
     }
+
+    @Test
+    fun summaryShowsNoGradesWhenEveryValueIsMissing() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        composeRule.setContent {
+            MygesTheme {
+                GradeSummaryCard(
+                    listOf(
+                        Grade(
+                            id = "grade-1",
+                            courseName = "Algorithms",
+                            subject = "Exam",
+                            value = null,
+                            scale = 20.0,
+                            coefficient = 1.0,
+                            average = null,
+                            date = LocalDate.parse("2026-06-12"),
+                            period = "S2"
+                        )
+                    )
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(context.getString(R.string.grades_no_grade)).assertIsDisplayed()
+    }
 }

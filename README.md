@@ -1,148 +1,148 @@
-# Application Android MyGES
+# MyGES Android Application
 
-Ce dépôt décrit les fondations fonctionnelles et techniques d'une application Android native MyGES. L'application consomme les endpoints MyGES existants, expose une expérience mobile centrée sur l'étudiant et conserve une architecture claire pour faciliter la maintenance, les tests et l'évolution.
+This repository describes the functional and technical foundations of a native Android application for MyGES. The application consumes existing MyGES endpoints, provides a student-focused mobile experience, and maintains a clear architecture to simplify maintenance, testing, and future development.
 
-## Objectifs
+## Objectives
 
-- Consulter l'agenda, les notes, les absences, les cours, les documents et les projets.
-- Centraliser les informations utiles au quotidien étudiant dans une application Android native.
-- Utiliser les composants Android natifs, sans WebView ni interface web embarquée.
-- Fonctionner correctement avec une gestion robuste du cache local et des états hors ligne.
-- Isoler la logique métier du framework UI, du stockage local et des services externes.
-- Préparer l'application à l'internationalisation dès le départ.
+* View schedules, grades, absences, courses, documents, and projects.
+* Centralize useful student information in a native Android application.
+* Use native Android components without WebView or embedded web interfaces.
+* Provide reliable local caching and offline state management.
+* Isolate business logic from the UI framework, local storage, and external services.
+* Prepare the application for internationalization from the start.
 
-## Recommandations d'amélioration du README
+## README Improvement Recommendations
 
-- Clarifier le statut du document : il s'agit d'une spécification technique initiale, pas encore d'une documentation d'installation complète.
-- Indiquer explicitement que le projet cible Android uniquement.
-- Supprimer les options multi-plateformes et les références iOS, Flutter ou React Native si l'application doit être Android native.
-- Préciser que l'application ne doit pas être une app web déguisée : pas de WebView pour les écrans principaux.
-- Séparer les choix d'architecture, les fonctionnalités, l'API et l'i18n pour rendre la lecture plus directe.
-- Ajouter une section `Installation` lorsque le projet contiendra le code source, les scripts Gradle et les dépendances.
-- Ajouter une section `Configuration` pour documenter l'URL de base API, les secrets locaux, les build variants et les paramètres de debug.
-- Ajouter une section `Tests` lorsque les conventions de tests unitaires, d'intégration et UI seront définies.
-- Documenter explicitement les endpoints utilisés, les paramètres dynamiques et les usages principaux.
+* Clarify the status of this document: it is an initial technical specification, not yet a complete installation guide.
+* Explicitly state that the project targets Android only.
+* Remove multi-platform options and references to iOS, Flutter, or React Native if the application remains Android native.
+* Clearly specify that the application must not be a web application in disguise: no WebView for core screens.
+* Separate architecture choices, features, API documentation, and i18n to improve readability.
+* Add an `Installation` section once source code, Gradle scripts, and dependencies are available.
+* Add a `Configuration` section to document the API base URL, local secrets, build variants, and debug settings.
+* Add a `Tests` section once testing conventions have been defined.
+* Explicitly document the endpoints used, dynamic parameters, and their primary purposes.
 
-## Principes Android natifs
+## Native Android Principles
 
-L'application doit être développée comme une application Android native, pas comme une interface web encapsulée.
+The application must be developed as a native Android application, not as a wrapped web interface.
 
-- UI native avec Jetpack Compose ou vues Android natives.
-- Navigation Android native, sans routage web.
-- Accès aux fonctionnalités système via les APIs Android : stockage sécurisé, notifications, fichiers, calendrier, biométrie.
-- Appels API via un client HTTP natif, pas via une page web chargée dans l'application.
-- Cache local via une base embarquée Android, pas via `localStorage`, cookies web ou session de navigateur.
-- Gestion des erreurs, loaders, états vides et hors ligne directement dans les écrans natifs.
+* Native UI using Jetpack Compose or Android Views.
+* Native Android navigation without web routing.
+* Access to platform capabilities through Android APIs: secure storage, notifications, files, calendar, biometrics.
+* API calls through a native HTTP client, not through a web page loaded inside the application.
+* Local cache through an embedded Android database, not through `localStorage`, browser cookies, or web sessions.
+* Error states, loading states, empty states, and offline states handled directly by native screens.
 
-Une WebView peut rester acceptable uniquement pour un cas très ponctuel, par exemple afficher un document HTML externe non reproductible nativement. Elle ne doit pas servir à rendre l'application principale.
+A WebView may be acceptable only for very specific use cases, such as displaying an external HTML document that cannot reasonably be reproduced natively. It must not be used to render the main application experience.
 
 ## Architecture
 
-L'application suit une architecture hexagonale adaptée à Android. La logique métier reste indépendante de l'interface, du stockage local, du client HTTP et des services natifs.
+The application follows a hexagonal architecture adapted for Android. Business logic remains independent from the UI, local storage, HTTP client, and Android services.
 
 ```text
 app/src/main/java/
-├── domain/                    # Entités, value objects et règles métier
-├── application/               # Cas d'utilisation et ports
+├── domain/                    # Entities, value objects, and business rules
+├── application/               # Use cases and ports
 ├── adapters/
-│   ├── primary/               # UI Compose, navigation, ViewModels
-│   └── secondary/             # API, stockage, notifications, services Android
-└── config/                    # Configuration applicative
+│   ├── primary/               # Compose UI, navigation, ViewModels
+│   └── secondary/             # API, storage, notifications, Android services
+└── config/                    # Application configuration
 ```
 
-### Couches principales
+### Main Layers
 
-- `domain` : modèles métier comme `Student`, `Grade`, `Absence`, `AgendaEvent`, `Project` ou `AcademicDocument`.
-- `application` : orchestration des cas d'utilisation, par exemple l'authentification, la synchronisation, la récupération des notes ou la gestion des projets.
-- `adapters/primary` : écrans Android, composants Compose, navigation et ViewModels.
-- `adapters/secondary` : client API MyGES, cache local, stockage sécurisé, notifications et intégrations Android.
+* `domain`: business models such as `Student`, `Grade`, `Absence`, `AgendaEvent`, `Project`, or `AcademicDocument`.
+* `application`: use case orchestration, including authentication, synchronization, grade retrieval, and project management.
+* `adapters/primary`: Android screens, Compose components, navigation, and ViewModels.
+* `adapters/secondary`: MyGES API client, local cache, secure storage, notifications, and Android integrations.
 
-Cette séparation permet de tester les règles métier sans dépendre de l'UI Android ou des services externes.
+This separation allows business rules to be tested independently from Android UI and external services.
 
-## Stack technique recommandée
+## Recommended Technology Stack
 
-- Langage : Kotlin.
-- UI : Jetpack Compose.
-- Architecture UI : ViewModel avec `StateFlow`.
-- Injection de dépendances : Hilt.
-- Client HTTP : Retrofit et OkHttp.
-- Sérialisation : Kotlinx Serialization ou Moshi.
-- Cache local : Room.
-- Préférences : DataStore.
-- Stockage sécurisé : Android Keystore et EncryptedSharedPreferences.
-- Tâches de fond : WorkManager.
-- Notifications : Firebase Cloud Messaging et notifications locales Android.
-- Fichiers : Storage Access Framework.
-- Biométrie : AndroidX Biometric.
-- Tests unitaires : JUnit, MockK, Turbine.
-- Tests UI : Compose UI Test.
+* Language: Kotlin.
+* UI: Jetpack Compose.
+* UI Architecture: ViewModel with `StateFlow`.
+* Dependency Injection: Hilt.
+* HTTP Client: Retrofit and OkHttp.
+* Serialization: Kotlinx Serialization or Moshi.
+* Local Cache: Room.
+* Preferences: DataStore.
+* Secure Storage: Android Keystore and EncryptedSharedPreferences.
+* Background Work: WorkManager.
+* Notifications: Firebase Cloud Messaging and Android local notifications.
+* Files: Storage Access Framework.
+* Biometrics: AndroidX Biometric.
+* Unit Testing: JUnit, MockK, Turbine.
+* UI Testing: Compose UI Test.
 
-## Fonctionnalités mobiles prévues
+## Planned Mobile Features
 
-### Authentification
+### Authentication
 
-- Connexion à l'espace MyGES.
-- Stockage sécurisé des jetons d'authentification.
-- Support possible de la biométrie après une première connexion réussie.
-- Gestion explicite des erreurs de session, d'expiration et de réseau.
+* Login to MyGES.
+* Secure storage of authentication tokens.
+* Optional biometric authentication after a successful first login.
+* Explicit handling of session expiration, authentication, and network errors.
 
-### Tableau de bord
+### Dashboard
 
-- Résumé du profil étudiant.
-- Prochain cours.
-- Dernières notes.
-- Absences récentes.
-- Projets et échéances importantes.
-- État de synchronisation et de cache.
+* Student profile summary.
+* Upcoming course.
+* Latest grades.
+* Recent absences.
+* Projects and important deadlines.
+* Synchronization and cache status.
 
-### Agenda
+### Schedule
 
-- Consultation des événements de cours.
-- Affichage par jour, semaine ou liste.
-- Détails d'un cours : horaire, salle, intervenant, type et modalité.
-- Synchronisation optionnelle avec le calendrier Android.
+* Course event consultation.
+* Day, week, and list views.
+* Course details including schedule, room, instructor, type, and modality.
+* Optional synchronization with Android Calendar.
 
-### Notes et absences
+### Grades and Absences
 
-- Consultation des notes par année, période ou matière.
-- Affichage des coefficients et moyennes lorsque les données nécessaires sont disponibles.
-- Liste des absences avec statut de justification.
-- Accès aux informations utiles pour suivre l'assiduité.
+* View grades by academic year, period, or subject.
+* Display coefficients and averages when the required data is available.
+* View absences with justification status.
+* Access information useful for attendance tracking.
 
-### Cours, projets et travaux pratiques
+### Courses, Projects, and Practicals
 
-- Liste des cours par année.
-- Accès aux syllabus et fichiers associés.
-- Liste des projets et travaux pratiques.
-- Consultation des groupes, étapes, fichiers et livrables.
-- Suivi des prochaines échéances de projet.
+* List of courses by academic year.
+* Access to syllabi and associated files.
+* List of projects and practical work.
+* View groups, steps, files, and deliverables.
+* Track upcoming project deadlines.
 
 ### Documents
 
-- Accès aux documents annuels.
-- Téléchargement et ouverture de fichiers via les intents Android.
-- Prévisualisation locale lorsque le type de fichier est supporté.
+* Access annual academic documents.
+* Download and open files through Android intents.
+* Local preview when supported by the file type.
 
 ### Notifications
 
-- Notifications locales ou push pour les changements importants.
-- Exemples : nouvelle note, absence enregistrée, changement d'agenda, rappel de rendu.
-- Préférences configurables par type de notification lorsque l'API le permet.
+* Local or push notifications for important changes.
+* Examples: new grade, recorded absence, schedule update, submission reminder.
+* Configurable notification preferences when supported by the API.
 
-## Internationalisation (i18n)
+## Internationalization (i18n)
 
-L'application doit être conçue pour supporter plusieurs langues sans modifier le code applicatif.
+The application must support multiple languages without requiring code changes.
 
-### Principes
+### Principles
 
-- Aucune chaîne visible ne doit être codée en dur dans les écrans, composants ou messages d'erreur.
-- Toutes les chaînes UI doivent être déclarées dans les ressources Android.
-- Les clés de traduction doivent être stables, explicites et organisées par domaine fonctionnel.
-- Les dates, heures, nombres et montants doivent être formatés selon la locale active.
-- La langue par défaut doit être le français.
-- L'application doit pouvoir utiliser la langue du système, avec une option de surcharge dans les paramètres si nécessaire.
+* No user-facing string should be hardcoded in screens, components, or error messages.
+* All UI strings must be defined in Android resources.
+* Translation keys should be stable, explicit, and organized by functional domain.
+* Dates, times, numbers, and currencies should be formatted according to the active locale.
+* French should be the default language.
+* The application should support the system language, with an optional language override in settings if needed.
 
-### Structure recommandée
+### Recommended Structure
 
 ```text
 app/src/main/res/
@@ -152,145 +152,145 @@ app/src/main/res/
     └── strings.xml
 ```
 
-Exemple :
+Example:
 
 ```xml
 <resources>
-    <string name="auth_login_title">Connexion</string>
-    <string name="dashboard_next_course">Prochain cours</string>
-    <string name="grades_title">Notes</string>
+    <string name="auth_login_title">Login</string>
+    <string name="dashboard_next_course">Next Course</string>
+    <string name="grades_title">Grades</string>
     <string name="absences_title">Absences</string>
-    <string name="projects_deadline">Échéance</string>
-    <string name="error_network">Connexion impossible. Vérifiez votre réseau.</string>
+    <string name="projects_deadline">Deadline</string>
+    <string name="error_network">Unable to connect. Please check your network.</string>
 </resources>
 ```
 
-### Points d'attention
+### Important Considerations
 
-- Utiliser les pluriels Android pour les absences, notifications, documents et échéances.
-- Éviter de concaténer des chaînes traduites dans le code.
-- Tester les écrans avec des libellés plus longs que le français.
-- Prévoir les traductions des notifications locales et des messages hors ligne.
-- Formater les dates avec `java.time` et la locale active.
+* Use Android plurals for absences, notifications, documents, and deadlines.
+* Avoid concatenating translated strings in code.
+* Test screens with labels longer than the French equivalents.
+* Provide translations for local notifications and offline messages.
+* Format dates using `java.time` and the active locale.
 
-## API MyGES
+## MyGES API
 
-Les endpoints ci-dessous sont les routes MyGES utilisées par l'application. Ils sont documentés ici sous forme de chemins relatifs ; l'URL de base doit être configurée par environnement.
+The endpoints below represent the MyGES routes used by the application. They are documented as relative paths; the base URL must be configured per environment.
 
-### Profil et configuration
+### Profile and Configuration
 
-| Endpoint | Usage |
-| --- | --- |
-| `me/profile` | Récupération du profil étudiant |
-| `me/minimumVersion` | Version minimale requise de l'application |
-| `me/years` | Liste des années disponibles |
-| `me/trimesterYears` | Années et périodes académiques |
-| `me/cvec` | Informations CVEC |
-| `me/internalrules` | Règlement intérieur |
-| `me/partners` | Partenaires |
-| `me/suggestion` | Envoi ou récupération de suggestions selon le contrat API |
+| Endpoint            | Purpose                                                  |
+| ------------------- | -------------------------------------------------------- |
+| `me/profile`        | Retrieve student profile                                 |
+| `me/minimumVersion` | Minimum required application version                     |
+| `me/years`          | Available academic years                                 |
+| `me/trimesterYears` | Academic years and periods                               |
+| `me/cvec`           | CVEC information                                         |
+| `me/internalrules`  | Internal regulations                                     |
+| `me/partners`       | Partners                                                 |
+| `me/suggestion`     | Submit or retrieve suggestions depending on API contract |
 
-### Agenda, cours et scolarité
+### Schedule, Courses, and Academic Data
 
-| Endpoint | Usage |
-| --- | --- |
-| `me/agenda` | Agenda de l'étudiant |
-| `me/{year}/courses` | Cours d'une année |
-| `me/{year}/classes` | Classes d'une année |
-| `me/{year}/students` | Étudiants d'une année |
-| `me/{year}/teachers` | Enseignants d'une année |
-| `me/classes/{puid}/students/{year}` | Étudiants d'une classe pour une année |
-| `me/{rcId}/syllabus` | Syllabus d'un cours |
+| Endpoint                            | Purpose                              |
+| ----------------------------------- | ------------------------------------ |
+| `me/agenda`                         | Student schedule                     |
+| `me/{year}/courses`                 | Courses for a given year             |
+| `me/{year}/classes`                 | Classes for a given year             |
+| `me/{year}/students`                | Students for a given year            |
+| `me/{year}/teachers`                | Teachers for a given year            |
+| `me/classes/{puid}/students/{year}` | Students of a class for a given year |
+| `me/{rcId}/syllabus`                | Course syllabus                      |
 
-### Notes, absences et documents
+### Grades, Absences, and Documents
 
-| Endpoint | Usage |
-| --- | --- |
-| `me/{year}/grades` | Notes d'une année |
-| `me/{year}/absences` | Absences d'une année |
-| `me/{year}/annualDocuments` | Documents annuels d'une année |
-| `me/annualDocuments/{id}` | Détail ou téléchargement d'un document annuel |
+| Endpoint                    | Purpose                             |
+| --------------------------- | ----------------------------------- |
+| `me/{year}/grades`          | Grades for a given year             |
+| `me/{year}/absences`        | Absences for a given year           |
+| `me/{year}/annualDocuments` | Annual documents for a given year   |
+| `me/annualDocuments/{id}`   | Annual document details or download |
 
-### Fichiers de cours
+### Course Files
 
-| Endpoint | Usage |
-| --- | --- |
-| `me/{rcId}/files` | Fichiers associés à un cours |
-| `me/{rcId}/files/{ocId}` | Détail ou téléchargement d'un fichier de cours |
+| Endpoint                 | Purpose                         |
+| ------------------------ | ------------------------------- |
+| `me/{rcId}/files`        | Files associated with a course  |
+| `me/{rcId}/files/{ocId}` | Course file details or download |
 
-### Projets et travaux pratiques
+### Projects and Practicals
 
-| Endpoint | Usage |
-| --- | --- |
-| `me/{year}/projects` | Projets d'une année |
-| `me/projects/{projectId}` | Détail d'un projet |
-| `me/nextProjectSteps` | Prochaines étapes de projet |
-| `me/projectFiles/{pfId}` | Fichier associé à un projet |
-| `me/projectStepFiles/{psfId}` | Fichier associé à une étape de projet |
-| `me/courses/{rcId}/projects` | Projets associés à un cours |
-| `me/courses/{rcId}/projects/{projectId}/groups/{projectGroupId}` | Groupe d'un projet |
-| `me/{year}/practicals` | Travaux pratiques d'une année |
-| `me/courses/{rcId}/practicals` | Travaux pratiques associés à un cours |
+| Endpoint                                                         | Purpose                       |
+| ---------------------------------------------------------------- | ----------------------------- |
+| `me/{year}/projects`                                             | Projects for a given year     |
+| `me/projects/{projectId}`                                        | Project details               |
+| `me/nextProjectSteps`                                            | Upcoming project steps        |
+| `me/projectFiles/{pfId}`                                         | Project file                  |
+| `me/projectStepFiles/{psfId}`                                    | Project step file             |
+| `me/courses/{rcId}/projects`                                     | Projects linked to a course   |
+| `me/courses/{rcId}/projects/{projectId}/groups/{projectGroupId}` | Project group                 |
+| `me/{year}/practicals`                                           | Practicals for a given year   |
+| `me/courses/{rcId}/practicals`                                   | Practicals linked to a course |
 
-### Actualités et notifications
+### News and Notifications
 
-| Endpoint | Usage |
-| --- | --- |
-| `me/news` | Actualités |
-| `me/news/banners` | Bannières d'actualité |
-| `me/notificationsDelays` | Délais de notification configurables |
-| `me/notificationsDelays/{notificationTypeId}` | Délai d'un type de notification |
-| `me/speedMeetingAppointments` | Rendez-vous speed meeting |
+| Endpoint                                      | Purpose                                |
+| --------------------------------------------- | -------------------------------------- |
+| `me/news`                                     | News                                   |
+| `me/news/banners`                             | News banners                           |
+| `me/notificationsDelays`                      | Configurable notification delays       |
+| `me/notificationsDelays/{notificationTypeId}` | Notification delay for a specific type |
+| `me/speedMeetingAppointments`                 | Speed meeting appointments             |
 
-### Paramètres dynamiques
+### Dynamic Parameters
 
-- `{year}` : année académique.
-- `{rcId}` : identifiant de cours ou de ressource cours.
-- `{puid}` : identifiant de classe ou de population selon le contrat MyGES.
-- `{id}` : identifiant de document annuel.
-- `{ocId}` : identifiant de fichier de cours.
-- `{projectId}` : identifiant de projet.
-- `{projectGroupId}` : identifiant de groupe de projet.
-- `{pfId}` : identifiant de fichier projet.
-- `{psfId}` : identifiant de fichier d'étape de projet.
-- `{notificationTypeId}` : identifiant de type de notification.
+* `{year}`: academic year.
+* `{rcId}`: course or course resource identifier.
+* `{puid}`: class or population identifier according to the MyGES API contract.
+* `{id}`: annual document identifier.
+* `{ocId}`: course file identifier.
+* `{projectId}`: project identifier.
+* `{projectGroupId}`: project group identifier.
+* `{pfId}`: project file identifier.
+* `{psfId}`: project step file identifier.
+* `{notificationTypeId}`: notification type identifier.
 
-## Synchronisation et cache
+## Synchronization and Cache
 
-L'application doit être utilisable dans des conditions réseau variables.
+The application must remain usable under varying network conditions.
 
-- Les données critiques doivent être mises en cache localement après récupération.
-- Les écrans doivent afficher l'état de synchronisation : à jour, en cours, hors ligne ou en erreur.
-- Les erreurs API doivent être transformées en erreurs applicatives compréhensibles.
-- Les jetons doivent être stockés uniquement dans le stockage sécurisé Android.
-- Les données sensibles ne doivent pas être journalisées.
-- Les synchronisations périodiques doivent passer par WorkManager et respecter les contraintes batterie/réseau Android.
+* Critical data must be cached locally after retrieval.
+* Screens must display synchronization status: up to date, synchronizing, offline, or error.
+* API errors must be converted into meaningful application-level errors.
+* Tokens must be stored exclusively in secure Android storage.
+* Sensitive data must never be logged.
+* Periodic synchronization must use WorkManager and respect Android battery and network constraints.
 
-## Structure README recommandée
+## Recommended README Structure
 
-Lorsque le projet contiendra le code source, le README devrait suivre cette structure :
+Once source code becomes available, the README should follow this structure:
 
 ```text
-1. Présentation
-2. Fonctionnalités
-3. Stack technique Android
+1. Overview
+2. Features
+3. Android Technology Stack
 4. Installation
 5. Configuration
 6. Architecture
-7. Internationalisation
-8. API MyGES
+7. Internationalization
+8. MyGES API
 9. Tests
-10. Build Android
-11. Remarques techniques
+10. Android Build
+11. Technical Notes
 ```
 
-## Remarques techniques importantes
+## Important Technical Notes
 
-- Les endpoints listés doivent être validés avec le contrat API réel : méthodes HTTP, paramètres de requête, pagination, formats de réponse et codes d'erreur.
-- Les routes de téléchargement doivent préciser si elles retournent un binaire, une URL signée ou des métadonnées.
-- La stratégie de rafraîchissement de session doit être définie avant l'intégration du client API.
-- Les notifications push nécessitent généralement un backend ou un service tiers ; une application Android seule ne peut pas toujours détecter les changements en temps réel sans synchronisation périodique.
-- Les tâches de fond Android sont contraintes par Doze, App Standby et les politiques batterie constructeur.
-- Les calculs de moyennes ne doivent être effectués localement que si les coefficients et règles de calcul sont fiables.
-- Les données académiques et personnelles doivent être traitées comme sensibles : stockage sécurisé, logs filtrés et permissions minimales.
-- L'application ne doit pas dépendre d'une session web MyGES embarquée pour afficher les écrans principaux.
+* Listed endpoints must be validated against the actual API contract, including HTTP methods, query parameters, pagination, response formats, and error codes.
+* Download routes must specify whether they return binaries, signed URLs, or metadata.
+* Session refresh strategy must be defined before API integration.
+* Push notifications generally require a backend or third-party service; an Android application alone cannot always detect changes in real time without periodic synchronization.
+* Android background tasks are constrained by Doze, App Standby, and manufacturer battery policies.
+* Grade averages should only be calculated locally when coefficients and grading rules are reliable.
+* Academic and personal data must be treated as sensitive information through secure storage, filtered logging, and minimal permissions.
+* The application must not depend on an embedded MyGES web session to render its primary screens.

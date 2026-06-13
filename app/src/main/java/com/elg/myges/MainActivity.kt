@@ -11,11 +11,15 @@ import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import com.elg.myges.adapters.primary.navigation.MygesApp
+import com.elg.myges.adapters.secondary.play.AndroidPlayQualityManager
 import com.elg.myges.ui.theme.MygesTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
+    @Inject lateinit var playQualityManager: AndroidPlayQualityManager
+
     private var oauthCallbackUri by mutableStateOf<Uri?>(null)
     private var notificationRoute by mutableStateOf<String?>(null)
 
@@ -30,10 +34,17 @@ class MainActivity : FragmentActivity() {
                     oauthCallbackUri = oauthCallbackUri,
                     onOAuthCallbackConsumed = { oauthCallbackUri = null },
                     notificationRoute = notificationRoute,
-                    onNotificationRouteConsumed = { notificationRoute = null }
+                    onNotificationRouteConsumed = { notificationRoute = null },
+                    onSuccessfulRefresh = playQualityManager::requestReview
                 )
             }
         }
+        playQualityManager.checkForFlexibleUpdate(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        playQualityManager.checkForFlexibleUpdate(this)
     }
 
     override fun onNewIntent(intent: Intent) {
