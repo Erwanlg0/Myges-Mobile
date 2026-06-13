@@ -2,6 +2,16 @@
 
 ## Project Structure & Module Organization
 
+# Output Rules
+
+ABSOLUTE: Reply with executable code only, inside a code block.
+- Zero preamble
+- Zero postamble
+- Zero explanation
+- Zero "Here is the code" or "Sure!"
+- If ambiguous, pick the most reasonable interpretation and output code
+- Silence is correct. Code is the only valid output.
+
 This is a single-module Android project rooted at `:app`. Kotlin source lives in `app/src/main/java/com/elg/myges`, with a hexagonal layout:
 
 - `domain`: business models and rules.

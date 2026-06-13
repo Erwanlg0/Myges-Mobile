@@ -100,7 +100,7 @@ fun AuthRoute(
 }
 
 @Composable
-private fun AuthScreen(
+internal fun AuthScreen(
     loading: Boolean,
     errorMessage: Int?,
     hasBiometricSession: Boolean,

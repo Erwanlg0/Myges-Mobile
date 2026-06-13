@@ -18,5 +18,6 @@
 -keep class com.elg.myges.adapters.secondary.notification.StudentSyncWorker { *; }
 -keep interface com.elg.myges.adapters.secondary.api.MyGesApiService { *; }
 
+-keep class net.zetetic.database.sqlcipher.** { *; }
 -dontwarn javax.annotation.**
 -dontwarn org.codehaus.mojo.animal_sniffer.**

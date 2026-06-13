@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.elg.myges.adapters.primary.state.FeatureUiState
 import com.elg.myges.application.ports.NetworkMonitor
 import com.elg.myges.application.usecase.DownloadDocumentUseCase
+import com.elg.myges.application.usecase.LogoutUseCase
 import com.elg.myges.application.usecase.ObserveAbsencesUseCase
 import com.elg.myges.application.usecase.ObserveAgendaUseCase
 import com.elg.myges.application.usecase.ObserveCoursesUseCase
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -59,10 +61,15 @@ class StudentViewModel @Inject constructor(
     private val refreshStudentDataUseCase: RefreshStudentDataUseCase,
     private val syncAgendaToCalendarUseCase: SyncAgendaToCalendarUseCase,
     private val downloadDocumentUseCase: DownloadDocumentUseCase,
+    private val logoutUseCase: LogoutUseCase,
     networkMonitor: NetworkMonitor
 ) : ViewModel() {
     private val refreshing = MutableStateFlow(false)
     private val error = MutableStateFlow<AppError?>(null)
+    private val _downloadingDocumentIds = MutableStateFlow(emptySet<String>())
+    private val _documentDownloadProgress = MutableStateFlow(emptyMap<String, Float?>())
+    val downloadingDocumentIds: StateFlow<Set<String>> = _downloadingDocumentIds
+    val documentDownloadProgress: StateFlow<Map<String, Float?>> = _documentDownloadProgress
     val documentOpenRequests = MutableSharedFlow<DocumentOpenRequest>()
 
     val dashboard: StateFlow<FeatureUiState<DashboardSummary?>> = observeDashboard()
@@ -103,7 +110,7 @@ class StudentViewModel @Inject constructor(
             refreshing.value = true
             error.value = null
             runCatching { refreshStudentDataUseCase() }
-                .onFailure { error.value = it.toAppError() }
+                .onFailure { handleFailure(it) }
             refreshing.value = false
         }
     }
@@ -113,24 +120,38 @@ class StudentViewModel @Inject constructor(
             refreshing.value = true
             error.value = null
             runCatching { syncAgendaToCalendarUseCase(events) }
-                .onFailure { error.value = it.toAppError() }
+                .onFailure { handleFailure(it) }
             refreshing.value = false
         }
     }
 
     fun openDocument(document: AcademicDocument) {
         viewModelScope.launch {
-            refreshing.value = true
+            _downloadingDocumentIds.update { it + document.id }
+            _documentDownloadProgress.update { it + (document.id to null) }
             error.value = null
-            runCatching { downloadDocumentUseCase(document) }
+            runCatching {
+                downloadDocumentUseCase(document) { progress ->
+                    _documentDownloadProgress.update { it + (document.id to progress) }
+                }
+            }
                 .onSuccess { uri -> documentOpenRequests.emit(DocumentOpenRequest(uri, document.mimeType)) }
-                .onFailure { error.value = it.toAppError() }
-            refreshing.value = false
+                .onFailure { handleFailure(it) }
+            _downloadingDocumentIds.update { it - document.id }
+            _documentDownloadProgress.update { it - document.id }
         }
     }
 
     fun reportOpenDocumentFailure() {
         error.value = AppError.Storage
+    }
+
+    private suspend fun handleFailure(throwable: Throwable) {
+        val appError = throwable.toAppError()
+        error.value = appError
+        if (appError == AppError.Unauthorized) {
+            runCatching { logoutUseCase() }
+        }
     }
 
     private fun observeNetworkRecovery(online: Flow<Boolean>) {

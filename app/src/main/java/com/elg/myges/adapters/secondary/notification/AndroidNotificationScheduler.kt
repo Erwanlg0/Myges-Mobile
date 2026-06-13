@@ -92,7 +92,8 @@ class AndroidNotificationScheduler @Inject constructor(
                 grade.courseName.ifBlank { context.getString(R.string.common_untitled) },
                 formatGrade(grade)
             ),
-            route = ROUTE_GRADES
+            route = ROUTE_GRADES,
+            subject = grade.courseName
         )
     }
 
@@ -105,7 +106,8 @@ class AndroidNotificationScheduler @Inject constructor(
                 absence.courseName.ifBlank { context.getString(R.string.common_untitled) },
                 formatInstant(absence.startsAt)
             ),
-            route = ROUTE_ABSENCES
+            route = ROUTE_ABSENCES,
+            subject = absence.courseName
         )
     }
 
@@ -118,7 +120,8 @@ class AndroidNotificationScheduler @Inject constructor(
                 event.title.ifBlank { context.getString(R.string.common_untitled) },
                 formatInstant(event.startsAt)
             ),
-            route = ROUTE_AGENDA
+            route = ROUTE_AGENDA,
+            subject = event.title
         )
     }
 
@@ -133,7 +136,8 @@ class AndroidNotificationScheduler @Inject constructor(
                 project.name.ifBlank { context.getString(R.string.common_untitled) },
                 deadline
             ),
-            route = ROUTE_PROJECTS
+            route = ROUTE_PROJECTS,
+            subject = project.courseName ?: project.name
         )
     }
 
@@ -145,22 +149,36 @@ class AndroidNotificationScheduler @Inject constructor(
                 R.string.notifications_new_document_body,
                 document.title.ifBlank { context.getString(R.string.common_untitled) }
             ),
-            route = ROUTE_DOCUMENTS
+            route = ROUTE_DOCUMENTS,
+            subject = document.category ?: document.title
         )
     }
 
-    private fun showNotification(id: Int, title: String, body: String, route: String) {
+    private fun showNotification(
+        id: Int,
+        title: String,
+        body: String,
+        route: String,
+        subject: String? = null
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             return
         }
+        val intent = contentIntent(id, route)
         val notification = NotificationCompat.Builder(context, CHANNEL_STUDENT)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setContentIntent(contentIntent(id, route))
+            .setContentIntent(intent)
+            .setGroup(notificationGroupKey(route, subject))
+            .addAction(
+                R.mipmap.ic_launcher,
+                context.getString(R.string.notifications_action_open),
+                intent
+            )
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notify(id, notification)
@@ -201,10 +219,6 @@ class AndroidNotificationScheduler @Inject constructor(
 
     private fun currentLocale(): Locale {
         return context.resources.configuration.locales[0] ?: Locale.getDefault()
-    }
-
-    private fun stableNotificationId(value: String): Int {
-        return value.hashCode().let { if (it == Int.MIN_VALUE) Int.MAX_VALUE else kotlin.math.abs(it) }
     }
 
     private companion object {

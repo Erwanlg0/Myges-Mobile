@@ -37,7 +37,7 @@ interface StudentDataRepository {
     fun observeNews(): Flow<List<NewsItem>>
     suspend fun syncAll()
     suspend fun clearCache()
-    suspend fun downloadDocument(document: AcademicDocument): Uri
+    suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit = {}): Uri
 }
 
 interface SettingsRepository {

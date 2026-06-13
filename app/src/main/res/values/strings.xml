@@ -2,6 +2,7 @@
     <string name="app_name">MyGES</string>
 
     <string name="action_cancel">Annuler</string>
+    <string name="action_close">Fermer</string>
     <string name="action_retry">Réessayer</string>
     <string name="action_sync_now">Synchroniser maintenant</string>
     <string name="cd_open_navigation">Ouvrir la navigation</string>
@@ -47,6 +48,7 @@
     <string name="dashboard_due_projects">Échéances de projets</string>
 
     <string name="profile_email">E-mail</string>
+    <string name="profile_avatar_cd">Photo de profil de %1$s</string>
     <string name="profile_program">Formation</string>
     <string name="profile_school">École</string>
     <string name="profile_year">Année</string>
@@ -55,6 +57,7 @@
     <string name="agenda_empty_title">Agenda vide</string>
     <string name="agenda_empty_body">Aucun événement n’est disponible dans le cache local.</string>
     <string name="agenda_sync_calendar">Synchroniser le calendrier</string>
+    <string name="agenda_details_title">Détail du cours</string>
     <string name="agenda_end">Fin</string>
     <string name="agenda_filter_empty">Aucun événement pour cette vue.</string>
     <string name="agenda_mode_day">Jour</string>
@@ -63,13 +66,19 @@
     <string name="agenda_modality">Modalité</string>
     <string name="agenda_room">Salle</string>
     <string name="agenda_teacher">Intervenant</string>
+    <string name="agenda_type">Type</string>
 
     <string name="grades_title">Notes</string>
     <string name="grades_empty_title">Aucune note</string>
     <string name="grades_empty_body">Les notes synchronisées apparaîtront ici dès que MyGES les renverra.</string>
     <string name="grades_average">Moyenne</string>
     <string name="grades_coefficient">Coefficient</string>
+    <string name="grades_count">Notes prises en compte</string>
+    <string name="grades_gpa">GPA estimé</string>
+    <string name="grades_summary_incomplete">Estimation calculée avec les données disponibles. Elle peut différer des règles officielles de l’école.</string>
+    <string name="grades_summary_title">Moyenne générale</string>
     <string name="grades_value_format">%1$s/%2$s</string>
+    <string name="grades_weighted_average">Moyenne pondérée</string>
 
     <string name="absences_title">Absences</string>
     <string name="absences_empty_title">Aucune absence</string>
@@ -93,6 +102,8 @@
     <string name="courses_empty_title">Aucun cours</string>
     <string name="courses_empty_body">Les cours de l’année synchronisée apparaîtront ici.</string>
     <string name="courses_files">Fichiers</string>
+    <string name="courses_hide_syllabus">Masquer le syllabus</string>
+    <string name="courses_show_syllabus">Afficher le syllabus</string>
     <string name="courses_teacher">Intervenant</string>
 
     <string name="projects_title">Projets</string>
@@ -102,7 +113,10 @@
     <string name="projects_deadline">Échéance</string>
     <string name="projects_files">Fichiers</string>
     <string name="projects_group">Groupe</string>
+    <string name="projects_no_steps">Aucune étape détaillée disponible</string>
+    <string name="projects_progress">Progression</string>
     <string name="projects_status">Statut</string>
+    <string name="projects_steps_completed">%1$d/%2$d étapes terminées</string>
 
     <string name="practicals_title">Travaux pratiques</string>
     <string name="practicals_empty_title">Aucun travail pratique</string>
@@ -115,10 +129,12 @@
     <string name="documents_empty_title">Aucun document</string>
     <string name="documents_empty_body">Les documents annuels et fichiers téléchargés apparaîtront ici.</string>
     <string name="documents_category">Catégorie</string>
+    <string name="documents_downloading">Téléchargement</string>
     <string name="documents_open">Télécharger et ouvrir</string>
     <string name="documents_updated_at">Mis à jour</string>
 
     <string name="notifications_title">Notifications</string>
+    <string name="notifications_action_open">Ouvrir</string>
     <string name="notifications_empty_title">Aucune actualité</string>
     <string name="notifications_empty_body">Les actualités et alertes synchronisées apparaîtront ici.</string>
     <string name="notifications_grant_permission">Autoriser les notifications</string>

@@ -4,6 +4,7 @@ agp = "9.2.1"
 appcompat = "1.7.1"
 biometric = "1.1.0"
 browser = "1.10.0"
+coil = "2.7.0"
 composeBom = "2026.02.01"
 coreKtx = "1.19.0"
 coreSplashscreen = "1.2.0"
@@ -34,6 +35,7 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }

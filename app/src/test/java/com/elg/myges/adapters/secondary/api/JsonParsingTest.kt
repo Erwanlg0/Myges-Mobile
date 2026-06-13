@@ -57,6 +57,34 @@ class JsonParsingTest {
     }
 
     @Test
+    fun yearsParseTrimesterYearsPayload() {
+        val years = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "school_name": "ESGI",
+                  "tri_describe": "Semestre 1",
+                  "tri_id": 21,
+                  "tri_name": "S1",
+                  "year": 2026
+                },
+                {
+                  "school_name": "ESGI",
+                  "tri_describe": "Semestre 2",
+                  "tri_id": 22,
+                  "tri_name": "S2",
+                  "year": 2026
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toYears()
+
+        assertEquals(listOf("2026"), years)
+    }
+
+    @Test
     fun agendaParsesKordisResultPayload() {
         val events = json.parseToJsonElement(
             """
@@ -211,6 +239,29 @@ class JsonParsingTest {
     }
 
     @Test
+    fun syllabusParsesKordisPayloadIntoReadableText() {
+        val syllabus = json.parseToJsonElement(
+            """
+            {
+              "result": {
+                "syllabus_name": "Algorithmique",
+                "teaching_goals": "Comprendre les structures de données",
+                "detail_plan": "Listes chaînées",
+                "skills": "Analyser un algorithme",
+                "evaluation_type": "Projet"
+              }
+            }
+            """.trimIndent()
+        ).toCourseSyllabus()
+
+        checkNotNull(syllabus)
+        assertTrue(syllabus.contains("Algorithmique"))
+        assertTrue(syllabus.contains("Comprendre les structures de données"))
+        assertTrue(syllabus.contains("Listes chaînées"))
+        assertTrue(syllabus.contains("Projet"))
+    }
+
+    @Test
     fun documentsParseKordisCourseFilePayload() {
         val documents = json.parseToJsonElement(
             """
@@ -267,6 +318,7 @@ class JsonParsingTest {
         assertEquals("Consignes du projet", documents.first().title)
         assertEquals("2025", documents.first().year)
         assertEquals("consignes.md", documents.first().fileName)
+        assertEquals("me/projectFiles/20788", documents.first().downloadUrl)
     }
 
     @Test
@@ -308,6 +360,38 @@ class JsonParsingTest {
     }
 
     @Test
+    fun nextProjectStepsParseKordisPayloadAsProjects() {
+        val projects = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "pro_name": "Projet final ReactJS",
+                  "pro_id": 22843,
+                  "psp_desc": "Rendu final",
+                  "psp_type": "Livrable",
+                  "group_id": 3321,
+                  "psp_id": 778,
+                  "type": "project",
+                  "course_name": "React",
+                  "psp_limit_date": 1774653214127
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toNextProjectStepProjects()
+
+        assertEquals(1, projects.size)
+        assertEquals("22843", projects.first().id)
+        assertEquals("Projet final ReactJS", projects.first().name)
+        assertEquals("React", projects.first().courseName)
+        assertEquals("3321", projects.first().groupName)
+        assertEquals(Instant.ofEpochMilli(1774653214127), projects.first().deadline)
+        assertEquals("778", projects.first().steps.first().id)
+        assertEquals("Rendu final", projects.first().steps.first().title)
+    }
+
+    @Test
     fun projectDocumentsParseKordisStepFiles() {
         val documents = json.parseToJsonElement(
             """
@@ -346,6 +430,34 @@ class JsonParsingTest {
         assertEquals("application/zip", documents.first().mimeType)
         assertEquals("https://ges-dl.kordis.fr/private/step-file", documents.first().downloadUrl)
         assertEquals(Instant.ofEpochMilli(1774653214127), documents.first().updatedAt)
+    }
+
+    @Test
+    fun projectStepDocumentsUseEndpointWhenLinkIsMissing() {
+        val documents = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "project_id": 22843,
+                  "steps": [
+                    {
+                      "psp_desc": "Rendu final",
+                      "files": [
+                        {
+                          "psf_id": 991,
+                          "psf_name": "rendu.zip"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toProjectDocuments()
+
+        assertEquals("me/projectStepFiles/991", documents.first().downloadUrl)
     }
 
     @Test
@@ -398,5 +510,79 @@ class JsonParsingTest {
         assertEquals("12", news.first().id)
         assertEquals("Résumé", news.first().body)
         assertEquals(Instant.ofEpochMilli(1781222400000), news.first().publishedAt)
+    }
+    @Test
+    fun newsParsesSingleMinimumVersionPayload() {
+        val news = json.parseToJsonElement(
+            """
+            {
+              "result": {
+                "type": "skolae_app_version",
+                "label": "Version minimum requise",
+                "value": "3.5.0"
+              }
+            }
+            """.trimIndent()
+        ).toNews()
+
+        assertEquals(1, news.size)
+        assertEquals("skolae_app_version", news.first().id)
+        assertEquals("Version minimum requise", news.first().title)
+        assertEquals("3.5.0", news.first().body)
+    }
+
+    @Test
+    fun newsParsesSpeedMeetingAppointmentsAsStudentNews() {
+        val news = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "appointment_start": 1781222400000,
+                  "appointment_end": 1781226000000,
+                  "corporate_name": "KEMEO",
+                  "location": "ONLINE",
+                  "organizer": "ESGI",
+                  "ss_id": 134062,
+                  "title": "Speed meeting",
+                  "offers": [
+                    {
+                      "offer": "DÃ©veloppeur PHP h/f",
+                      "contract": "Contrat d'apprentissage"
+                    }
+                  ]
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toNews()
+
+        assertEquals(1, news.size)
+        assertEquals("Speed meeting", news.first().title)
+        assertEquals(Instant.ofEpochMilli(1781222400000), news.first().publishedAt)
+        assertTrue(news.first().body.orEmpty().contains("KEMEO"))
+        assertTrue(news.first().body.orEmpty().contains("DÃ©veloppeur PHP h/f"))
+    }
+
+    @Test
+    fun newsParsesPartnersPayloadAsStudentNews() {
+        val news = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "partner_id": 1,
+                  "name": "Microsoft Campus",
+                  "content": "Offres campus",
+                  "link": "https://example.com"
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toNews()
+
+        assertEquals(1, news.size)
+        assertEquals("Microsoft Campus", news.first().title)
+        assertEquals("Offres campus", news.first().body)
     }
 }

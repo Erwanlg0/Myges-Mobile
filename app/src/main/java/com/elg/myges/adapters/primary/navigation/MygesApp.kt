@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Event
@@ -59,6 +60,7 @@ import com.elg.myges.adapters.primary.ui.NotificationsScreen
 import com.elg.myges.adapters.primary.ui.PracticalsScreen
 import com.elg.myges.adapters.primary.ui.ProjectsScreen
 import com.elg.myges.adapters.primary.ui.SettingsScreen
+import com.elg.myges.adapters.primary.ui.StudentAvatar
 import com.elg.myges.adapters.primary.viewmodel.AppViewModel
 import com.elg.myges.adapters.primary.viewmodel.SettingsViewModel
 import com.elg.myges.adapters.primary.viewmodel.StudentViewModel
@@ -120,6 +122,7 @@ private fun StudentRoute(
     val coroutineScope = rememberCoroutineScope()
     val studentViewModel: StudentViewModel = hiltViewModel()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val dashboardState by studentViewModel.dashboard.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
@@ -158,7 +161,20 @@ private fun StudentRoute(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {
-                Text(
+                dashboardState.data?.profile?.let { profile ->
+                    StudentAvatar(
+                        avatarUrl = profile.avatarUrl,
+                        displayName = profile.displayName,
+                        modifier = Modifier
+                            .padding(start = 24.dp, top = 24.dp)
+                            .size(56.dp)
+                    )
+                    Text(
+                        text = profile.displayName,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(start = 24.dp, top = 12.dp, end = 24.dp)
+                    )
+                } ?: Text(
                     text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(24.dp)

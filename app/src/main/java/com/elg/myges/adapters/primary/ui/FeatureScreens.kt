@@ -8,14 +8,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Delete
@@ -24,13 +28,17 @@ import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,7 +46,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -61,6 +71,9 @@ import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
 import com.elg.myges.domain.model.Project
 import com.elg.myges.domain.model.UserSettings
+import com.elg.myges.domain.model.progress
+import com.elg.myges.domain.model.toGradeSummary
+import coil.compose.AsyncImage
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -80,6 +93,11 @@ fun DashboardScreen(viewModel: StudentViewModel) {
         dashboard.profile?.let { profile ->
             item {
                 DataCard {
+                    StudentAvatar(
+                        avatarUrl = profile.avatarUrl,
+                        displayName = profile.displayName,
+                        modifier = Modifier.size(72.dp)
+                    )
                     Text(
                         text = profile.displayName.orUntitled(),
                         style = MaterialTheme.typography.titleLarge,
@@ -130,8 +148,15 @@ fun AgendaScreen(viewModel: StudentViewModel) {
     val state by viewModel.agenda.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var selectedMode by remember { mutableStateOf(AgendaMode.List) }
+    var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
     val calendarLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         if (grants.values.all { it }) viewModel.syncAgendaToCalendar(state.data)
+    }
+    selectedEvent?.let { event ->
+        AgendaEventDetailsDialog(
+            event = event,
+            onDismiss = { selectedEvent = null }
+        )
     }
     FeatureStateContent(
         state = state,
@@ -162,7 +187,12 @@ fun AgendaScreen(viewModel: StudentViewModel) {
         if (filteredEvents.isEmpty()) {
             item { CompactCard { Text(stringResource(R.string.agenda_filter_empty)) } }
         } else {
-            items(filteredEvents, key = { it.id }) { event -> AgendaEventCard(event) }
+            items(filteredEvents, key = { it.id }) { event ->
+                AgendaEventCard(
+                    event = event,
+                    onOpen = { selectedEvent = event }
+                )
+            }
         }
     }
 }
@@ -178,6 +208,7 @@ fun GradesScreen(viewModel: StudentViewModel) {
         emptyBody = R.string.grades_empty_body,
         onRetry = viewModel::refresh
     ) { grades ->
+        item { GradeSummaryCard(grades) }
         grades.groupBy { it.period ?: noPeriod }.forEach { (period, periodGrades) ->
             item { SectionTitleText(period) }
             items(periodGrades, key = { it.id }) { grade -> GradeCard(grade) }
@@ -258,6 +289,8 @@ fun PracticalsScreen(viewModel: StudentViewModel) {
 @Composable
 fun DocumentsScreen(viewModel: StudentViewModel) {
     val state by viewModel.documents.collectAsStateWithLifecycle()
+    val downloadingDocumentIds by viewModel.downloadingDocumentIds.collectAsStateWithLifecycle()
+    val documentDownloadProgress by viewModel.documentDownloadProgress.collectAsStateWithLifecycle()
     FeatureStateContent(
         state = state,
         empty = List<AcademicDocument>::isEmpty,
@@ -266,7 +299,12 @@ fun DocumentsScreen(viewModel: StudentViewModel) {
         onRetry = viewModel::refresh
     ) { documents ->
         items(documents, key = { it.id }) { document ->
-            DocumentCard(document, onOpen = { viewModel.openDocument(document) })
+            DocumentCard(
+                document = document,
+                downloading = document.id in downloadingDocumentIds,
+                progress = documentDownloadProgress[document.id],
+                onOpen = { viewModel.openDocument(document) }
+            )
         }
     }
 }
@@ -430,7 +468,7 @@ private fun NotificationPreferences(
 }
 
 @Composable
-private fun LanguageSelector(
+internal fun LanguageSelector(
     selectedLanguageTag: String?,
     onLanguageSelected: (String?) -> Unit
 ) {
@@ -446,7 +484,7 @@ private fun LanguageSelector(
 }
 
 @Composable
-private fun SwitchRow(
+internal fun SwitchRow(
     @StringRes title: Int,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
@@ -471,8 +509,31 @@ private fun SwitchRow(
 }
 
 @Composable
-private fun AgendaEventCard(event: AgendaEvent) {
-    CompactCard {
+fun StudentAvatar(
+    avatarUrl: String?,
+    displayName: String,
+    modifier: Modifier = Modifier
+) {
+    if (avatarUrl.isNullOrBlank()) {
+        Box(modifier = modifier)
+        return
+    }
+    AsyncImage(
+        model = avatarUrl,
+        contentDescription = stringResource(R.string.profile_avatar_cd, displayName.orUntitled()),
+        contentScale = ContentScale.Crop,
+        modifier = modifier.clip(CircleShape)
+    )
+}
+
+@Composable
+internal fun AgendaEventCard(
+    event: AgendaEvent,
+    onOpen: (() -> Unit)? = null
+) {
+    CompactCard(
+        modifier = if (onOpen == null) Modifier else Modifier.clickable(onClick = onOpen)
+    ) {
         Text(
             text = event.title.orUntitled(),
             style = MaterialTheme.typography.titleMedium,
@@ -484,6 +545,37 @@ private fun AgendaEventCard(event: AgendaEvent) {
         LabelValue(R.string.agenda_teacher, event.teacher.orEmpty())
         LabelValue(R.string.agenda_modality, event.modality.orEmpty())
     }
+}
+
+@Composable
+internal fun AgendaEventDetailsDialog(
+    event: AgendaEvent,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.agenda_details_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = event.title.orUntitled(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                LabelValue(R.string.practicals_start, formatInstant(event.startsAt))
+                LabelValue(R.string.agenda_end, formatInstant(event.endsAt))
+                LabelValue(R.string.agenda_room, event.room.orEmpty())
+                LabelValue(R.string.agenda_teacher, event.teacher.orEmpty())
+                LabelValue(R.string.agenda_modality, event.modality.orEmpty())
+                LabelValue(R.string.agenda_type, event.type.orEmpty())
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        }
+    )
 }
 
 @Composable
@@ -513,7 +605,29 @@ private fun GradeCard(grade: Grade) {
 }
 
 @Composable
-private fun AbsenceCard(absence: Absence) {
+internal fun GradeSummaryCard(grades: List<Grade>) {
+    val summary = remember(grades) { grades.toGradeSummary() }
+    DataCard {
+        Text(
+            text = stringResource(R.string.grades_summary_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        LabelValue(R.string.grades_weighted_average, formatNumber(summary.weightedAverage))
+        LabelValue(R.string.grades_gpa, formatNumber(summary.gpa))
+        LabelValue(R.string.grades_count, summary.gradedCount.toString())
+        if (summary.incomplete) {
+            Text(
+                text = stringResource(R.string.grades_summary_incomplete),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+internal fun AbsenceCard(absence: Absence) {
     CompactCard {
         Text(
             text = absence.courseName.orUntitled(),
@@ -531,7 +645,8 @@ private fun AbsenceCard(absence: Absence) {
 }
 
 @Composable
-private fun CourseCard(course: Course) {
+internal fun CourseCard(course: Course) {
+    var syllabusExpanded by remember(course.id) { mutableStateOf(false) }
     CompactCard {
         Text(
             text = course.name.orUntitled(),
@@ -544,13 +659,18 @@ private fun CourseCard(course: Course) {
         LabelValue(R.string.courses_files, course.fileCount.toString())
         if (!course.syllabus.isNullOrBlank()) {
             HorizontalDivider()
-            Text(course.syllabus)
+            TextButton(onClick = { syllabusExpanded = !syllabusExpanded }) {
+                Text(stringResource(if (syllabusExpanded) R.string.courses_hide_syllabus else R.string.courses_show_syllabus))
+            }
+            if (syllabusExpanded) {
+                Text(course.syllabus)
+            }
         }
     }
 }
 
 @Composable
-private fun ProjectCard(project: Project) {
+internal fun ProjectCard(project: Project) {
     CompactCard {
         Text(
             text = project.name.orUntitled(),
@@ -562,6 +682,7 @@ private fun ProjectCard(project: Project) {
         LabelValue(R.string.projects_status, project.status.orEmpty())
         LabelValue(R.string.projects_deadline, formatInstant(project.deadline))
         LabelValue(R.string.projects_files, project.fileCount.toString())
+        ProjectProgress(project)
         project.steps.forEach { step ->
             HorizontalDivider()
             Text(step.title.orUntitled(), fontWeight = FontWeight.Medium)
@@ -572,7 +693,30 @@ private fun ProjectCard(project: Project) {
 }
 
 @Composable
-private fun PracticalCard(practical: Practical) {
+private fun ProjectProgress(project: Project) {
+    val progress = remember(project) { project.progress() }
+    Text(
+        text = stringResource(R.string.projects_progress),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    LinearProgressIndicator(
+        progress = { progress.fraction.toFloat() },
+        modifier = Modifier.fillMaxWidth()
+    )
+    Text(
+        text = if (progress.totalSteps == 0) {
+            stringResource(R.string.projects_no_steps)
+        } else {
+            stringResource(R.string.projects_steps_completed, progress.completedSteps, progress.totalSteps)
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+internal fun PracticalCard(practical: Practical) {
     CompactCard {
         Text(
             text = practical.name.orUntitled(),
@@ -588,8 +732,10 @@ private fun PracticalCard(practical: Practical) {
 }
 
 @Composable
-private fun DocumentCard(
+internal fun DocumentCard(
     document: AcademicDocument,
+    downloading: Boolean,
+    progress: Float?,
     onOpen: () -> Unit
 ) {
     CompactCard {
@@ -601,16 +747,36 @@ private fun DocumentCard(
         LabelValue(R.string.documents_category, document.category.orEmpty())
         LabelValue(R.string.profile_year, document.year.orEmpty())
         LabelValue(R.string.documents_updated_at, formatInstant(document.updatedAt))
-        OutlinedButton(onClick = onOpen) {
-            Icon(Icons.Rounded.Download, contentDescription = null)
+        OutlinedButton(
+            onClick = onOpen,
+            enabled = !downloading
+        ) {
+            if (downloading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(Icons.Rounded.Download, contentDescription = null)
+            }
             Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.documents_open))
+            Text(stringResource(if (downloading) R.string.documents_downloading else R.string.documents_open))
+        }
+        if (downloading) {
+            if (progress == null) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun NewsCard(newsItem: NewsItem) {
+internal fun NewsCard(newsItem: NewsItem) {
     CompactCard {
         Text(
             text = newsItem.title.orUntitled(),

@@ -63,11 +63,13 @@ class OfflineFirstStudentDataRepositoryTest {
         assertEquals(listOf("grade-1"), dao.gradeState.value.map { it.id })
         assertEquals(listOf("absence-1"), dao.absenceState.value.map { it.id })
         assertEquals(listOf("course-1"), dao.courseState.value.map { it.id })
+        assertEquals("Algorithms\n\nDetailed syllabus", dao.courseState.value.first().syllabus)
         assertEquals(listOf("project-1"), dao.projectState.value.map { it.id })
-        assertEquals(listOf("step-1"), dao.projectStepState.value.map { it.id })
+        assertEquals(setOf("step-1", "upcoming-step-1"), dao.projectStepState.value.map { it.id }.toSet())
         assertEquals(listOf("practical-1"), dao.practicalState.value.map { it.id })
         assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1"), dao.documentState.value.map { it.id }.toSet())
-        assertEquals(setOf("news-1", "banner-1"), dao.newsState.value.map { it.id }.toSet())
+        assertEquals("me/course-1/files/course-doc-1", dao.documentState.value.first { it.id == "course-doc-1" }.downloadUrl)
+        assertEquals(setOf("skolae_app_version", "news-1", "banner-1", "partner-1", "speed-1"), dao.newsState.value.map { it.id }.toSet())
         assertEquals(listOf("course-1"), api.courseFileRequests)
         assertFalse(expired.exists())
         assertTrue(current.exists())
@@ -121,7 +123,15 @@ private class RepositoryApi : MyGesApiService {
         """{"result":{"id":"student-1","displayName":"Student One","email":"student@example.com","academicYear":"2026"}}"""
     )
 
+    override suspend fun minimumVersion(): JsonElement = jsonElement(
+        """{"result":{"type":"skolae_app_version","label":"Minimum app version","value":"3.5.0"}}"""
+    )
+
     override suspend fun years(): JsonElement = jsonElement("""{"result":["2026"]}""")
+
+    override suspend fun trimesterYears(): JsonElement = jsonElement(
+        """{"result":[{"tri_describe":"Semestre 1","tri_id":21,"tri_name":"S1","year":2026}]}"""
+    )
 
     override suspend fun agenda(start: Long?, end: Long?): JsonElement = jsonElement(
         """{"result":[{"id":"agenda-1","title":"Math","start_date":"2026-06-12T08:00:00Z","end_date":"2026-06-12T10:00:00Z","room":"A101","teacher":"Teacher","type":"Course","rc_id":"course-1"}]}"""
@@ -134,9 +144,13 @@ private class RepositoryApi : MyGesApiService {
     override suspend fun courseFiles(rcId: String): JsonElement {
         courseFileRequests += rcId
         return jsonElement(
-            """{"result":[{"oc_id":"course-doc-1","title":"Course file","fileName":"course.pdf","extension":"pdf","url":"https://example.com/course.pdf"}]}"""
+            """{"result":[{"oc_id":"course-doc-1","title":"Course file","fileName":"course.pdf","extension":"pdf"}]}"""
         )
     }
+
+    override suspend fun syllabus(rcId: String): JsonElement = jsonElement(
+        """{"result":{"syllabus_name":"Algorithms","detail_plan":"Detailed syllabus"}}"""
+    )
 
     override suspend fun grades(year: String): JsonElement = jsonElement(
         """{"result":[{"id":"grade-1","courseName":"Algorithms","subject":"Exam","value":15.5,"scale":20,"date":"2026-06-10"}]}"""
@@ -154,6 +168,10 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"id":"project-1","name":"Project","courseName":"Algorithms","deadline":"2026-06-30T23:59:00Z","steps":[{"id":"step-1","title":"Submit","deadline":"2026-06-30T23:59:00Z"}],"project_files":[{"pf_id":"project-doc-1","pf_title":"Project brief","pf_file":"brief.pdf","extension":"pdf"}]}]}"""
     )
 
+    override suspend fun nextProjectSteps(): JsonElement = jsonElement(
+        """{"result":[{"pro_id":"project-1","pro_name":"Project","course_name":"Algorithms","psp_id":"upcoming-step-1","psp_desc":"Oral","psp_limit_date":"2026-06-25T12:00:00Z"}]}"""
+    )
+
     override suspend fun practicals(year: String): JsonElement = jsonElement(
         """{"result":[{"id":"practical-1","name":"Lab","courseName":"Algorithms","start":"2026-06-13T08:00:00Z","end":"2026-06-13T10:00:00Z","room":"B201"}]}"""
     )
@@ -164,6 +182,14 @@ private class RepositoryApi : MyGesApiService {
 
     override suspend fun newsBanners(): JsonElement = jsonElement(
         """{"result":[{"id":"banner-1","title":"Banner","body":"Important","publishedAt":"2026-06-02T08:00:00Z"}]}"""
+    )
+
+    override suspend fun partners(): JsonElement = jsonElement(
+        """{"result":[{"partner_id":"partner-1","name":"Partner","content":"Student offer"}]}"""
+    )
+
+    override suspend fun speedMeetingAppointments(): JsonElement = jsonElement(
+        """{"result":[{"ss_id":"speed-1","title":"Speed meeting","corporate_name":"Company","location":"ONLINE","appointment_start":"2026-06-03T08:00:00Z"}]}"""
     )
 
     override suspend fun download(url: String): ResponseBody {

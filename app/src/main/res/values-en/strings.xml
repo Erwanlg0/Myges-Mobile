@@ -2,6 +2,7 @@
     <string name="app_name">MyGES</string>
 
     <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
     <string name="action_retry">Retry</string>
     <string name="action_sync_now">Sync now</string>
     <string name="cd_open_navigation">Open navigation</string>
@@ -47,6 +48,7 @@
     <string name="dashboard_due_projects">Project deadlines</string>
 
     <string name="profile_email">Email</string>
+    <string name="profile_avatar_cd">%1$s profile picture</string>
     <string name="profile_program">Program</string>
     <string name="profile_school">School</string>
     <string name="profile_year">Year</string>
@@ -55,6 +57,7 @@
     <string name="agenda_empty_title">Empty agenda</string>
     <string name="agenda_empty_body">No event is available in the local cache.</string>
     <string name="agenda_sync_calendar">Sync calendar</string>
+    <string name="agenda_details_title">Class details</string>
     <string name="agenda_end">End</string>
     <string name="agenda_filter_empty">No event for this view.</string>
     <string name="agenda_mode_day">Day</string>
@@ -63,13 +66,19 @@
     <string name="agenda_modality">Modality</string>
     <string name="agenda_room">Room</string>
     <string name="agenda_teacher">Teacher</string>
+    <string name="agenda_type">Type</string>
 
     <string name="grades_title">Grades</string>
     <string name="grades_empty_title">No grades</string>
     <string name="grades_empty_body">Synced grades will appear here as soon as MyGES returns them.</string>
     <string name="grades_average">Average</string>
     <string name="grades_coefficient">Coefficient</string>
+    <string name="grades_count">Included grades</string>
+    <string name="grades_gpa">Estimated GPA</string>
+    <string name="grades_summary_incomplete">Estimate calculated from available data. It may differ from the school’s official rules.</string>
+    <string name="grades_summary_title">Overall average</string>
     <string name="grades_value_format">%1$s/%2$s</string>
+    <string name="grades_weighted_average">Weighted average</string>
 
     <string name="absences_title">Absences</string>
     <string name="absences_empty_title">No absences</string>
@@ -93,6 +102,8 @@
     <string name="courses_empty_title">No courses</string>
     <string name="courses_empty_body">Courses for the synced year will appear here.</string>
     <string name="courses_files">Files</string>
+    <string name="courses_hide_syllabus">Hide syllabus</string>
+    <string name="courses_show_syllabus">Show syllabus</string>
     <string name="courses_teacher">Teacher</string>
 
     <string name="projects_title">Projects</string>
@@ -102,7 +113,10 @@
     <string name="projects_deadline">Deadline</string>
     <string name="projects_files">Files</string>
     <string name="projects_group">Group</string>
+    <string name="projects_no_steps">No detailed step available</string>
+    <string name="projects_progress">Progress</string>
     <string name="projects_status">Status</string>
+    <string name="projects_steps_completed">%1$d/%2$d steps completed</string>
 
     <string name="practicals_title">Practicals</string>
     <string name="practicals_empty_title">No practicals</string>
@@ -115,10 +129,12 @@
     <string name="documents_empty_title">No documents</string>
     <string name="documents_empty_body">Annual documents and downloaded files will appear here.</string>
     <string name="documents_category">Category</string>
+    <string name="documents_downloading">Downloading</string>
     <string name="documents_open">Download and open</string>
     <string name="documents_updated_at">Updated</string>
 
     <string name="notifications_title">Notifications</string>
+    <string name="notifications_action_open">Open</string>
     <string name="notifications_empty_title">No news</string>
     <string name="notifications_empty_body">Synced news and alerts will appear here.</string>
     <string name="notifications_grant_permission">Allow notifications</string>

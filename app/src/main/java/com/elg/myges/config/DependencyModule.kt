@@ -121,6 +121,7 @@ object DependencyModule {
         @ApplicationContext context: Context,
         databasePassphraseStore: DatabasePassphraseStore
     ): MygesDatabase {
+        System.loadLibrary("sqlcipher")
         deletePlaintextDatabaseIfPresent(context, DATABASE_NAME)
         return Room.databaseBuilder(context, MygesDatabase::class.java, DATABASE_NAME)
             .openHelperFactory(SupportOpenHelperFactory(databasePassphraseStore.readOrCreate()))

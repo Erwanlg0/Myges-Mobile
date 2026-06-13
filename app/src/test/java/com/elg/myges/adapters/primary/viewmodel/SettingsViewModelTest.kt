@@ -216,7 +216,7 @@ private class RecordingStudentDataRepository(
     override suspend fun clearCache() {
         events += "clearCache"
     }
-    override suspend fun downloadDocument(document: AcademicDocument): Uri = Uri.EMPTY
+    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri = Uri.EMPTY
 }
 
 private class RecordingSessionRepository(

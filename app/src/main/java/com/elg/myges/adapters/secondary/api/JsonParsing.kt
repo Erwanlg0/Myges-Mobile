@@ -142,6 +142,29 @@ fun JsonElement.toCourses(): List<Course> {
     }
 }
 
+fun JsonElement.toCourseSyllabus(): String? {
+    val root = objectOrData()
+    return listOfNotNull(
+        root.text("syllabus_name", "course_name"),
+        root.text("teaching_goals"),
+        root.text("detail_plan"),
+        root.text("skills"),
+        root.text("prerequisite"),
+        root.text("teaching_method"),
+        root.text("evaluation_type"),
+        root.text("evaluation_criteria"),
+        root.text("books_reference"),
+        root.text("other_reference"),
+        root.text("computing_tools"),
+        root.arrayText("seance_details", "title", "name", "description", "detail")
+    )
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .joinToString("\n\n")
+        .takeIf { it.isNotBlank() }
+}
+
 fun JsonElement.toProjects(): List<Project> {
     return arrayOrNested("projects", "items", "data").map { element ->
         val root = element.objectOrData()
@@ -164,6 +187,29 @@ fun JsonElement.toProjects(): List<Project> {
             deadline = root.instant("deadline", "dueDate", "endDate", "update_date") ?: steps.mapNotNull { it.deadline }.minOrNull(),
             steps = steps,
             fileCount = root.array("files", "project_files", "documents", "deliverables").size + stepFileCount
+        )
+    }
+}
+
+fun JsonElement.toNextProjectStepProjects(): List<Project> {
+    return arrayOrNested("projectSteps", "steps", "items", "data").mapNotNull { element ->
+        val root = element.objectOrData()
+        val projectId = root.text("project_id", "projectId", "pro_id") ?: return@mapNotNull null
+        val step = ProjectStep(
+            id = root.text("psp_id", "stepId", "id", "uid") ?: stableId(root),
+            title = root.text("psp_desc", "title", "name", "psp_type", "type") ?: "",
+            deadline = root.instant("psp_limit_date", "deadline", "dueDate", "endDate"),
+            status = root.text("status", "state", "type")
+        )
+        Project(
+            id = projectId,
+            name = root.text("pro_name", "projectName", "name", "title") ?: "",
+            courseName = root.text("course_name", "courseName", "course", "module"),
+            groupName = root.text("group_id", "groupName", "group", "projectGroup"),
+            status = root.text("status", "state", "type"),
+            deadline = step.deadline,
+            steps = listOf(step),
+            fileCount = 0
         )
     }
 }
@@ -198,13 +244,15 @@ fun JsonElement.toProjectDocuments(): List<AcademicDocument> {
         val projectRoot = element.objectOrData()
         val projectFiles = projectRoot.array("project_files").map { file ->
             val root = file.objectOrData()
-            root.toDocument(parentTitle = projectRoot.text("name", "title"), parentYear = projectRoot.text("year", "academicYear"))
+            val document = root.toDocument(parentTitle = projectRoot.text("name", "title"), parentYear = projectRoot.text("year", "academicYear"))
+            document.copy(downloadUrl = document.downloadUrl ?: "me/projectFiles/${document.id}")
         }
         val stepFiles = projectRoot.array("steps", "projectSteps").flatMap { step ->
             val stepRoot = step.objectOrData()
             stepRoot.array("files").map { file ->
                 val root = file.objectOrData()
-                root.toDocument(parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"), parentYear = projectRoot.text("year", "academicYear"))
+                val document = root.toDocument(parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"), parentYear = projectRoot.text("year", "academicYear"))
+                document.copy(downloadUrl = document.downloadUrl ?: "me/projectStepFiles/${document.id}")
             }
         }
         projectFiles + stepFiles
@@ -212,13 +260,15 @@ fun JsonElement.toProjectDocuments(): List<AcademicDocument> {
 }
 
 fun JsonElement.toNews(): List<NewsItem> {
-    return arrayOrNested("news", "banners", "content", "items", "data").map { element ->
+    val items = arrayOrNested("news", "banners", "content", "items", "data")
+        .ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }
+    return items.map { element ->
         val root = element.objectOrData()
         NewsItem(
-            id = root.text("id", "newsId", "ne_id", "uid") ?: stableId(root),
-            title = root.text("title", "name") ?: "",
-            body = root.text("body", "content", "summary", "text", "html", "description"),
-            publishedAt = root.instant("publishedAt", "date", "createdAt", "update_date")
+            id = root.text("id", "newsId", "ne_id", "partner_id", "ss_id", "type", "uid") ?: stableId(root),
+            title = root.text("title", "name", "label") ?: "",
+            body = root.text("body", "content", "summary", "text", "html", "description", "value") ?: root.newsFallbackBody(),
+            publishedAt = root.instant("publishedAt", "date", "createdAt", "update_date", "appointment_start")
         )
     }
 }
@@ -332,6 +382,18 @@ private fun JsonObject.linkHref(): String? {
     return array("links")
         .mapNotNull { (it as? JsonObject)?.text("href", "url") }
         .firstOrNull()
+}
+
+private fun JsonObject.newsFallbackBody(): String? {
+    return listOfNotNull(
+        text("corporate_name"),
+        text("location"),
+        text("organizer"),
+        arrayText("offers", "offer", "contract", "of_activity")
+    )
+        .filter { it.isNotBlank() }
+        .joinToString(" - ")
+        .takeIf { it.isNotBlank() }
 }
 
 private fun JsonObject.instant(vararg keys: String): Instant? {

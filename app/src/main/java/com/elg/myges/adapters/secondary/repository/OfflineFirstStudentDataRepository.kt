@@ -6,10 +6,12 @@ import androidx.core.content.FileProvider
 import com.elg.myges.adapters.secondary.api.MyGesApiService
 import com.elg.myges.adapters.secondary.api.toAbsences
 import com.elg.myges.adapters.secondary.api.toAgendaEvents
+import com.elg.myges.adapters.secondary.api.toCourseSyllabus
 import com.elg.myges.adapters.secondary.api.toCourses
 import com.elg.myges.adapters.secondary.api.toDocuments
 import com.elg.myges.adapters.secondary.api.toGrades
 import com.elg.myges.adapters.secondary.api.toNews
+import com.elg.myges.adapters.secondary.api.toNextProjectStepProjects
 import com.elg.myges.adapters.secondary.api.toPracticals
 import com.elg.myges.adapters.secondary.api.toProfile
 import com.elg.myges.adapters.secondary.api.toProjectDocuments
@@ -120,14 +122,25 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             try {
                 purgeExpiredDocumentCache(File(context.cacheDir, DOCUMENT_CACHE))
                 val profile = api.profile().toProfile()
-                val years = academicYearCandidates(api.years()?.toYears().orEmpty(), profile.academicYear)
+                val years = academicYearCandidates(
+                    api.years()?.toYears().orEmpty() + runCatching { api.trimesterYears()?.toYears().orEmpty() }.getOrDefault(emptyList()),
+                    profile.academicYear
+                )
                 val agendaWindow = AgendaWindow.fromToday()
                 val agenda = api.agenda(
                     start = agendaWindow.start,
                     end = agendaWindow.end
                 )?.toAgendaEvents().orEmpty()
+                val nextProjectStepProjects = runCatching {
+                    api.nextProjectSteps()?.toNextProjectStepProjects().orEmpty()
+                }.getOrDefault(emptyList())
                 val yearData = firstNonEmptyYearData(years)
-                val news = api.news()?.toNews().orEmpty() + runCatching { api.newsBanners()?.toNews().orEmpty() }.getOrDefault(emptyList())
+                    .withNextProjectSteps(nextProjectStepProjects)
+                val news = runCatching { api.minimumVersion()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
+                    api.news()?.toNews().orEmpty() +
+                    runCatching { api.newsBanners()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
+                    runCatching { api.partners()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
+                    runCatching { api.speedMeetingAppointments()?.toNews().orEmpty() }.getOrDefault(emptyList())
                 val previousIds = SyncedIds(
                     agenda = dao.agendaIds().toSet(),
                     grades = dao.gradeIds().toSet(),
@@ -161,7 +174,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         }
     }
 
-    override suspend fun downloadDocument(document: AcademicDocument): Uri {
+    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri {
         return withContext(Dispatchers.IO) {
             try {
                 val remoteUrl = document.downloadUrl ?: "me/annualDocuments/${document.id}"
@@ -169,9 +182,22 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 val directory = File(context.cacheDir, DOCUMENT_CACHE).apply { mkdirs() }
                 purgeExpiredDocumentCache(directory)
                 val target = File(directory, document.fileName.sanitizedFileName())
+                val contentLength = response.contentLength()
+                var copied = 0L
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                onProgress(0f.takeIf { contentLength > 0 })
                 response.byteStream().use { input ->
-                    target.outputStream().use { output -> input.copyTo(output) }
+                    target.outputStream().use { output ->
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            output.write(buffer, 0, read)
+                            copied += read
+                            onProgress(if (contentLength > 0) (copied.toFloat() / contentLength).coerceIn(0f, 1f) else null)
+                        }
+                    }
                 }
+                onProgress(1f)
                 target.setLastModified(Instant.now().toEpochMilli())
                 FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
             } catch (throwable: Throwable) {
@@ -201,6 +227,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         var fallback: YearData? = null
         years.forEach { year ->
             val courses = api.courses(year)?.toCourses().orEmpty()
+                .withRemoteSyllabus()
             val projectsJson = api.projects(year)
             val projects = projectsJson?.toProjects().orEmpty()
             val documents = api.annualDocuments(year)?.toDocuments().orEmpty() +
@@ -223,8 +250,26 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     private suspend fun courseDocuments(courses: List<Course>): List<AcademicDocument> {
         return courses.filter { it.fileCount > 0 }
             .flatMap { course ->
-                runCatching { api.courseFiles(course.id)?.toDocuments().orEmpty() }.getOrDefault(emptyList())
+                runCatching {
+                    api.courseFiles(course.id)
+                        ?.toDocuments()
+                        .orEmpty()
+                        .map { document ->
+                            document.copy(downloadUrl = document.downloadUrl ?: "me/${course.id}/files/${document.id}")
+                        }
+                }.getOrDefault(emptyList())
             }
+    }
+
+    private suspend fun List<Course>.withRemoteSyllabus(): List<Course> {
+        return map { course ->
+            if (!course.syllabus.isNullOrBlank()) {
+                course
+            } else {
+                val syllabus = runCatching { api.syllabus(course.id)?.toCourseSyllabus() }.getOrNull()
+                if (syllabus.isNullOrBlank()) course else course.copy(syllabus = syllabus)
+            }
+        }
     }
 
     private suspend fun notifyAboutChanges(
@@ -281,6 +326,24 @@ private data class YearData(
             documents.isNotEmpty() ||
             projects.isNotEmpty() ||
             practicals.isNotEmpty()
+    }
+
+    fun withNextProjectSteps(nextProjectStepProjects: List<Project>): YearData {
+        if (nextProjectStepProjects.isEmpty()) return this
+        val upcomingByProjectId = nextProjectStepProjects.associateBy { it.id }
+        val mergedProjects = projects.map { project ->
+            val upcoming = upcomingByProjectId[project.id] ?: return@map project
+            project.copy(
+                name = project.name.ifBlank { upcoming.name },
+                courseName = project.courseName ?: upcoming.courseName,
+                groupName = project.groupName ?: upcoming.groupName,
+                status = project.status ?: upcoming.status,
+                deadline = listOfNotNull(project.deadline, upcoming.deadline).minOrNull(),
+                steps = (project.steps + upcoming.steps).distinctBy { it.id }
+            )
+        }
+        val existingProjectIds = projects.map { it.id }.toSet()
+        return copy(projects = mergedProjects + nextProjectStepProjects.filter { it.id !in existingProjectIds })
     }
 }
 

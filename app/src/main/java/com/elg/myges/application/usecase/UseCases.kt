@@ -146,7 +146,7 @@ class ClearCacheUseCase @Inject constructor(
 class DownloadDocumentUseCase @Inject constructor(
     private val repository: StudentDataRepository
 ) {
-    suspend operator fun invoke(document: AcademicDocument) = repository.downloadDocument(document)
+    suspend operator fun invoke(document: AcademicDocument, onProgress: (Float?) -> Unit = {}) = repository.downloadDocument(document, onProgress)
 }
 
 class ObserveSettingsUseCase @Inject constructor(

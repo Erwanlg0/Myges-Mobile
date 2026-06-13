@@ -3,9 +3,12 @@ package com.elg.myges.adapters.primary.viewmodel
 import android.net.Uri
 import com.elg.myges.application.ports.CalendarSyncPort
 import com.elg.myges.application.ports.NetworkMonitor
+import com.elg.myges.application.ports.NotificationScheduler
 import com.elg.myges.application.ports.SettingsRepository
 import com.elg.myges.application.ports.StudentDataRepository
+import com.elg.myges.application.ports.SessionRepository
 import com.elg.myges.application.usecase.DownloadDocumentUseCase
+import com.elg.myges.application.usecase.LogoutUseCase
 import com.elg.myges.application.usecase.ObserveAbsencesUseCase
 import com.elg.myges.application.usecase.ObserveAgendaUseCase
 import com.elg.myges.application.usecase.ObserveCoursesUseCase
@@ -20,6 +23,8 @@ import com.elg.myges.application.usecase.SyncAgendaToCalendarUseCase
 import com.elg.myges.domain.model.Absence
 import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
+import com.elg.myges.domain.model.AppError
+import com.elg.myges.domain.model.AppException
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
 import com.elg.myges.domain.model.Grade
@@ -27,11 +32,14 @@ import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.NotificationPreferences
 import com.elg.myges.domain.model.Practical
 import com.elg.myges.domain.model.Project
+import com.elg.myges.domain.model.Session
 import com.elg.myges.domain.model.UserSettings
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -39,8 +47,11 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StudentViewModelNetworkRecoveryTest {
@@ -82,10 +93,92 @@ class StudentViewModelNetworkRecoveryTest {
         assertEquals(1, repository.syncCount)
     }
 
+    @Test
+    fun openDocumentTracksOnlyTheDownloadingDocument() = runTest(dispatcher) {
+        val repository = FakeStudentDataRepository()
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = studentViewModel(repository, settingsRepository, FakeNetworkMonitor(true))
+        val document = AcademicDocument(
+            id = "document-1",
+            title = "Certificate",
+            category = null,
+            year = null,
+            mimeType = "application/pdf",
+            fileName = "certificate.pdf",
+            downloadUrl = "https://example.com/certificate.pdf",
+            updatedAt = null
+        )
+        repository.downloadFinished = CompletableDeferred()
+        advanceUntilIdle()
+
+        viewModel.openDocument(document)
+        advanceUntilIdle()
+
+        assertTrue("document-1" in viewModel.downloadingDocumentIds.value)
+
+        repository.downloadFinished?.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse("document-1" in viewModel.downloadingDocumentIds.value)
+    }
+
+    @Test
+    fun openDocumentExposesDownloadProgress() = runTest(dispatcher) {
+        val repository = FakeStudentDataRepository()
+        val settingsRepository = FakeSettingsRepository()
+        val viewModel = studentViewModel(repository, settingsRepository, FakeNetworkMonitor(true))
+        val document = AcademicDocument(
+            id = "document-1",
+            title = "Certificate",
+            category = null,
+            year = null,
+            mimeType = "application/pdf",
+            fileName = "certificate.pdf",
+            downloadUrl = "https://example.com/certificate.pdf",
+            updatedAt = null
+        )
+        repository.downloadFinished = CompletableDeferred()
+        advanceUntilIdle()
+
+        viewModel.openDocument(document)
+        advanceUntilIdle()
+
+        assertEquals(0.5f, viewModel.documentDownloadProgress.value["document-1"])
+
+        repository.downloadFinished?.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse("document-1" in viewModel.documentDownloadProgress.value)
+    }
+
+
+    @Test
+    fun unauthorizedRefreshLogsOutSessionAndCancelsSync() = runTest(dispatcher) {
+        val repository = FakeStudentDataRepository()
+        val settingsRepository = FakeSettingsRepository()
+        val sessionRepository = FakeSessionRepository()
+        val notificationScheduler = FakeNotificationScheduler()
+        repository.syncFailure = AppException(AppError.Unauthorized)
+
+        studentViewModel(
+            repository = repository,
+            settingsRepository = settingsRepository,
+            networkMonitor = FakeNetworkMonitor(true),
+            sessionRepository = sessionRepository,
+            notificationScheduler = notificationScheduler
+        )
+        advanceUntilIdle()
+
+        assertTrue(sessionRepository.loggedOut)
+        assertTrue(notificationScheduler.syncCancelled)
+    }
+
     private fun studentViewModel(
         repository: FakeStudentDataRepository,
         settingsRepository: FakeSettingsRepository,
-        networkMonitor: FakeNetworkMonitor
+        networkMonitor: FakeNetworkMonitor,
+        sessionRepository: FakeSessionRepository = FakeSessionRepository(),
+        notificationScheduler: FakeNotificationScheduler = FakeNotificationScheduler()
     ): StudentViewModel {
         val calendarSyncPort = FakeCalendarSyncPort()
         return StudentViewModel(
@@ -101,6 +194,7 @@ class StudentViewModelNetworkRecoveryTest {
             RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort),
             SyncAgendaToCalendarUseCase(calendarSyncPort),
             DownloadDocumentUseCase(repository),
+            LogoutUseCase(sessionRepository, notificationScheduler),
             networkMonitor
         )
     }
@@ -113,6 +207,8 @@ private class FakeNetworkMonitor(initialOnline: Boolean) : NetworkMonitor {
 
 private class FakeStudentDataRepository : StudentDataRepository {
     var syncCount = 0
+    var syncFailure: Throwable? = null
+    var downloadFinished: CompletableDeferred<Unit>? = null
     private val dashboard = MutableStateFlow(DashboardSummary(null, null, emptyList(), emptyList(), emptyList(), null))
     private val agenda = MutableStateFlow(emptyList<AgendaEvent>())
     private val grades = MutableStateFlow(emptyList<Grade>())
@@ -133,10 +229,13 @@ private class FakeStudentDataRepository : StudentDataRepository {
     override fun observeDocuments(): Flow<List<AcademicDocument>> = documents
     override fun observeNews(): Flow<List<NewsItem>> = news
     override suspend fun syncAll() {
+        syncFailure?.let { throw it }
         syncCount += 1
     }
     override suspend fun clearCache() = Unit
-    override suspend fun downloadDocument(document: AcademicDocument): Uri {
+    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri {
+        onProgress(0.5f)
+        downloadFinished?.await()
         return Uri.EMPTY
     }
 }
@@ -170,4 +269,34 @@ private class FakeSettingsRepository : SettingsRepository {
 
 private class FakeCalendarSyncPort : CalendarSyncPort {
     override suspend fun sync(events: List<AgendaEvent>) = Unit
+}
+
+private class FakeSessionRepository : SessionRepository {
+    var loggedOut = false
+    override val session: StateFlow<Session?> = MutableStateFlow(null)
+    override val hasLockedBiometricSession: StateFlow<Boolean> = MutableStateFlow(false)
+
+    override fun currentSession(): Session? = null
+    override fun invalidateSession() = Unit
+    override suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) = Unit
+    override suspend fun unlockWithBiometrics() = Unit
+    override suspend fun logout() {
+        loggedOut = true
+    }
+}
+
+private class FakeNotificationScheduler : NotificationScheduler {
+    var syncCancelled = false
+
+    override fun ensureChannels() = Unit
+    override suspend fun scheduleStudentSync() = Unit
+    override suspend fun cancelStudentSync() {
+        syncCancelled = true
+    }
+    override suspend fun showSyncFailure() = Unit
+    override suspend fun showNewGrade(grade: Grade) = Unit
+    override suspend fun showNewAbsence(absence: Absence) = Unit
+    override suspend fun showAgendaChange(event: AgendaEvent) = Unit
+    override suspend fun showProjectDeadline(project: Project) = Unit
+    override suspend fun showNewDocument(document: AcademicDocument) = Unit
 }

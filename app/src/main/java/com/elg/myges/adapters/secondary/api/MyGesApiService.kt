@@ -12,8 +12,14 @@ interface MyGesApiService {
     @GET("me/profile")
     suspend fun profile(): JsonElement
 
+    @GET("me/minimumVersion")
+    suspend fun minimumVersion(): JsonElement?
+
     @GET("me/years")
     suspend fun years(): JsonElement?
+
+    @GET("me/trimesterYears")
+    suspend fun trimesterYears(): JsonElement?
 
     @GET("me/agenda")
     suspend fun agenda(
@@ -27,6 +33,9 @@ interface MyGesApiService {
     @GET("me/{rcId}/files")
     suspend fun courseFiles(@Path("rcId") rcId: String): JsonElement?
 
+    @GET("me/{rcId}/syllabus")
+    suspend fun syllabus(@Path("rcId") rcId: String): JsonElement?
+
     @GET("me/{year}/grades")
     suspend fun grades(@Path("year") year: String): JsonElement?
 
@@ -39,6 +48,9 @@ interface MyGesApiService {
     @GET("me/{year}/projects")
     suspend fun projects(@Path("year") year: String): JsonElement?
 
+    @GET("me/nextProjectSteps")
+    suspend fun nextProjectSteps(): JsonElement?
+
     @GET("me/{year}/practicals")
     suspend fun practicals(@Path("year") year: String): JsonElement?
 
@@ -47,6 +59,12 @@ interface MyGesApiService {
 
     @GET("me/news/banners")
     suspend fun newsBanners(): JsonElement?
+
+    @GET("me/partners")
+    suspend fun partners(): JsonElement?
+
+    @GET("me/speedMeetingAppointments")
+    suspend fun speedMeetingAppointments(): JsonElement?
 
     @GET
     @Streaming
