@@ -16,7 +16,7 @@ class AbsenceCardTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun absenceCardShowsStatusAndReason() {
+    fun absenceCardShowsStatus() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
 
         composeRule.setContent {
@@ -37,6 +37,5 @@ class AbsenceCardTest {
 
         composeRule.onNodeWithText("Architecture Android").assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.absences_unjustified)).assertIsDisplayed()
-        composeRule.onNodeWithText("Transport").assertIsDisplayed()
     }
 }

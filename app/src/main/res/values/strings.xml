@@ -6,6 +6,8 @@
     <string name="action_retry">Réessayer</string>
     <string name="action_sync_now">Synchroniser maintenant</string>
     <string name="cd_open_navigation">Ouvrir la navigation</string>
+    <string name="cd_previous">Précédent</string>
+    <string name="cd_next">Suivant</string>
 
     <string name="common_date">Date</string>
     <string name="common_no_period">Période non précisée</string>
@@ -44,8 +46,11 @@
     <string name="dashboard_next_course">Prochain cours</string>
     <string name="dashboard_no_next_course">Aucun cours à venir dans le cache local.</string>
     <string name="dashboard_latest_grades">Dernières notes</string>
-    <string name="dashboard_recent_absences">Absences récentes</string>
+    <string name="dashboard_recent_absences">Dernière absence</string>
     <string name="dashboard_due_projects">Échéances de projets</string>
+    <string name="dashboard_go_to_agenda">Accéder à la semaine du prochain cours</string>
+    <string name="dashboard_go_to_grades">Accéder aux notes de cette période</string>
+    <string name="dashboard_go_to_absences">Accéder aux absences de cette période</string>
 
     <string name="profile_email">E-mail</string>
     <string name="profile_avatar_cd">Photo de profil de %1$s</string>
@@ -65,6 +70,7 @@
     <string name="agenda_mode_week">Semaine</string>
     <string name="agenda_modality">Modalité</string>
     <string name="agenda_room">Salle</string>
+    <string name="agenda_address">Adresse</string>
     <string name="agenda_teacher">Intervenant</string>
     <string name="agenda_type">Type</string>
 
@@ -77,7 +83,14 @@
     <string name="grades_count">Notes prises en compte</string>
     <string name="grades_detail_title">Détail de la note</string>
     <string name="grades_gpa">GPA estimé</string>
-    <string name="grades_no_grade">No grades</string>
+    <string name="grades_no_grade">Aucune note</string>
+    <string name="grades_breakdown_title">Détail par composant</string>
+    <string name="grades_cc_average">Moyenne CC</string>
+    <string name="grades_general_average">Moyenne Générale (G)</string>
+    <string name="grades_cc_title">Contrôles Continus (CC)</string>
+    <string name="grades_exam_title">Examen</string>
+    <string name="grades_simulation_label">Libellé</string>
+    <string name="grades_simulation_add">Ajouter</string>
     <string name="grades_simulation_average">Moyenne simulée</string>
     <string name="grades_simulation_coefficient">Coefficient simulé</string>
     <string name="grades_simulation_title">Simulation</string>
@@ -86,6 +99,14 @@
     <string name="grades_summary_title">Moyenne générale</string>
     <string name="grades_value_format">%1$s/%2$s</string>
     <string name="grades_weighted_average">Moyenne pondérée</string>
+    <string name="action_delete">Supprimer</string>
+    <string name="projects_detail_title">Détail du projet</string>
+    <string name="projects_steps_title">Étapes</string>
+    <string name="projects_progress_label">Progression</string>
+    <string name="agenda_mode_week_5">Semaine (5j)</string>
+    <string name="agenda_mode_week_7">Semaine (7j)</string>
+    <string name="agenda_mode_month">Mois</string>
+    <string name="agenda_sync_calendar_export">Exporter le calendrier (.ics)</string>
 
     <string name="absences_title">Absences</string>
     <string name="absences_empty_title">Aucune absence</string>

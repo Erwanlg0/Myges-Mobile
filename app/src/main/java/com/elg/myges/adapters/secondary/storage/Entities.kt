@@ -24,7 +24,9 @@ data class AgendaEventEntity(
     val teacher: String?,
     val type: String?,
     val modality: String?,
-    val courseId: String?
+    val courseId: String?,
+    val address: String? = null,
+    val colorId: String? = null
 )
 
 @Entity(tableName = "grades")
@@ -48,7 +50,8 @@ data class AbsenceEntity(
     val endsAtEpochMillis: Long,
     val justified: Boolean,
     val status: String?,
-    val reason: String?
+    val reason: String?,
+    val period: String? = null
 )
 
 @Entity(tableName = "courses")
@@ -59,7 +62,8 @@ data class CourseEntity(
     val year: String?,
     val period: String?,
     val syllabus: String?,
-    val fileCount: Int
+    val fileCount: Int,
+    val location: String?
 )
 
 @Entity(tableName = "projects")

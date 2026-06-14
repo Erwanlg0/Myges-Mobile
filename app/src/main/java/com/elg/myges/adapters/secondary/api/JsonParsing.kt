@@ -59,6 +59,36 @@ fun JsonElement.toYears(): List<String> {
 }
 
 fun JsonElement.toAgendaEvents(): List<AgendaEvent> {
+    val CAMPUS_LOCATIONS = mapOf(
+        "NATION1" to "242 rue du Faubourg Saint Antoine, 75012 Paris",
+        "NATION2" to "220 rue du Faubourg Saint Antoine, 75012 Paris",
+        "VOLTAIRE1" to "1 rue Bouvier, 75011 Paris",
+        "VOLTAIRE2" to "20 rue Bouvier, 75011 Paris",
+        "ERARD" to "19-21 rue Erard, 75011 Paris",
+        "BEAUGRENELLE" to "35 quai André Citroen 75015 Paris",
+        "MONTSOURIS" to "5 rue Lemaignan, 75014 Paris",
+        "MONTROUGE" to "11 rue Camille Pelletan, 92120 Montrouge",
+        "JOURDAN" to "6-10 bd Jourdan 75014 Paris",
+        "VAUGIRARD" to "273-277 rue de Vaugirard, 75012 Paris",
+        "MAIN-D-OR" to "8‐14 Passage de la Main d’Or 75011 Paris",
+        "RANELAGH" to "64-70 Rue du Ranelagh, 75016 Paris"
+    )
+
+    val CAMPUS_COLORS = mapOf(
+        "NATION1" to "3",
+        "NATION2" to "2",
+        "VOLTAIRE1" to "5",
+        "VOLTAIRE2" to "5",
+        "ERARD" to "4",
+        "BEAUGRENELLE" to "1",
+        "MONTSOURIS" to "3",
+        "MONTROUGE" to "6",
+        "JOURDAN" to "7",
+        "VAUGIRARD" to "9",
+        "MAIN-D-OR" to "8",
+        "RANELAGH" to "10"
+    )
+
     return arrayOrNested("agenda", "events", "items", "data").mapNotNull { element ->
         val root = element.objectOrData()
         val discipline = root["discipline"] as? JsonObject
@@ -66,6 +96,50 @@ fun JsonElement.toAgendaEvents(): List<AgendaEvent> {
             ?: return@mapNotNull null
         val endsAt = root.instant("endsAt", "end", "endDate", "dateEnd", "end_date")
             ?: startsAt.plusSeconds(3600)
+            
+        val roomsArray = root.array("rooms")
+        var campusKey: String? = null
+        var roomName: String? = null
+        
+        if (roomsArray.isNotEmpty()) {
+            val firstRoomObj = roomsArray.firstOrNull() as? JsonObject
+            if (firstRoomObj != null) {
+                roomName = firstRoomObj.text("name")
+                campusKey = firstRoomObj.text("campus")
+            }
+        }
+        
+        if (roomName.isNullOrBlank()) {
+            roomName = root.text("room", "classroom", "salle") ?: root.arrayText("rooms", "name")
+        }
+        if (campusKey.isNullOrBlank()) {
+            val rootCampus = root.text("campus")
+            if (!rootCampus.isNullOrBlank()) {
+                campusKey = rootCampus
+            } else {
+                val rootModality = root.text("modality", "mode")
+                if (!rootModality.isNullOrBlank() && CAMPUS_LOCATIONS.containsKey(rootModality.uppercase().trim())) {
+                    campusKey = rootModality
+                }
+            }
+        }
+
+        var resolvedAddress: String? = null
+        var resolvedColorId = "11"
+
+        if (!campusKey.isNullOrBlank()) {
+            val keyUpper = campusKey.uppercase().trim()
+            if (CAMPUS_LOCATIONS.containsKey(keyUpper)) {
+                resolvedAddress = CAMPUS_LOCATIONS[keyUpper]
+                resolvedColorId = CAMPUS_COLORS[keyUpper] ?: "11"
+            } else {
+                val knownModalities = setOf("PRÉSENTIEL", "PRESENTIEL", "DISTANTIEL", "HYBRIDE", "E-LEARNING", "ONLINE")
+                if (!knownModalities.contains(keyUpper)) {
+                    resolvedAddress = campusKey
+                }
+            }
+        }
+
         AgendaEvent(
             id = root.text("id", "eventId", "uid", "reservation_id") ?: stableId(root),
             title = root.text("title", "name", "courseName", "matiere")
@@ -73,47 +147,132 @@ fun JsonElement.toAgendaEvents(): List<AgendaEvent> {
                 ?: "",
             startsAt = startsAt,
             endsAt = endsAt,
-            room = root.text("room", "classroom", "salle") ?: root.arrayText("rooms", "name"),
+            room = roomName,
             teacher = root.text("teacher", "intervenant", "professor") ?: discipline?.text("teacher"),
             type = root.text("type", "kind", "prestation_type"),
             modality = root.text("modality", "mode", "campus"),
-            courseId = root.text("courseId", "rcId", "rc_id", "moduleId") ?: discipline?.text("rc_id")
+            courseId = root.text("courseId", "rcId", "rc_id", "moduleId") ?: discipline?.text("rc_id"),
+            address = resolvedAddress,
+            colorId = resolvedColorId
         )
     }
 }
 
-fun JsonElement.toGrades(): List<Grade> {
+fun JsonElement.toGrades(year: String? = null): List<Grade> {
+    val dateKeys = arrayOf(
+        "date", "createdAt", "publishedAt", "date_exam", "dateExam", 
+        "date_examen", "dateExamen", "examDate", "exam_date", 
+        "publishDate", "publish_date", "published", "updatedAt", 
+        "update_date", "date_note", "dateNote", "published_at", "created_at"
+    )
     return arrayOrNested("grades", "items", "data").flatMap { element ->
         val root = element.objectOrData()
-        val nestedGrades = root.array("grades")
-        if (nestedGrades.isNotEmpty()) {
-            nestedGrades.mapIndexedNotNull { index, gradeElement ->
-                val gradeRoot = gradeElement as? JsonObject
-                val value = gradeRoot?.number("value", "grade", "note") ?: gradeElement.numberOrNull()
-                value?.let {
-                    root.toGrade(
-                        idSuffix = "grade-$index",
-                        subject = gradeRoot?.text("subject", "title", "name", "evaluation"),
-                        value = it,
-                        scale = gradeRoot?.number("scale", "outOf", "bareme"),
-                        date = gradeRoot?.localDate("date", "createdAt", "publishedAt")
-                    )
-                }
-            }
-        } else {
-            val value = root.number("value", "grade", "note", "exam", "average", "ccaverage")
-            value?.let { listOf(root.toGrade(value = it)) }.orEmpty()
+        val baseId = root.text("id", "gradeId", "uid", "rc_id") ?: stableId(root)
+        
+        if (!root.containsKey("grades") && !root.containsKey("exam") && !root.containsKey("course")) {
+            return@flatMap listOf(
+                root.toGrade(
+                    value = root.number("grade", "value", "note"),
+                    year = year
+                )
+            )
         }
+        
+        // Parse CC grades
+        val nestedGrades = root.array("grades")
+        val ccGrades = nestedGrades.mapIndexedNotNull { index, gradeElement ->
+            val value = when (gradeElement) {
+                is JsonPrimitive -> gradeElement.doubleOrNull ?: gradeElement.contentOrNull?.replace(',', '.')?.toDoubleOrNull()
+                is JsonObject -> gradeElement.number("value", "grade", "note")
+                else -> null
+            }
+            val dateVal = when (gradeElement) {
+                is JsonObject -> gradeElement.localDate(*dateKeys)
+                else -> null
+            }
+            value?.let { Pair(it, dateVal) }
+        }
+
+        // Parse Exam
+        val examValue = root.number("exam", "examen")
+        val examDate = root.localDate("date_exam", "exam_date")
+
+        // Compute/parse average
+        val ccAverage = if (ccGrades.isNotEmpty()) ccGrades.map { it.first }.average() else null
+        val calculatedAverage = when {
+            ccAverage != null && examValue != null -> 0.5 * ccAverage + 0.5 * examValue
+            ccAverage != null -> ccAverage
+            examValue != null -> examValue
+            else -> null
+        }
+        val finalAverage = root.number("average", "moyenne", "ccaverage") ?: calculatedAverage
+
+        val resultList = mutableListOf<Grade>()
+
+        // 1. Create the Main Grade Card
+        resultList.add(
+            root.toGrade(
+                idSuffix = null,
+                subject = "",
+                value = finalAverage,
+                scale = root.number("scale", "outOf", "bareme"),
+                date = root.localDate(*dateKeys),
+                year = year
+            )
+        )
+
+        // 2. Create the CC component Grade cards
+        ccGrades.forEachIndexed { index, pair ->
+            resultList.add(
+                root.toGrade(
+                    idSuffix = "cc-$index",
+                    subject = "CC ${index + 1}",
+                    value = pair.first,
+                    scale = root.number("scale", "outOf", "bareme"),
+                    date = pair.second ?: root.localDate(*dateKeys),
+                    year = year
+                )
+            )
+        }
+
+        // 3. Create the Exam component Grade card
+        if (examValue != null) {
+            resultList.add(
+                root.toGrade(
+                    idSuffix = "exam",
+                    subject = "Examen",
+                    value = examValue,
+                    scale = root.number("scale", "outOf", "bareme"),
+                    date = examDate ?: root.localDate(*dateKeys),
+                    year = year
+                )
+            )
+        }
+
+        resultList
     }
 }
 
-fun JsonElement.toAbsences(): List<Absence> {
+fun JsonElement.toAbsences(year: String? = null, availablePeriods: List<String> = emptyList()): List<Absence> {
     return arrayOrNested("absences", "items", "data").mapNotNull { element ->
         val root = element.objectOrData()
         val startsAt = root.instant("startsAt", "start", "startDate", "dateStart", "date")
             ?: return@mapNotNull null
         val endsAt = root.instant("endsAt", "end", "endDate", "dateEnd")
             ?: startsAt.plusSeconds(3600)
+
+        val startsAtLdt = java.time.LocalDateTime.ofInstant(startsAt, java.time.ZoneOffset.UTC)
+        val month = startsAtLdt.monthValue
+        val isSem2 = month in 2..8
+        val targetSemesterName = if (isSem2) "Semestre 2" else "Semestre 1"
+
+        var resolvedPeriod = availablePeriods.firstOrNull { it.contains(targetSemesterName, ignoreCase = true) }
+
+        if (resolvedPeriod == null && year != null) {
+            val startYearNum = year.toIntOrNull() ?: 2026
+            resolvedPeriod = "$startYearNum-${startYearNum + 1} - Semestre ${if (isSem2) 2 else 1}"
+        }
+
         Absence(
             id = root.text("id", "absenceId", "uid") ?: stableId(root),
             courseName = root.text("courseName", "course_name", "course", "module", "matiere") ?: "",
@@ -121,7 +280,8 @@ fun JsonElement.toAbsences(): List<Absence> {
             endsAt = endsAt,
             justified = root.bool("justified", "isJustified", "justifiee") == true,
             status = root.text("status", "state", "etat", "type"),
-            reason = root.text("reason", "motif", "type")
+            reason = root.text("reason", "motif"),
+            period = resolvedPeriod
         )
     }
 }
@@ -166,6 +326,11 @@ fun JsonElement.toCourseSyllabus(): String? {
 }
 
 fun JsonElement.toProjects(): List<Project> {
+    val projectDateKeys = arrayOf(
+        "deadline", "dueDate", "endDate", "psp_limit_date", "limit_date", 
+        "limitDate", "date_limit", "dateLimit", "date", "due_date", "due", 
+        "update_date", "date_limite", "dateLimite"
+    )
     return arrayOrNested("projects", "items", "data").map { element ->
         val root = element.objectOrData()
         val steps = root.array("steps", "projectSteps").map { step ->
@@ -173,7 +338,7 @@ fun JsonElement.toProjects(): List<Project> {
             ProjectStep(
                 id = stepRoot.text("id", "stepId", "psp_id", "uid") ?: stableId(stepRoot),
                 title = stepRoot.text("title", "name", "psp_desc", "psp_type") ?: "",
-                deadline = stepRoot.instant("deadline", "dueDate", "endDate", "psp_limit_date"),
+                deadline = stepRoot.instant(*projectDateKeys),
                 status = stepRoot.text("status", "state")
             )
         }
@@ -184,7 +349,7 @@ fun JsonElement.toProjects(): List<Project> {
             courseName = root.text("courseName", "course_name", "course", "module"),
             groupName = root.text("groupName", "group", "projectGroup") ?: root.arrayText("groups", "group_name", "name"),
             status = root.text("status", "state"),
-            deadline = root.instant("deadline", "dueDate", "endDate", "update_date") ?: steps.mapNotNull { it.deadline }.minOrNull(),
+            deadline = root.instant(*projectDateKeys) ?: steps.mapNotNull { it.deadline }.minOrNull(),
             steps = steps,
             fileCount = root.array("files", "project_files", "documents", "deliverables").size + stepFileCount
         )
@@ -192,13 +357,18 @@ fun JsonElement.toProjects(): List<Project> {
 }
 
 fun JsonElement.toNextProjectStepProjects(): List<Project> {
+    val projectDateKeys = arrayOf(
+        "deadline", "dueDate", "endDate", "psp_limit_date", "limit_date", 
+        "limitDate", "date_limit", "dateLimit", "date", "due_date", "due", 
+        "update_date", "date_limite", "dateLimite"
+    )
     return arrayOrNested("projectSteps", "steps", "items", "data").mapNotNull { element ->
         val root = element.objectOrData()
         val projectId = root.text("project_id", "projectId", "pro_id") ?: return@mapNotNull null
         val step = ProjectStep(
             id = root.text("psp_id", "stepId", "id", "uid") ?: stableId(root),
             title = root.text("psp_desc", "title", "name", "psp_type", "type") ?: "",
-            deadline = root.instant("psp_limit_date", "deadline", "dueDate", "endDate"),
+            deadline = root.instant(*projectDateKeys),
             status = root.text("status", "state", "type")
         )
         Project(
@@ -294,7 +464,7 @@ private fun JsonElement.arrayOrNested(vararg keys: String): List<JsonElement> {
 
 private fun academicYearFromProfile(value: String): String {
     val startYear = Regex("\\d{4}").find(value)?.value?.toIntOrNull() ?: return value
-    return ((startYear + 1)..(startYear + 3)).joinToString(", ")
+    return (startYear..(startYear + 3)).joinToString(", ")
 }
 
 private fun String.toMimeType(): String? {
@@ -442,11 +612,29 @@ private fun JsonElement.numberOrNull(): Double? {
 private fun JsonObject.toGrade(
     idSuffix: String? = null,
     subject: String? = null,
-    value: Double,
+    value: Double? = null,
     scale: Double? = null,
-    date: LocalDate? = null
+    date: LocalDate? = null,
+    year: String? = null
 ): Grade {
     val baseId = text("id", "gradeId", "uid", "rc_id") ?: stableId(this)
+    val rawPeriod = text("period", "trimester_name", "semester", "trimester")
+    val resolvedPeriod = if (rawPeriod != null && year != null && !rawPeriod.contains(year)) {
+        val startYearNum = year.toIntOrNull()
+        if (startYearNum != null) {
+            "$startYearNum-${startYearNum + 1} - $rawPeriod"
+        } else {
+            "$year - $rawPeriod"
+        }
+    } else {
+        rawPeriod
+    }
+    val dateKeys = arrayOf(
+        "date", "createdAt", "publishedAt", "date_exam", "dateExam", 
+        "date_examen", "dateExamen", "examDate", "exam_date", 
+        "publishDate", "publish_date", "published", "updatedAt", 
+        "update_date", "date_note", "dateNote", "published_at", "created_at"
+    )
     return Grade(
         id = listOfNotNull(baseId, idSuffix).joinToString("-"),
         courseName = text("courseName", "course", "module", "matiere") ?: "",
@@ -455,8 +643,8 @@ private fun JsonObject.toGrade(
         scale = scale ?: number("scale", "outOf", "bareme") ?: 20.0,
         coefficient = number("coefficient", "coef"),
         average = number("average", "moyenne", "ccaverage"),
-        date = date ?: localDate("date", "createdAt", "publishedAt"),
-        period = text("period", "trimester_name", "semester", "trimester")
+        date = date ?: localDate(*dateKeys),
+        period = resolvedPeriod
     )
 }
 
@@ -464,12 +652,34 @@ private fun parseInstant(value: JsonElement?): Instant? {
     if (value == null || value is JsonNull) return null
     val primitive = value as? JsonPrimitive ?: return null
     primitive.contentOrNull?.let { text ->
-        text.toLongOrNull()?.let { number ->
+        val cleanText = text.trim().replace(Regex("\\s+"), " ")
+        cleanText.toLongOrNull()?.let { number ->
             return if (number > 9999999999L) Instant.ofEpochMilli(number) else Instant.ofEpochSecond(number)
         }
-        runCatching { Instant.parse(text) }.getOrNull()?.let { return it }
-        runCatching { LocalDate.parse(text.take(10)).atStartOfDay().toInstant(ZoneOffset.UTC) }.getOrNull()?.let { return it }
-        runCatching { DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(text, Instant::from) }.getOrNull()?.let { return it }
+        if (cleanText.contains('/') && cleanText.contains('h')) {
+            runCatching {
+                val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH'h'mm")
+                val ldt = java.time.LocalDateTime.parse(cleanText, formatter)
+                ldt.atZone(java.time.ZoneId.systemDefault()).toInstant()
+            }.getOrNull()?.let { return it }
+        }
+        if (cleanText.contains('/') && cleanText.contains(':')) {
+            runCatching {
+                val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+                val ldt = java.time.LocalDateTime.parse(cleanText, formatter)
+                ldt.atZone(java.time.ZoneId.systemDefault()).toInstant()
+            }.getOrNull()?.let { return it }
+        }
+        if (cleanText.contains('/') && cleanText.length == 10) {
+            runCatching {
+                val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                val ld = java.time.LocalDate.parse(cleanText, formatter)
+                ld.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant()
+            }.getOrNull()?.let { return it }
+        }
+        runCatching { Instant.parse(cleanText) }.getOrNull()?.let { return it }
+        runCatching { LocalDate.parse(cleanText.take(10)).atStartOfDay().toInstant(ZoneOffset.UTC) }.getOrNull()?.let { return it }
+        runCatching { DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(cleanText, Instant::from) }.getOrNull()?.let { return it }
     }
     primitive.doubleOrNull?.toLong()?.let { number ->
         return if (number > 9999999999L) Instant.ofEpochMilli(number) else Instant.ofEpochSecond(number)

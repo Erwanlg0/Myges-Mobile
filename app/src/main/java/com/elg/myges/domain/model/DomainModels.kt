@@ -22,7 +22,9 @@ data class AgendaEvent(
     val teacher: String?,
     val type: String?,
     val modality: String?,
-    val courseId: String?
+    val courseId: String?,
+    val address: String? = null,
+    val colorId: String? = null
 )
 
 data class Grade(
@@ -44,7 +46,8 @@ data class Absence(
     val endsAt: Instant,
     val justified: Boolean,
     val status: String?,
-    val reason: String?
+    val reason: String?,
+    val period: String? = null
 )
 
 data class Course(
@@ -54,7 +57,8 @@ data class Course(
     val year: String?,
     val period: String?,
     val syllabus: String?,
-    val fileCount: Int
+    val fileCount: Int,
+    val location: String? = null
 )
 
 data class ProjectStep(

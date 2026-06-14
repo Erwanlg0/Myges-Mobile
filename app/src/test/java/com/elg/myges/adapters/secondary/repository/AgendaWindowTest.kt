@@ -22,6 +22,36 @@ class AgendaWindowTest {
     }
 
     @Test
+    fun agendaWindowFirstSyncCoversAcademicStartTo365DaysAhead() {
+        val today = LocalDate.parse("2026-06-12")
+        val window = AgendaWindow.firstSync(today)
+
+        assertEquals(LocalDate.of(2023, 9, 1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(), window.start)
+        assertEquals(
+            today.plusDays(365)
+                .atTime(23, 59, 59, 999_000_000)
+                .toInstant(ZoneOffset.UTC)
+                .toEpochMilli(),
+            window.end
+        )
+    }
+
+    @Test
+    fun agendaWindowSubsequentSyncCoversYesterdayTo365DaysAhead() {
+        val today = LocalDate.parse("2026-06-12")
+        val window = AgendaWindow.subsequentSync(today)
+
+        assertEquals(today.minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(), window.start)
+        assertEquals(
+            today.plusDays(365)
+                .atTime(23, 59, 59, 999_000_000)
+                .toInstant(ZoneOffset.UTC)
+                .toEpochMilli(),
+            window.end
+        )
+    }
+
+    @Test
     fun academicYearCandidatesContinueDescendingWhenCurrentYearIsEmpty() {
         val years = academicYearCandidates(listOf("2026"), null, currentYear = 2026)
 

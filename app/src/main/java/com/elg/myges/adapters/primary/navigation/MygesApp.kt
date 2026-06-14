@@ -282,7 +282,7 @@ private fun StudentScaffold(
             startDestination = destinations.first().route,
             modifier = Modifier.padding(padding)
         ) {
-            composable("dashboard") { DashboardScreen(studentViewModel) }
+            composable("dashboard") { DashboardScreen(studentViewModel, onNavigateToTab = { route -> navController.navigateTo(route) }) }
             composable("agenda") { AgendaScreen(studentViewModel) }
             composable("grades") { GradesScreen(studentViewModel) }
             composable("absences") { AbsencesScreen(studentViewModel) }

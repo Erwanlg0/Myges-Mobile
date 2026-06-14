@@ -125,6 +125,7 @@ object DependencyModule {
         deletePlaintextDatabaseIfPresent(context, DATABASE_NAME)
         return Room.databaseBuilder(context, MygesDatabase::class.java, DATABASE_NAME)
             .openHelperFactory(SupportOpenHelperFactory(databasePassphraseStore.readOrCreate()))
+            .fallbackToDestructiveMigration()
             .build()
     }
 

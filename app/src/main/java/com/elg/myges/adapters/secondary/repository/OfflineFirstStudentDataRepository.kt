@@ -74,8 +74,8 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             DashboardSummary(
                 profile = localData.profile?.toDomain(),
                 nextEvent = localData.agenda.firstOrNull { it.endsAt.isAfter(now) },
-                latestGrades = localData.grades.sortedByDescending { it.date }.take(3),
-                recentAbsences = localData.absences.take(3),
+                latestGrades = localData.grades.sortedWith(compareByDescending<Grade> { it.date }.thenByDescending { it.id }).take(3),
+                recentAbsences = localData.absences.sortedByDescending { it.startsAt }.take(1),
                 dueProjects = localData.projects.filter { it.deadline?.isAfter(now) == true }.take(3),
                 lastSyncAt = settings.lastSyncAt
             )
@@ -122,11 +122,27 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             try {
                 purgeExpiredDocumentCache(File(context.cacheDir, DOCUMENT_CACHE))
                 val profile = api.profile().toProfile()
-                val years = academicYearCandidates(
-                    api.years()?.toYears().orEmpty() + runCatching { api.trimesterYears()?.toYears().orEmpty() }.getOrDefault(emptyList()),
-                    profile.academicYear
+                val activeYears = (api.years()?.toYears().orEmpty() + 
+                        runCatching { api.trimesterYears()?.toYears().orEmpty() }.getOrDefault(emptyList()) + 
+                        listOfNotNull(profile.academicYear)
+                    )
+                    .flatMap { yearStr ->
+                        Regex("\\d{4}").findAll(yearStr).map { it.value }
+                    }
+                    .distinct()
+                    .sortedDescending()
+                    .ifEmpty { listOf(Year.now().value.toString()) }
+                
+                val updatedProfile = profile.copy(
+                    academicYear = activeYears.sorted().joinToString(", ")
                 )
-                val agendaWindow = AgendaWindow.fromToday()
+
+                val isFirstSync = dao.agendaIds().isEmpty()
+                val agendaWindow = if (isFirstSync) {
+                    AgendaWindow.firstSync()
+                } else {
+                    AgendaWindow.subsequentSync()
+                }
                 val agenda = api.agenda(
                     start = agendaWindow.start,
                     end = agendaWindow.end
@@ -134,7 +150,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 val nextProjectStepProjects = runCatching {
                     api.nextProjectSteps()?.toNextProjectStepProjects().orEmpty()
                 }.getOrDefault(emptyList())
-                val yearData = firstNonEmptyYearData(years)
+                val yearData = fetchAllYearsData(activeYears)
                     .withNextProjectSteps(nextProjectStepProjects)
                 val news = runCatching { api.minimumVersion()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
                     api.news()?.toNews().orEmpty() +
@@ -149,7 +165,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     documents = dao.documentIds().toSet()
                 )
                 dao.replaceSyncedData(
-                    profile = profile.toEntity(),
+                    profile = updatedProfile.toEntity(),
                     agenda = agenda.map { it.toEntity() },
                     grades = yearData.grades.map { it.toEntity() },
                     absences = yearData.absences.map { it.toEntity() },
@@ -223,28 +239,51 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "document" }
     }
 
-    private suspend fun firstNonEmptyYearData(years: List<String>): YearData {
-        var fallback: YearData? = null
+    private suspend fun fetchAllYearsData(years: List<String>): YearData {
+        val allCourses = mutableListOf<Course>()
+        val allGrades = mutableListOf<Grade>()
+        val allAbsences = mutableListOf<Absence>()
+        val allDocuments = mutableListOf<AcademicDocument>()
+        val allProjects = mutableListOf<Project>()
+        val allPracticals = mutableListOf<Practical>()
+        val fetchedCourseDocIds = mutableSetOf<String>()
+
         years.forEach { year ->
-            val courses = api.courses(year)?.toCourses().orEmpty()
+            val courses = runCatching { api.courses(year)?.toCourses().orEmpty() }.getOrDefault(emptyList())
                 .withRemoteSyllabus()
-            val projectsJson = api.projects(year)
+            val grades = runCatching { api.grades(year)?.toGrades(year).orEmpty() }.getOrDefault(emptyList())
+            val projectsJson = runCatching { api.projects(year) }.getOrNull()
             val projects = projectsJson?.toProjects().orEmpty()
-            val documents = api.annualDocuments(year)?.toDocuments().orEmpty() +
-                courseDocuments(courses) +
+            
+            val newCourses = courses.filter { it.id !in fetchedCourseDocIds }
+            fetchedCourseDocIds.addAll(newCourses.map { it.id })
+            
+            val documents = runCatching { api.annualDocuments(year)?.toDocuments().orEmpty() }.getOrDefault(emptyList()) +
+                courseDocuments(newCourses) +
                 projectsJson?.toProjectDocuments().orEmpty()
-            val data = YearData(
-                courses = courses,
-                grades = api.grades(year)?.toGrades().orEmpty(),
-                absences = api.absences(year)?.toAbsences().orEmpty(),
-                documents = documents,
-                projects = projects,
-                practicals = api.practicals(year)?.toPracticals().orEmpty()
-            )
-            if (fallback == null) fallback = data
-            if (data.hasAcademicData()) return data
+                
+            val availablePeriods = (grades.mapNotNull { it.period } + courses.mapNotNull { it.period })
+                .filter { it.isNotBlank() }
+                .distinct()
+            val absences = runCatching { api.absences(year)?.toAbsences(year, availablePeriods).orEmpty() }.getOrDefault(emptyList())
+            val practicals = runCatching { api.practicals(year)?.toPracticals().orEmpty() }.getOrDefault(emptyList())
+
+            allCourses.addAll(courses)
+            allGrades.addAll(grades)
+            allAbsences.addAll(absences)
+            allDocuments.addAll(documents)
+            allProjects.addAll(projects)
+            allPracticals.addAll(practicals)
         }
-        return fallback ?: YearData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+
+        return YearData(
+            courses = allCourses.distinctBy { it.id },
+            grades = allGrades.distinctBy { it.id },
+            absences = allAbsences.distinctBy { it.id },
+            documents = allDocuments.distinctBy { it.id },
+            projects = allProjects.distinctBy { it.id },
+            practicals = allPracticals.distinctBy { it.id }
+        )
     }
 
     private suspend fun courseDocuments(courses: List<Course>): List<AcademicDocument> {
@@ -352,6 +391,24 @@ internal data class AgendaWindow(
     val end: Long
 ) {
     companion object {
+        fun firstSync(today: LocalDate = LocalDate.now(ZoneOffset.UTC)): AgendaWindow {
+            val start = LocalDate.of(2023, 9, 1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+            val end = today.plusDays(365)
+                .atTime(23, 59, 59, 999_000_000)
+                .toInstant(ZoneOffset.UTC)
+                .toEpochMilli()
+            return AgendaWindow(start, end)
+        }
+
+        fun subsequentSync(today: LocalDate = LocalDate.now(ZoneOffset.UTC)): AgendaWindow {
+            val start = today.minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+            val end = today.plusDays(365)
+                .atTime(23, 59, 59, 999_000_000)
+                .toInstant(ZoneOffset.UTC)
+                .toEpochMilli()
+            return AgendaWindow(start, end)
+        }
+
         fun fromToday(today: LocalDate = LocalDate.now(ZoneOffset.UTC)): AgendaWindow {
             val start = today.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
             val end = today.plusDays(27)

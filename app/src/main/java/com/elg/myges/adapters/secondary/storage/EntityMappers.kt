@@ -42,7 +42,9 @@ fun AgendaEvent.toEntity() = AgendaEventEntity(
     teacher = teacher,
     type = type,
     modality = modality,
-    courseId = courseId
+    courseId = courseId,
+    address = address,
+    colorId = colorId
 )
 
 fun AgendaEventEntity.toDomain() = AgendaEvent(
@@ -54,7 +56,9 @@ fun AgendaEventEntity.toDomain() = AgendaEvent(
     teacher = teacher,
     type = type,
     modality = modality,
-    courseId = courseId
+    courseId = courseId,
+    address = address,
+    colorId = colorId
 )
 
 fun Grade.toEntity() = GradeEntity(
@@ -88,7 +92,8 @@ fun Absence.toEntity() = AbsenceEntity(
     endsAtEpochMillis = endsAt.toEpochMilli(),
     justified = justified,
     status = status,
-    reason = reason
+    reason = reason,
+    period = period
 )
 
 fun AbsenceEntity.toDomain() = Absence(
@@ -98,7 +103,8 @@ fun AbsenceEntity.toDomain() = Absence(
     endsAt = Instant.ofEpochMilli(endsAtEpochMillis),
     justified = justified,
     status = status,
-    reason = reason
+    reason = reason,
+    period = period
 )
 
 fun Course.toEntity() = CourseEntity(
@@ -108,7 +114,8 @@ fun Course.toEntity() = CourseEntity(
     year = year,
     period = period,
     syllabus = syllabus,
-    fileCount = fileCount
+    fileCount = fileCount,
+    location = location
 )
 
 fun CourseEntity.toDomain() = Course(
@@ -118,7 +125,8 @@ fun CourseEntity.toDomain() = Course(
     year = year,
     period = period,
     syllabus = syllabus,
-    fileCount = fileCount
+    fileCount = fileCount,
+    location = location
 )
 
 fun Project.toEntity() = ProjectEntity(

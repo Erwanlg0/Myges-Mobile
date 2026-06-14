@@ -6,6 +6,8 @@
     <string name="action_retry">Retry</string>
     <string name="action_sync_now">Sync now</string>
     <string name="cd_open_navigation">Open navigation</string>
+    <string name="cd_previous">Previous</string>
+    <string name="cd_next">Next</string>
 
     <string name="common_date">Date</string>
     <string name="common_no_period">No period</string>
@@ -44,8 +46,11 @@
     <string name="dashboard_next_course">Next class</string>
     <string name="dashboard_no_next_course">No upcoming class in the local cache.</string>
     <string name="dashboard_latest_grades">Latest grades</string>
-    <string name="dashboard_recent_absences">Recent absences</string>
+    <string name="dashboard_recent_absences">Latest absence</string>
     <string name="dashboard_due_projects">Project deadlines</string>
+    <string name="dashboard_go_to_agenda">Go to next course week</string>
+    <string name="dashboard_go_to_grades">Go to grades period</string>
+    <string name="dashboard_go_to_absences">Go to absences period</string>
 
     <string name="profile_email">Email</string>
     <string name="profile_avatar_cd">%1$s profile picture</string>
@@ -65,6 +70,7 @@
     <string name="agenda_mode_week">Week</string>
     <string name="agenda_modality">Modality</string>
     <string name="agenda_room">Room</string>
+    <string name="agenda_address">Address</string>
     <string name="agenda_teacher">Teacher</string>
     <string name="agenda_type">Type</string>
 
@@ -78,6 +84,13 @@
     <string name="grades_detail_title">Grade detail</string>
     <string name="grades_gpa">Estimated GPA</string>
     <string name="grades_no_grade">No grades</string>
+    <string name="grades_breakdown_title">Component Breakdown</string>
+    <string name="grades_cc_average">CC Average</string>
+    <string name="grades_general_average">General Average (G)</string>
+    <string name="grades_cc_title">Continuous Control (CC)</string>
+    <string name="grades_exam_title">Exam</string>
+    <string name="grades_simulation_label">Label</string>
+    <string name="grades_simulation_add">Add</string>
     <string name="grades_simulation_average">Simulated average</string>
     <string name="grades_simulation_coefficient">Simulated coefficient</string>
     <string name="grades_simulation_title">Simulation</string>
@@ -86,6 +99,14 @@
     <string name="grades_summary_title">Overall average</string>
     <string name="grades_value_format">%1$s/%2$s</string>
     <string name="grades_weighted_average">Weighted average</string>
+    <string name="action_delete">Delete</string>
+    <string name="projects_detail_title">Project Details</string>
+    <string name="projects_steps_title">Steps</string>
+    <string name="projects_progress_label">Progress</string>
+    <string name="agenda_mode_week_5">Week (5d)</string>
+    <string name="agenda_mode_week_7">Week (7d)</string>
+    <string name="agenda_mode_month">Month</string>
+    <string name="agenda_sync_calendar_export">Export calendar (.ics)</string>
 
     <string name="absences_title">Absences</string>
     <string name="absences_empty_title">No absences</string>

@@ -9,7 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.fragment.app.FragmentActivity
+import androidx.appcompat.app.AppCompatActivity
 import com.elg.myges.adapters.primary.navigation.MygesApp
 import com.elg.myges.adapters.secondary.play.AndroidPlayQualityManager
 import com.elg.myges.ui.theme.MygesTheme
@@ -17,7 +17,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
     @Inject lateinit var playQualityManager: AndroidPlayQualityManager
 
     private var oauthCallbackUri by mutableStateOf<Uri?>(null)

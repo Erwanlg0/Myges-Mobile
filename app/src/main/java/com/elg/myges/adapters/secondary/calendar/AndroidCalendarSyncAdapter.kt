@@ -47,11 +47,25 @@ class AndroidCalendarSyncAdapter @Inject constructor(
     }
 
     private fun writableCalendarId(): Long? {
-        val projection = arrayOf(CalendarContract.Calendars._ID)
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.ACCOUNT_TYPE
+        )
         val selection = "${CalendarContract.Calendars.VISIBLE} = 1 AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ?"
         val args = arrayOf(CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString())
         context.contentResolver.query(CalendarContract.Calendars.CONTENT_URI, projection, selection, args, null)?.use { cursor ->
-            return if (cursor.moveToFirst()) cursor.getLong(0) else null
+            var fallbackId: Long? = null
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(0)
+                val accountType = cursor.getString(1)
+                if (accountType == "com.google") {
+                    return id
+                }
+                if (fallbackId == null) {
+                    fallbackId = id
+                }
+            }
+            return fallbackId
         }
         return null
     }
@@ -98,6 +112,12 @@ class AndroidCalendarSyncAdapter @Inject constructor(
     }
 
     private fun AgendaEvent.toCalendarEvent(calendarId: Long, timeZone: String): DesiredCalendarEvent {
+        val loc = if (!room.isNullOrBlank() && !address.isNullOrBlank()) {
+            if (address.contains(room, ignoreCase = true)) address
+            else "$room - $address"
+        } else {
+            address ?: room
+        }
         return DesiredCalendarEvent(
             externalId = id,
             calendarId = calendarId,
@@ -106,8 +126,25 @@ class AndroidCalendarSyncAdapter @Inject constructor(
             startsAtEpochMillis = startsAt.toEpochMilli(),
             endsAtEpochMillis = endsAt.toEpochMilli(),
             timeZone = timeZone,
-            location = room
+            location = loc,
+            colorId = colorId
         )
+    }
+}
+
+private fun colorIdToArgb(colorId: String?): Int {
+    return when (colorId) {
+        "1" -> 0xFF7986CB.toInt() // Lavender
+        "2" -> 0xFF33B679.toInt() // Sage
+        "3" -> 0xFF8E24AA.toInt() // Grape
+        "4" -> 0xFFE67C73.toInt() // Flamingo
+        "5" -> 0xFFF6BF26.toInt() // Banana
+        "6" -> 0xFFF4511E.toInt() // Tangerine
+        "7" -> 0xFF039BE5.toInt() // Peacock
+        "8" -> 0xFF616161.toInt() // Graphite
+        "9" -> 0xFF3F51B5.toInt() // Basil
+        "10" -> 0xFF0B8043.toInt() // Green
+        else -> 0xFFFFF56F.toInt() // Default Yellow
     }
 }
 
@@ -141,7 +178,8 @@ internal data class DesiredCalendarEvent(
     val startsAtEpochMillis: Long,
     val endsAtEpochMillis: Long,
     val timeZone: String,
-    val location: String?
+    val location: String?,
+    val colorId: String? = null
 ) {
     fun toContentValues(): ContentValues {
         return ContentValues().apply {
@@ -151,6 +189,7 @@ internal data class DesiredCalendarEvent(
             put(CalendarContract.Events.DTSTART, startsAtEpochMillis)
             put(CalendarContract.Events.DTEND, endsAtEpochMillis)
             put(CalendarContract.Events.EVENT_TIMEZONE, timeZone)
+            put(CalendarContract.Events.EVENT_COLOR, colorIdToArgb(colorId))
             if (location == null) {
                 putNull(CalendarContract.Events.EVENT_LOCATION)
             } else {

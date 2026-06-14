@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elg.myges.adapters.primary.state.FeatureUiState
+import java.time.LocalDate
 import com.elg.myges.application.ports.NetworkMonitor
 import com.elg.myges.application.usecase.DownloadDocumentUseCase
 import com.elg.myges.application.usecase.LogoutUseCase
@@ -74,6 +75,28 @@ class StudentViewModel @Inject constructor(
     val documentOpenRequests = MutableSharedFlow<DocumentOpenRequest>()
     private val _refreshSucceeded = MutableSharedFlow<Unit>()
     val refreshSucceeded: SharedFlow<Unit> = _refreshSucceeded
+
+    val agendaDateToNavigate = MutableSharedFlow<LocalDate>()
+    val gradesPeriodToNavigate = MutableSharedFlow<String>()
+    val absencesPeriodToNavigate = MutableSharedFlow<String>()
+
+    fun navigateToAgendaDate(date: LocalDate) {
+        viewModelScope.launch {
+            agendaDateToNavigate.emit(date)
+        }
+    }
+
+    fun navigateToGradesPeriod(period: String) {
+        viewModelScope.launch {
+            gradesPeriodToNavigate.emit(period)
+        }
+    }
+
+    fun navigateToAbsencesPeriod(period: String) {
+        viewModelScope.launch {
+            absencesPeriodToNavigate.emit(period)
+        }
+    }
 
     val dashboard: StateFlow<FeatureUiState<DashboardSummary?>> = observeDashboard()
         .asFeatureState(null, networkMonitor.isOnline)

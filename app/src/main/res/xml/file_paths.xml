@@ -3,4 +3,7 @@
     <cache-path
         name="documents"
         path="documents/" />
+    <cache-path
+        name="cache_root"
+        path="." />
 </paths>

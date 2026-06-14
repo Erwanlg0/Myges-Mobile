@@ -33,7 +33,7 @@ class JsonParsingTest {
 
         assertEquals("123", profile.id)
         assertEquals("Erwan Luce", profile.displayName)
-        assertEquals("2024, 2025, 2026", profile.academicYear)
+        assertEquals("2023, 2024, 2025, 2026", profile.academicYear)
         assertEquals("me/profile/photo", profile.avatarUrl)
     }
 
@@ -105,7 +105,7 @@ class JsonParsingTest {
                   "teacher": "Mme Martin",
                   "modality": "Présentiel",
                   "rooms": [
-                    { "name": "A101" }
+                    { "name": "A101", "campus": "ERARD" }
                   ],
                   "discipline": {
                     "name": "Algorithmique",
@@ -121,6 +121,8 @@ class JsonParsingTest {
         assertEquals("123", events.first().id)
         assertEquals("Cours", events.first().title)
         assertEquals("A101", events.first().room)
+        assertEquals("19-21 rue Erard, 75011 Paris", events.first().address)
+        assertEquals("4", events.first().colorId)
         assertEquals("456", events.first().courseId)
     }
 
@@ -187,13 +189,54 @@ class JsonParsingTest {
             """.trimIndent()
         ).toGrades()
 
-        assertEquals(2, grades.size)
-        assertEquals("456-grade-0", grades.first().id)
-        assertEquals("Algorithmique", grades.first().courseName)
-        assertEquals("Semestre 1", grades.first().subject)
-        assertEquals(16.5, grades.first().value ?: 0.0, 0.0)
-        assertEquals(2.0, grades.first().coefficient ?: 0.0, 0.0)
-        assertEquals(14.5, grades.first().average ?: 0.0, 0.0)
+        assertEquals(3, grades.size)
+        
+        // Main Card
+        val main = grades[0]
+        assertEquals("456", main.id)
+        assertEquals("Algorithmique", main.courseName)
+        assertEquals("", main.subject)
+        assertEquals(14.5, main.value ?: 0.0, 0.0)
+        assertEquals(2.0, main.coefficient ?: 0.0, 0.0)
+
+        // CC 1 Component
+        val cc1 = grades[1]
+        assertEquals("456-cc-0", cc1.id)
+        assertEquals("CC 1", cc1.subject)
+        assertEquals(16.5, cc1.value ?: 0.0, 0.0)
+
+        // CC 2 Component
+        val cc2 = grades[2]
+        assertEquals("456-cc-1", cc2.id)
+        assertEquals("CC 2", cc2.subject)
+        assertEquals(12.0, cc2.value ?: 0.0, 0.0)
+    }
+
+    @Test
+    fun gradesParseKordisCourseWithNoGrades() {
+        val grades = json.parseToJsonElement(
+            """
+            {
+              "response_code": 200,
+              "result": [
+                {
+                  "rc_id": 328196,
+                  "course": "B1 - nosql, application aux graphes avec graphql",
+                  "grades": [],
+                  "exam": null,
+                  "coef": "2.0",
+                  "trimester_name": "Semestre 1"
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toGrades()
+
+        assertEquals(1, grades.size)
+        val main = grades[0]
+        assertEquals("328196", main.id)
+        assertEquals("B1 - nosql, application aux graphes avec graphql", main.courseName)
+        assertEquals(null, main.value)
     }
 
     @Test

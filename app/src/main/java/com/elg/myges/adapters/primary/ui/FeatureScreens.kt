@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -27,12 +29,29 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.ArrowForward
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.core.content.FileProvider
+import java.io.File
+import java.time.format.DateTimeFormatter
+import java.time.ZoneOffset
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -40,7 +59,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,8 +106,20 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 @Composable
-fun DashboardScreen(viewModel: StudentViewModel) {
+fun DashboardScreen(
+    viewModel: StudentViewModel,
+    onNavigateToTab: (String) -> Unit
+) {
     val state by viewModel.dashboard.collectAsStateWithLifecycle()
+    var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
+
+    selectedEvent?.let { event ->
+        AgendaEventDetailsDialog(
+            event = event,
+            onDismiss = { selectedEvent = null }
+        )
+    }
+
     FeatureStateContent(
         state = state,
         empty = { it.isDashboardEmpty() },
@@ -115,28 +148,134 @@ fun DashboardScreen(viewModel: StudentViewModel) {
                 }
             }
         }
-        item { SectionTitle(R.string.dashboard_next_course) }
         item {
-            dashboard.nextEvent?.let { AgendaEventCard(it) }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.dashboard_next_course),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                dashboard.nextEvent?.let { nextEvent ->
+                    IconButton(
+                        onClick = {
+                            val nextEventDate = nextEvent.startsAt.atZone(ZoneId.systemDefault()).toLocalDate()
+                            viewModel.navigateToAgendaDate(nextEventDate)
+                            onNavigateToTab("agenda")
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.CalendarMonth,
+                            contentDescription = stringResource(R.string.dashboard_go_to_agenda),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            dashboard.nextEvent?.let { AgendaEventCard(it, onOpen = { selectedEvent = it }) }
                 ?: CompactCard { Text(stringResource(R.string.dashboard_no_next_course)) }
         }
-        item { SectionTitle(R.string.dashboard_latest_grades) }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.dashboard_latest_grades),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                dashboard.latestGrades.firstOrNull()?.period?.let { period ->
+                    IconButton(
+                        onClick = {
+                            viewModel.navigateToGradesPeriod(period)
+                            onNavigateToTab("grades")
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowForward,
+                            contentDescription = stringResource(R.string.dashboard_go_to_grades),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
         if (dashboard.latestGrades.isEmpty()) {
             item { CompactCard { Text(stringResource(R.string.grades_empty_title)) } }
         } else {
-            items(dashboard.latestGrades, key = { it.id }) { GradeCard(it, onOpen = {}) }
+            items(dashboard.latestGrades, key = { it.id }) { grade ->
+                GradeCard(
+                    grade = grade,
+                    onOpen = {
+                        grade.period?.let { period ->
+                            viewModel.navigateToGradesPeriod(period)
+                            onNavigateToTab("grades")
+                        }
+                    }
+                )
+            }
         }
-        item { SectionTitle(R.string.dashboard_recent_absences) }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.dashboard_recent_absences),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                dashboard.recentAbsences.firstOrNull()?.period?.let { period ->
+                    IconButton(
+                        onClick = {
+                            viewModel.navigateToAbsencesPeriod(period)
+                            onNavigateToTab("absences")
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowForward,
+                            contentDescription = stringResource(R.string.dashboard_go_to_absences),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
         if (dashboard.recentAbsences.isEmpty()) {
             item { CompactCard { Text(stringResource(R.string.absences_empty_title)) } }
         } else {
-            items(dashboard.recentAbsences, key = { it.id }) { AbsenceCard(it) }
+            item {
+                val lastAbsence = dashboard.recentAbsences.first()
+                AbsenceCard(
+                    absence = lastAbsence,
+                    onOpen = {
+                        lastAbsence.period?.let { period ->
+                            viewModel.navigateToAbsencesPeriod(period)
+                            onNavigateToTab("absences")
+                        }
+                    }
+                )
+            }
         }
         item { SectionTitle(R.string.dashboard_due_projects) }
         if (dashboard.dueProjects.isEmpty()) {
             item { CompactCard { Text(stringResource(R.string.projects_empty_title)) } }
         } else {
-            items(dashboard.dueProjects, key = { it.id }) { ProjectCard(it) }
+            items(dashboard.dueProjects, key = { it.id }) { project ->
+                var showDialog by remember { mutableStateOf(false) }
+                if (showDialog) {
+                    ProjectDetailsDialog(project) { showDialog = false }
+                }
+                ProjectCard(project, onOpen = { showDialog = true })
+            }
         }
         dashboard.lastSyncAt?.let {
             item {
@@ -153,8 +292,19 @@ fun AgendaScreen(viewModel: StudentViewModel) {
     val state by viewModel.agenda.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    var selectedMode by remember { mutableStateOf(AgendaMode.List) }
+    var selectedMode by remember { mutableStateOf(AgendaMode.Week7) }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
+
+    LaunchedEffect(viewModel) {
+        viewModel.agendaDateToNavigate.collect { targetDate ->
+            selectedDate = targetDate
+            selectedMode = AgendaMode.Week7
+        }
+    }
+    val daysWithEvents = remember(state.data) {
+        state.data.map { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate() }.toSet()
+    }
     val calendarLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         if (grants.values.all { it }) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -174,37 +324,220 @@ fun AgendaScreen(viewModel: StudentViewModel) {
         emptyBody = R.string.agenda_empty_body,
         onRetry = viewModel::refresh
     ) { events ->
-        val filteredEvents = events.filterForMode(selectedMode)
+        
         item {
             AgendaModeSelector(selectedMode) { selectedMode = it }
         }
+        
         item {
-            OutlinedButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    if (context.hasCalendarPermissions()) {
-                        viewModel.syncAgendaToCalendar(events)
-                    } else {
-                        calendarLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
-                    }
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.agenda_sync_calendar))
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (context.hasCalendarPermissions()) {
+                            viewModel.syncAgendaToCalendar(events)
+                        } else {
+                            calendarLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.agenda_sync_calendar))
+                }
+                
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        runCatching {
+                            val icsString = events.toIcsString()
+                            val file = File(context.cacheDir, "agenda.ics")
+                            file.writeText(icsString)
+                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/calendar"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Export Agenda"))
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Rounded.Download, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.agenda_sync_calendar_export))
+                }
             }
         }
-        if (filteredEvents.isEmpty()) {
-            item { CompactCard { Text(stringResource(R.string.agenda_filter_empty)) } }
-        } else {
-            items(filteredEvents, key = { it.id }) { event ->
-                AgendaEventCard(
-                    event = event,
-                    onOpen = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        selectedEvent = event
+        
+        if (selectedMode != AgendaMode.List) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            selectedDate = when (selectedMode) {
+                                AgendaMode.Day -> selectedDate.minusDays(1)
+                                AgendaMode.Week5, AgendaMode.Week7 -> selectedDate.minusWeeks(1)
+                                AgendaMode.Month -> selectedDate.minusMonths(1)
+                                else -> selectedDate
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Rounded.ArrowBack, contentDescription = stringResource(R.string.cd_previous))
                     }
-                )
+                    
+                    val headerText = when (selectedMode) {
+                        AgendaMode.Day -> formatDate(selectedDate)
+                        AgendaMode.Week5, AgendaMode.Week7 -> {
+                            val startOfWeek = selectedDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                            val endDay = if (selectedMode == AgendaMode.Week5) 4 else 6
+                            val endOfWeek = startOfWeek.plusDays(endDay.toLong())
+                            "${formatDate(startOfWeek)} - ${formatDate(endOfWeek)}"
+                        }
+                        AgendaMode.Month -> {
+                            val formatter = DateTimeFormatter.ofPattern("MMMM yyyy", currentJavaLocale())
+                            selectedDate.format(formatter).replaceFirstChar { it.uppercase() }
+                        }
+                        else -> ""
+                    }
+                    
+                    Text(
+                        text = headerText,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    IconButton(
+                        onClick = {
+                            selectedDate = when (selectedMode) {
+                                AgendaMode.Day -> selectedDate.plusDays(1)
+                                AgendaMode.Week5, AgendaMode.Week7 -> selectedDate.plusWeeks(1)
+                                AgendaMode.Month -> selectedDate.plusMonths(1)
+                                else -> selectedDate
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Rounded.ArrowForward, contentDescription = stringResource(R.string.cd_next))
+                    }
+                }
+            }
+        }
+        
+        when (selectedMode) {
+            AgendaMode.List -> {
+                if (events.isEmpty()) {
+                    item { CompactCard { Text(stringResource(R.string.agenda_filter_empty)) } }
+                } else {
+                    items(events, key = { it.id }) { event ->
+                        AgendaEventCard(
+                            event = event,
+                            onOpen = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                selectedEvent = event
+                            }
+                        )
+                    }
+                }
+            }
+            AgendaMode.Day -> {
+                val dayEvents = events.filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate() == selectedDate }
+                if (dayEvents.isEmpty()) {
+                    item { CompactCard { Text(stringResource(R.string.agenda_filter_empty)) } }
+                } else {
+                    items(dayEvents, key = { it.id }) { event ->
+                        AgendaEventCard(
+                            event = event,
+                            onOpen = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                selectedEvent = event
+                            }
+                        )
+                    }
+                }
+            }
+            AgendaMode.Week5, AgendaMode.Week7 -> {
+                val startOfWeek = selectedDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                val numDays = if (selectedMode == AgendaMode.Week5) 5 else 7
+                val daysList = (0 until numDays).map { startOfWeek.plusDays(it.toLong()) }
+                
+                var hasAnyEvent = false
+                daysList.forEach { day ->
+                    val dayEvents = events.filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate() == day }
+                    if (dayEvents.isNotEmpty()) {
+                        hasAnyEvent = true
+                        item {
+                            Text(
+                                text = formatDate(day),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        items(dayEvents, key = { it.id }) { event ->
+                            AgendaEventCard(
+                                event = event,
+                                onOpen = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    selectedEvent = event
+                                }
+                            )
+                        }
+                    }
+                }
+                if (!hasAnyEvent) {
+                    item { CompactCard { Text(stringResource(R.string.agenda_filter_empty)) } }
+                }
+            }
+            AgendaMode.Month -> {
+                item {
+                    MonthCalendarGrid(
+                        selectedDate = selectedDate,
+                        daysWithEvents = daysWithEvents,
+                        onDaySelected = { selectedDate = it }
+                    )
+                }
+                
+                val dayEvents = events.filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate() == selectedDate }
+                if (dayEvents.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = formatDate(selectedDate),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    items(dayEvents, key = { it.id }) { event ->
+                        AgendaEventCard(
+                            event = event,
+                            onOpen = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                selectedEvent = event
+                            }
+                        )
+                    }
+                } else {
+                    item {
+                        CompactCard {
+                            Text(
+                                text = stringResource(R.string.agenda_filter_empty),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -213,14 +546,46 @@ fun AgendaScreen(viewModel: StudentViewModel) {
 @Composable
 fun GradesScreen(viewModel: StudentViewModel) {
     val state by viewModel.grades.collectAsStateWithLifecycle()
-    val noPeriod = stringResource(R.string.common_no_period)
+    val coursesState by viewModel.courses.collectAsStateWithLifecycle()
+    val absencesState by viewModel.absences.collectAsStateWithLifecycle()
     var selectedGrade by remember { mutableStateOf<Grade?>(null) }
+    
+    val gradesList = state.data.orEmpty()
+    val coursesList = coursesState.data.orEmpty()
+    val absencesList = absencesState.data.orEmpty()
+
+    val periods = remember(gradesList, coursesList, absencesList) {
+        val all = (gradesList.mapNotNull { it.period } + 
+                   coursesList.mapNotNull { it.period } + 
+                   absencesList.mapNotNull { it.period })
+            .filter { it.isNotBlank() }
+            .distinct()
+        all.sortedWith { p1, p2 -> comparePeriods(p2, p1) }
+    }
+    var selectedPeriod by remember(periods) {
+        val defaultPeriod = periods.firstOrNull { period ->
+            gradesList.any { it.period == period }
+        } ?: periods.firstOrNull()
+        mutableStateOf(defaultPeriod)
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.gradesPeriodToNavigate.collect { targetPeriod ->
+            selectedPeriod = targetPeriod
+        }
+    }
+
     selectedGrade?.let { grade ->
+        val components = remember(grade, gradesList) {
+            gradesList.filter { it.courseName == grade.courseName && it.period == grade.period }
+        }
         GradeDetailsDialog(
             grade = grade,
+            components = components,
             onDismiss = { selectedGrade = null }
         )
     }
+
     FeatureStateContent(
         state = state,
         empty = List<Grade>::isEmpty,
@@ -228,16 +593,63 @@ fun GradesScreen(viewModel: StudentViewModel) {
         emptyBody = R.string.grades_empty_body,
         onRetry = viewModel::refresh
     ) { grades ->
-        item { GradeSummaryCard(grades) }
-        item { GradeSimulationCard(grades) }
-        grades.groupBy { it.period ?: noPeriod }.forEach { (period, periodGrades) ->
-            item { SectionTitleText(period) }
-            items(periodGrades, key = { it.id }) { grade ->
-                GradeCard(
-                    grade = grade,
-                    onOpen = { selectedGrade = grade }
-                )
+        val filteredGrades = if (selectedPeriod != null) {
+            grades.filter { it.period == selectedPeriod }
+        } else {
+            grades
+        }
+
+        if (periods.isNotEmpty()) {
+            item {
+                var expanded by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    CompactCard(
+                        modifier = Modifier.clickable { expanded = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = selectedPeriod ?: "",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowDropDown,
+                                contentDescription = null
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        periods.forEach { period ->
+                            DropdownMenuItem(
+                                text = { Text(period) },
+                                onClick = {
+                                    selectedPeriod = period
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
+        }
+
+        val mainGrades = filteredGrades.filter { !it.id.contains("-cc-") && !it.id.contains("-exam") }
+
+        item { GradeSummaryCard(mainGrades) }
+        item { GradeSimulationCard(mainGrades) }
+        
+        items(mainGrades, key = { it.id }) { grade ->
+            GradeCard(
+                grade = grade,
+                onOpen = { selectedGrade = grade }
+            )
         }
     }
 }
@@ -245,6 +657,34 @@ fun GradesScreen(viewModel: StudentViewModel) {
 @Composable
 fun AbsencesScreen(viewModel: StudentViewModel) {
     val state by viewModel.absences.collectAsStateWithLifecycle()
+    val coursesState by viewModel.courses.collectAsStateWithLifecycle()
+    val gradesState by viewModel.grades.collectAsStateWithLifecycle()
+    
+    val absencesList = state.data.orEmpty()
+    val coursesList = coursesState.data.orEmpty()
+    val gradesList = gradesState.data.orEmpty()
+
+    val periods = remember(absencesList, coursesList, gradesList) {
+        val all = (absencesList.mapNotNull { it.period } + 
+                   coursesList.mapNotNull { it.period } + 
+                   gradesList.mapNotNull { it.period })
+            .filter { it.isNotBlank() }
+            .distinct()
+        all.sortedWith { p1, p2 -> comparePeriods(p2, p1) }
+    }
+    var selectedPeriod by remember(periods) {
+        val defaultPeriod = periods.firstOrNull { period ->
+            absencesList.any { it.period == period }
+        } ?: periods.firstOrNull()
+        mutableStateOf(defaultPeriod)
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.absencesPeriodToNavigate.collect { targetPeriod ->
+            selectedPeriod = targetPeriod
+        }
+    }
+
     FeatureStateContent(
         state = state,
         empty = List<Absence>::isEmpty,
@@ -252,11 +692,58 @@ fun AbsencesScreen(viewModel: StudentViewModel) {
         emptyBody = R.string.absences_empty_body,
         onRetry = viewModel::refresh
     ) { absences ->
+        val filteredAbsences = if (selectedPeriod != null) {
+            absences.filter { it.period == selectedPeriod }
+        } else {
+            absences
+        }
+
+        if (periods.isNotEmpty()) {
+            item {
+                var expanded by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    CompactCard(
+                        modifier = Modifier.clickable { expanded = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = selectedPeriod ?: "",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowDropDown,
+                                contentDescription = null
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        periods.forEach { period ->
+                            DropdownMenuItem(
+                                text = { Text(period) },
+                                onClick = {
+                                    selectedPeriod = period
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         item {
-            val unjustified = absences.count { !it.justified }
+            val unjustified = filteredAbsences.count { !it.justified }
             DataCard {
                 Text(
-                    text = pluralStringResource(R.plurals.absences_count, absences.size, absences.size),
+                    text = pluralStringResource(R.plurals.absences_count, filteredAbsences.size, filteredAbsences.size),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -266,7 +753,7 @@ fun AbsencesScreen(viewModel: StudentViewModel) {
                 )
             }
         }
-        items(absences, key = { it.id }) { absence -> AbsenceCard(absence) }
+        items(filteredAbsences, key = { it.id }) { absence -> AbsenceCard(absence) }
     }
 }
 
@@ -287,6 +774,13 @@ fun CoursesScreen(viewModel: StudentViewModel) {
 @Composable
 fun ProjectsScreen(viewModel: StudentViewModel) {
     val state by viewModel.projects.collectAsStateWithLifecycle()
+    var selectedProject by remember { mutableStateOf<Project?>(null) }
+    selectedProject?.let { project ->
+        ProjectDetailsDialog(
+            project = project,
+            onDismiss = { selectedProject = null }
+        )
+    }
     FeatureStateContent(
         state = state,
         empty = List<Project>::isEmpty,
@@ -294,7 +788,12 @@ fun ProjectsScreen(viewModel: StudentViewModel) {
         emptyBody = R.string.projects_empty_body,
         onRetry = viewModel::refresh
     ) { projects ->
-        items(projects, key = { it.id }) { project -> ProjectCard(project) }
+        items(projects, key = { it.id }) { project ->
+            ProjectCard(
+                project = project,
+                onOpen = { selectedProject = project }
+            )
+        }
     }
 }
 
@@ -486,8 +985,13 @@ private fun AgendaModeSelector(
     selectedMode: AgendaMode,
     onModeSelected: (AgendaMode) -> Unit
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        AgendaMode.entries.forEach { mode ->
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        AgendaMode.values().forEach { mode ->
             FilterChip(
                 selected = selectedMode == mode,
                 onClick = { onModeSelected(mode) },
@@ -616,7 +1120,21 @@ internal fun AgendaEventDetailsDialog(
                 )
                 LabelValue(R.string.practicals_start, formatInstant(event.startsAt))
                 LabelValue(R.string.agenda_end, formatInstant(event.endsAt))
-                LabelValue(R.string.agenda_room, event.room.orEmpty())
+                val context = LocalContext.current
+                LabelValue(
+                    label = R.string.agenda_room,
+                    value = event.room.orEmpty()
+                )
+                LabelValue(
+                    label = R.string.agenda_address,
+                    value = event.address.orEmpty(),
+                    onClick = if (event.address.isNullOrBlank()) null else {
+                        {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(event.address)}"))
+                            runCatching { context.startActivity(intent) }
+                        }
+                    }
+                )
                 LabelValue(R.string.agenda_teacher, event.teacher.orEmpty())
                 LabelValue(R.string.agenda_modality, event.modality.orEmpty())
                 LabelValue(R.string.agenda_type, event.type.orEmpty())
@@ -662,6 +1180,9 @@ private fun GradeCard(
         LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
         LabelValue(R.string.grades_average, formatNumber(grade.average))
         LabelValue(R.string.common_date, formatDate(grade.date))
+        if (!grade.period.isNullOrBlank()) {
+            LabelValue(R.string.common_period, grade.period)
+        }
     }
 }
 
@@ -697,8 +1218,15 @@ internal fun GradeSummaryCard(grades: List<Grade>) {
 @Composable
 private fun GradeDetailsDialog(
     grade: Grade,
+    components: List<Grade>,
     onDismiss: () -> Unit
 ) {
+    val ccComponents = components.filter { it.id.contains("-cc-") }
+    val examComponent = components.firstOrNull { it.id.contains("-exam") }
+    
+    val ccValues = ccComponents.mapNotNull { it.value }
+    val ccAverage = if (ccValues.isNotEmpty()) ccValues.average() else null
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.grades_detail_title)) },
@@ -710,15 +1238,72 @@ private fun GradeDetailsDialog(
                     fontWeight = FontWeight.SemiBold
                 )
                 LabelValue(R.string.common_period, grade.period.orEmpty())
-                LabelValue(R.string.grades_component, grade.subject.orUntitled())
-                if (grade.value == null) {
-                    LabelValue(R.string.grades_average, stringResource(R.string.grades_no_grade))
-                } else {
-                    LabelValue(
-                        R.string.grades_average,
-                        stringResource(R.string.grades_value_format, formatNumber(grade.value), formatNumber(grade.scale))
+                
+                if (ccComponents.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(
+                        text = stringResource(R.string.grades_cc_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
                     )
+                    ccComponents.forEach { component ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = component.subject.orUntitled(),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            val valText = if (component.value != null) {
+                                stringResource(R.string.grades_value_format, formatNumber(component.value), formatNumber(component.scale))
+                            } else {
+                                stringResource(R.string.grades_no_grade)
+                            }
+                            Text(
+                                text = valText,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                    ccAverage?.let {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LabelValue(R.string.grades_cc_average, stringResource(R.string.grades_value_format, formatNumber(it), "20"))
+                    }
                 }
+                
+                examComponent?.let { exam ->
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(
+                        text = stringResource(R.string.grades_exam_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = exam.subject.orUntitled(),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        val valText = if (exam.value != null) {
+                            stringResource(R.string.grades_value_format, formatNumber(exam.value), formatNumber(exam.scale))
+                        } else {
+                            stringResource(R.string.grades_no_grade)
+                        }
+                        Text(
+                            text = valText,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                LabelValue(
+                    R.string.grades_general_average,
+                    if (grade.value != null) stringResource(R.string.grades_value_format, formatNumber(grade.value), formatNumber(grade.scale)) else stringResource(R.string.grades_no_grade)
+                )
                 LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
                 LabelValue(R.string.common_date, formatDate(grade.date))
             }
@@ -735,51 +1320,115 @@ private fun GradeDetailsDialog(
 private fun GradeSimulationCard(grades: List<Grade>) {
     var valueText by remember { mutableStateOf("") }
     var coefficientText by remember { mutableStateOf("1") }
-    val simulatedGrade = valueText.toGradeNumber()?.let { value ->
-        Grade(
-            id = "simulation",
-            courseName = stringResource(R.string.grades_simulation_title),
-            subject = stringResource(R.string.grades_simulation_value),
-            value = value,
-            scale = 20.0,
-            coefficient = coefficientText.toGradeNumber() ?: 1.0,
-            average = null,
-            date = null,
-            period = null
-        )
+    var labelText by remember { mutableStateOf("") }
+    var simulatedList by remember { mutableStateOf(emptyList<Grade>()) }
+    
+    val overallGrades = remember(grades, simulatedList) {
+        grades + simulatedList
     }
-    val summary = remember(grades, simulatedGrade) {
-        (grades + listOfNotNull(simulatedGrade)).toGradeSummary()
-    }
+    val summary = remember(overallGrades) { overallGrades.toGradeSummary() }
+    
     DataCard {
         Text(
             text = stringResource(R.string.grades_simulation_title),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
+        
+        if (simulatedList.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                simulatedList.forEachIndexed { index, sim ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                      ) {
+                          Text(
+                              text = "${sim.courseName} (coef ${formatNumber(sim.coefficient)}): ${formatNumber(sim.value)}/20",
+                              style = MaterialTheme.typography.bodyMedium
+                          )
+                          IconButton(
+                              onClick = { simulatedList = simulatedList.filterIndexed { i, _ -> i != index } },
+                              modifier = Modifier.size(24.dp)
+                          ) {
+                              Icon(
+                                  imageVector = Icons.Rounded.Delete,
+                                  contentDescription = stringResource(R.string.action_delete),
+                                  modifier = Modifier.size(16.dp)
+                              )
+                          }
+                      }
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            }
+        }
+        
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = labelText,
+                onValueChange = { labelText = it },
+                label = { Text(stringResource(R.string.grades_simulation_label)) },
+                modifier = Modifier.weight(1.5f),
+                singleLine = true
+            )
             OutlinedTextField(
                 value = valueText,
                 onValueChange = { valueText = it },
                 label = { Text(stringResource(R.string.grades_simulation_value)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                singleLine = true
             )
             OutlinedTextField(
                 value = coefficientText,
                 onValueChange = { coefficientText = it },
                 label = { Text(stringResource(R.string.grades_simulation_coefficient)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                singleLine = true
             )
         }
+        
+        Button(
+            onClick = {
+                val value = valueText.toGradeNumber()
+                val coef = coefficientText.toGradeNumber() ?: 1.0
+                if (value != null) {
+                    val label = labelText.trim().ifBlank { "Simulated" }
+                    val newSim = Grade(
+                        id = "sim-${System.currentTimeMillis()}",
+                        courseName = label,
+                        subject = label,
+                        value = value,
+                        scale = 20.0,
+                        coefficient = coef,
+                        average = null,
+                        date = null,
+                        period = null
+                    )
+                    simulatedList = simulatedList + newSim
+                    valueText = ""
+                    labelText = ""
+                    coefficientText = "1"
+                }
+            },
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text(stringResource(R.string.grades_simulation_add))
+        }
+        
         LabelValue(R.string.grades_simulation_average, formatNumber(summary.weightedAverage))
     }
 }
 
 @Composable
-internal fun AbsenceCard(absence: Absence) {
-    CompactCard {
+internal fun AbsenceCard(
+    absence: Absence,
+    onOpen: (() -> Unit)? = null
+) {
+    CompactCard(
+        modifier = if (onOpen == null) Modifier else Modifier.clickable(onClick = onOpen)
+    ) {
         Text(
             text = absence.courseName.orUntitled(),
             style = MaterialTheme.typography.titleMedium,
@@ -791,7 +1440,9 @@ internal fun AbsenceCard(absence: Absence) {
             R.string.absences_status,
             if (absence.justified) stringResource(R.string.absences_justified) else stringResource(R.string.absences_unjustified)
         )
-        LabelValue(R.string.absences_reason, absence.reason.orEmpty())
+        if (!absence.period.isNullOrBlank()) {
+            LabelValue(R.string.common_period, absence.period)
+        }
     }
 }
 
@@ -808,6 +1459,34 @@ internal fun CourseCard(course: Course) {
         LabelValue(R.string.profile_year, course.year.orEmpty())
         LabelValue(R.string.common_period, course.period.orEmpty())
         LabelValue(R.string.courses_files, course.fileCount.toString())
+        course.location?.let { location ->
+            if (location.isNotBlank()) {
+                val context = LocalContext.current
+                Row(
+                    modifier = Modifier
+                        .clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(location)}"))
+                            runCatching { context.startActivity(intent) }
+                        }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = location,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textDecoration = TextDecoration.Underline
+                    )
+                }
+            }
+        }
         if (!course.syllabus.isNullOrBlank()) {
             HorizontalDivider()
             TextButton(onClick = { syllabusExpanded = !syllabusExpanded }) {
@@ -821,21 +1500,34 @@ internal fun CourseCard(course: Course) {
 }
 
 @Composable
-internal fun ProjectCard(project: Project) {
-    CompactCard {
+internal fun ProjectCard(
+    project: Project,
+    onOpen: () -> Unit = {}
+) {
+    CompactCard(modifier = Modifier.clickable(onClick = onOpen)) {
         Text(
             text = project.name.orUntitled(),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
-        LabelValue(R.string.projects_course, project.courseName.orEmpty())
-        LabelValue(R.string.projects_group, project.groupName.orEmpty())
-        LabelValue(R.string.projects_status, project.status.orEmpty())
-        LabelValue(R.string.projects_deadline, formatInstant(project.deadline))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                LabelValue(R.string.projects_course, project.courseName.orEmpty())
+                LabelValue(R.string.projects_group, project.groupName.orEmpty())
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                LabelValue(R.string.projects_status, project.status.orEmpty())
+                LabelValue(R.string.projects_deadline, formatInstant(project.deadline))
+            }
+        }
         LabelValue(R.string.projects_files, project.fileCount.toString())
+        Spacer(Modifier.height(4.dp))
         ProjectProgress(project)
         project.steps.forEach { step ->
-            HorizontalDivider()
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             Text(step.title.orUntitled(), fontWeight = FontWeight.Medium)
             LabelValue(R.string.projects_deadline, formatInstant(step.deadline))
             LabelValue(R.string.projects_status, step.status.orEmpty())
@@ -853,7 +1545,7 @@ private fun ProjectProgress(project: Project) {
     )
     LinearProgressIndicator(
         progress = { progress.fraction.toFloat() },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clip(CircleShape)
     )
     Text(
         text = if (progress.totalSteps == 0) {
@@ -863,6 +1555,82 @@ private fun ProjectProgress(project: Project) {
         },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun ProjectDetailsDialog(
+    project: Project,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.projects_detail_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = project.name.orUntitled(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                LabelValue(R.string.projects_course, project.courseName.orEmpty())
+                LabelValue(R.string.projects_group, project.groupName.orEmpty())
+                LabelValue(R.string.projects_status, project.status.orEmpty())
+                LabelValue(R.string.projects_deadline, formatInstant(project.deadline))
+                LabelValue(R.string.projects_files, project.fileCount.toString())
+                
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                ProjectProgress(project)
+                
+                if (project.steps.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(
+                        text = stringResource(R.string.projects_steps_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        project.steps.forEach { step ->
+                            Column {
+                                Text(
+                                    text = step.title.orUntitled(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = formatInstant(step.deadline),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = step.status.orEmpty(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (step.status.isCompletedStatus()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        }
+    )
+}
+
+private fun String?.isCompletedStatus(): Boolean {
+    val normalized = this?.trim()?.lowercase().orEmpty()
+    return normalized in setOf(
+        "done", "completed", "complete", "closed", "validated", "validé", "validée", "terminé", "terminée", "fini", "finie", "rendu", "rendue"
     )
 }
 
@@ -969,24 +1737,143 @@ private fun String.toGradeNumber(): Double? {
     return trim().replace(',', '.').toDoubleOrNull()?.takeIf { it >= 0.0 }
 }
 
-private fun List<AgendaEvent>.filterForMode(mode: AgendaMode): List<AgendaEvent> {
-    val now = Instant.now()
-    val today = LocalDate.now()
-    return when (mode) {
-        AgendaMode.Day -> filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate() == today }
-        AgendaMode.Week -> filter { it.startsAt.isAfter(now.minus(1, ChronoUnit.HOURS)) && it.startsAt.isBefore(now.plus(7, ChronoUnit.DAYS)) }
-        AgendaMode.List -> this
-    }
-}
-
-private enum class AgendaMode(@StringRes val title: Int) {
-    Day(R.string.agenda_mode_day),
-    Week(R.string.agenda_mode_week),
-    List(R.string.agenda_mode_list)
-}
-
 private enum class LanguageOption(@StringRes val title: Int, val languageTag: String?) {
     System(R.string.settings_language_system, null),
     French(R.string.settings_language_french, "fr"),
     English(R.string.settings_language_english, "en")
+}
+
+private enum class AgendaMode(@StringRes val title: Int) {
+    Day(R.string.agenda_mode_day),
+    Week5(R.string.agenda_mode_week_5),
+    Week7(R.string.agenda_mode_week_7),
+    Month(R.string.agenda_mode_month),
+    List(R.string.agenda_mode_list)
+}
+
+@Composable
+private fun MonthCalendarGrid(
+    selectedDate: LocalDate,
+    daysWithEvents: Set<LocalDate>,
+    onDaySelected: (LocalDate) -> Unit
+) {
+    val firstOfMonth = selectedDate.withDayOfMonth(1)
+    val lengthOfMonth = selectedDate.lengthOfMonth()
+    val firstDayOfWeek = firstOfMonth.dayOfWeek.value
+    
+    val daysOfWeek = listOf("M", "T", "W", "T", "F", "S", "S")
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            daysOfWeek.forEach { dayName ->
+                Text(
+                    text = dayName,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        }
+        
+        val totalCells = (firstDayOfWeek - 1) + lengthOfMonth
+        val numRows = (totalCells + 6) / 7
+        
+        for (r in 0 until numRows) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                for (c in 0 until 7) {
+                    val cellIndex = r * 7 + c
+                    val dayNum = cellIndex - (firstDayOfWeek - 2)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .padding(2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (dayNum in 1..lengthOfMonth) {
+                            val cellDate = selectedDate.withDayOfMonth(dayNum)
+                            val isSelected = cellDate == selectedDate
+                            val hasEvent = cellDate in daysWithEvents
+                            
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .clickable { onDaySelected(cellDate) }
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else androidx.compose.ui.graphics.Color.Transparent
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = dayNum.toString(),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (hasEvent) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(4.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                                    else MaterialTheme.colorScheme.primary
+                                                )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun List<AgendaEvent>.toIcsString(): String {
+    val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC)
+    val sb = java.lang.StringBuilder()
+    sb.append("BEGIN:VCALENDAR\n")
+    sb.append("VERSION:2.0\n")
+    sb.append("PRODID:-//MyGES Mobile//Calendar Export//EN\n")
+    sb.append("CALSCALE:GREGORIAN\n")
+    forEach { event ->
+        sb.append("BEGIN:VEVENT\n")
+        sb.append("UID:").append(event.id).append("\n")
+        sb.append("DTSTART:").append(formatter.format(event.startsAt)).append("\n")
+        sb.append("DTEND:").append(formatter.format(event.endsAt)).append("\n")
+        sb.append("SUMMARY:").append(event.title).append("\n")
+        val desc = listOfNotNull(event.teacher, event.type, event.modality).joinToString(" - ")
+        sb.append("DESCRIPTION:").append(desc).append("\n")
+        sb.append("LOCATION:").append(event.room.orEmpty()).append("\n")
+        sb.append("END:VEVENT\n")
+    }
+    sb.append("END:VCALENDAR\n")
+    return sb.toString()
+}
+
+private fun comparePeriods(p1: String, p2: String): Int {
+    val yearRegex = Regex("\\d{4}")
+    val year1 = yearRegex.find(p1)?.value?.toIntOrNull() ?: 0
+    val year2 = yearRegex.find(p2)?.value?.toIntOrNull() ?: 0
+    if (year1 != year2) {
+        return year1.compareTo(year2)
+    }
+    
+    val numRegex = Regex("\\d+")
+    val num1 = numRegex.findAll(p1).mapNotNull { it.value.toIntOrNull() }.lastOrNull() ?: 0
+    val num2 = numRegex.findAll(p2).mapNotNull { it.value.toIntOrNull() }.lastOrNull() ?: 0
+    return num1.compareTo(num2)
 }
