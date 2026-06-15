@@ -206,16 +206,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
             else -> null
         }
 
-        val finalAverage = if (ccGrades.isEmpty() && examValue == null) {
-            null
-        } else {
-            val apiAverage = root.number("average", "moyenne", "ccaverage")
-            if (apiAverage == 0.0) {
-                calculatedAverage ?: 0.0
-            } else {
-                apiAverage ?: calculatedAverage
-            }
-        }
+        val finalAverage = calculatedAverage ?: root.number("average", "moyenne")?.takeIf { it != 0.0 }
 
         val resultList = mutableListOf<Grade>()
 

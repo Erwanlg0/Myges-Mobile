@@ -581,6 +581,9 @@ fun GradesScreen(viewModel: StudentViewModel) {
     var simulatedValues by remember(gradesList) {
         mutableStateOf(loadGradeSimulations(simulationPrefs, gradesList.map { it.id }.toSet()))
     }
+    var blockAssignments by remember(gradesList) {
+        mutableStateOf(loadGradeBlocks(simulationPrefs, gradesList.map { it.blockKey() }.toSet()))
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.gradesPeriodToNavigate.collect { targetPeriod ->
@@ -597,6 +600,28 @@ fun GradesScreen(viewModel: StudentViewModel) {
         GradeDetailsDialog(
             grade = if (simulationMode) grade.withSimulatedValue(simulatedValues[grade.id]) else grade,
             components = components,
+            block = blockAssignments[grade.blockKey()].orEmpty(),
+            simulationMode = simulationMode,
+            resetVersion = simulationResetVersion,
+            onValueChange = { gradeId, value ->
+                val updatedValues = if (value == null) {
+                    simulatedValues - gradeId
+                } else {
+                    simulatedValues + (gradeId to value)
+                }
+                simulatedValues = updatedValues
+                saveGradeSimulations(simulationPrefs, updatedValues)
+            },
+            onBlockChange = { block ->
+                val key = grade.blockKey()
+                val updatedBlocks = if (block.isBlank()) {
+                    blockAssignments - key
+                } else {
+                    blockAssignments + (key to block)
+                }
+                blockAssignments = updatedBlocks
+                saveGradeBlocks(simulationPrefs, updatedBlocks)
+            },
             onDismiss = { selectedGrade = null }
         )
     }
@@ -698,7 +723,10 @@ fun GradesScreen(viewModel: StudentViewModel) {
 
         val mainGrades = displayedGrades.filter { !it.id.contains("-cc-") && !it.id.contains("-exam") }
 
-        item { GradeSummaryCard(mainGrades) }
+        item { GradeSummaryCard(mainGrades, displayedGrades) }
+        if (blockAssignments.isNotEmpty()) {
+            item { GradeBlockAveragesCard(mainGrades, blockAssignments) }
+        }
         item {
             DataCard {
                 Row(
@@ -724,6 +752,7 @@ fun GradesScreen(viewModel: StudentViewModel) {
                     TextButton(
                         onClick = {
                             simulatedValues = emptyMap()
+                            blockAssignments = emptyMap()
                             clearGradeSimulations(simulationPrefs)
                             simulationResetVersion++
                         },
@@ -735,27 +764,12 @@ fun GradesScreen(viewModel: StudentViewModel) {
             }
         }
         
-        items(displayedGrades, key = { it.id }) { grade ->
-            if (simulationMode) {
-                GradeSimulationEditCard(
-                    grade = grade,
-                    resetVersion = simulationResetVersion,
-                    onValueChange = { value ->
-                        simulatedValues = if (value == null) {
-                            simulatedValues - grade.id
-                        } else {
-                            simulatedValues + (grade.id to value)
-                        }
-                        saveGradeSimulations(simulationPrefs, simulatedValues)
-                    },
-                    onOpen = { selectedGrade = grade }
-                )
-            } else {
-                GradeCard(
-                    grade = grade,
-                    onOpen = { selectedGrade = grade }
-                )
-            }
+        val gradeItems = mainGrades
+        items(gradeItems, key = { it.id }) { grade ->
+            GradeCard(
+                grade = grade,
+                onOpen = { selectedGrade = grade }
+            )
         }
     }
 }
@@ -763,11 +777,17 @@ fun GradesScreen(viewModel: StudentViewModel) {
 @Composable
 fun AbsencesScreen(viewModel: StudentViewModel) {
     val state by viewModel.absences.collectAsStateWithLifecycle()
+    val coursesState by viewModel.courses.collectAsStateWithLifecycle()
+    val gradesState by viewModel.grades.collectAsStateWithLifecycle()
     
     val absencesList = state.data.orEmpty()
+    val coursesList = coursesState.data.orEmpty()
+    val gradesList = gradesState.data.orEmpty()
 
-    val years = remember(absencesList) {
-        absencesList.map { it.academicYearLabel() }
+    val years = remember(absencesList, coursesList, gradesList) {
+        (absencesList.map { it.academicYearLabel() } +
+            coursesList.mapNotNull { it.academicYearLabel() } +
+            gradesList.mapNotNull { it.academicYearLabel().takeIf(String::isNotBlank) })
             .filter { it.isNotBlank() }
             .distinct()
             .sortedDescending()
@@ -775,9 +795,10 @@ fun AbsencesScreen(viewModel: StudentViewModel) {
     var selectedYear by remember(years) {
         mutableStateOf(years.firstOrNull())
     }
-    val semesters = remember(absencesList, selectedYear) {
-        absencesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }
-            .mapNotNull { it.semesterLabel() }
+    val semesters = remember(absencesList, coursesList, gradesList, selectedYear) {
+        (absencesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }.mapNotNull { it.semesterLabel() } +
+            coursesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }.mapNotNull { it.semesterLabel() } +
+            gradesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }.mapNotNull { it.semesterLabel() })
             .filter { it.isNotBlank() }
             .distinct()
             .sortedWith { p1, p2 -> comparePeriods(p2, p1) }
@@ -1490,7 +1511,9 @@ private fun GradeCard(
             )
         }
         LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
-        LabelValue(R.string.grades_average, formatNumber(grade.average))
+        if (grade.value != null) {
+            LabelValue(R.string.grades_average, formatNumber(grade.average))
+        }
         LabelValue(R.string.common_date, formatDate(grade.date))
         if (!grade.period.isNullOrBlank()) {
             LabelValue(R.string.common_period, grade.period)
@@ -1499,8 +1522,17 @@ private fun GradeCard(
 }
 
 @Composable
-internal fun GradeSummaryCard(grades: List<Grade>) {
+internal fun GradeSummaryCard(
+    grades: List<Grade>,
+    allGrades: List<Grade> = grades
+) {
     val summary = remember(grades) { grades.toGradeSummary() }
+    val ccAverage = remember(allGrades) {
+        allGrades.filter { it.id.contains("-cc-") }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
+    }
+    val examAverage = remember(allGrades) {
+        allGrades.filter { it.id.contains("-exam") }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
+    }
     DataCard {
         Text(
             text = stringResource(R.string.grades_summary_title),
@@ -1514,6 +1546,8 @@ internal fun GradeSummaryCard(grades: List<Grade>) {
             )
         } else {
             ColoredLabelValue(R.string.grades_weighted_average, formatNumber(summary.weightedAverage), gradeColor(summary.weightedAverage, 20.0))
+            ColoredLabelValue(R.string.grades_cc_average, ccAverage?.let { formatNumber(it) } ?: stringResource(R.string.grades_no_grade), gradeColor(ccAverage, 20.0))
+            ColoredLabelValue(R.string.grades_exam_title, examAverage?.let { formatNumber(it) } ?: stringResource(R.string.grades_no_grade), gradeColor(examAverage, 20.0))
             LabelValue(R.string.grades_gpa, formatNumber(summary.gpa))
         }
         LabelValue(R.string.grades_count, summary.gradedCount.toString())
@@ -1528,14 +1562,46 @@ internal fun GradeSummaryCard(grades: List<Grade>) {
 }
 
 @Composable
+private fun GradeBlockAveragesCard(
+    grades: List<Grade>,
+    blockAssignments: Map<String, String>
+) {
+    val blockSummaries = remember(grades, blockAssignments) {
+        grades.groupBy { blockAssignments[it.blockKey()]?.takeIf(String::isNotBlank) }
+            .filterKeys { it != null }
+            .mapKeys { it.key.orEmpty() }
+            .toSortedMap(compareBy<String> { it.toIntOrNull() ?: Int.MAX_VALUE }.thenBy { it })
+            .mapValues { (_, blockGrades) -> blockGrades.toGradeSummary() }
+    }
+    if (blockSummaries.isEmpty()) return
+    DataCard {
+        Text(
+            text = stringResource(R.string.grades_block_average),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        blockSummaries.forEach { (block, summary) ->
+            ColoredLabelValue(
+                label = R.string.grades_block,
+                value = "$block : ${summary.weightedAverage?.let { formatNumber(it) } ?: stringResource(R.string.grades_no_grade)}",
+                color = gradeColor(summary.weightedAverage, 20.0)
+            )
+        }
+    }
+}
+
+@Composable
 private fun GradeSimulationEditCard(
     grade: Grade,
     resetVersion: Int,
+    block: String,
     onValueChange: (Double?) -> Unit,
+    onBlockChange: (String) -> Unit,
     onOpen: () -> Unit
 ) {
     val initialValueText = formatNumber(grade.value)
     var valueText by remember(grade.id, resetVersion) { mutableStateOf(initialValueText) }
+    var blockText by remember(grade.blockKey(), resetVersion) { mutableStateOf(block) }
     CompactCard {
         Text(
             text = grade.courseName.orUntitled(),
@@ -1543,7 +1609,9 @@ private fun GradeSimulationEditCard(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clickable(onClick = onOpen)
         )
-        Text(grade.subject.orUntitled())
+        if (grade.subject.isNotBlank()) {
+            Text(grade.subject)
+        }
         OutlinedTextField(
             value = valueText,
             onValueChange = { value ->
@@ -1555,6 +1623,19 @@ private fun GradeSimulationEditCard(
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+        if (!grade.id.contains("-cc-") && !grade.id.contains("-exam")) {
+            OutlinedTextField(
+                value = blockText,
+                onValueChange = { value ->
+                    blockText = value
+                    onBlockChange(value.trim())
+                },
+                label = { Text(stringResource(R.string.grades_block)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
         if (!grade.period.isNullOrBlank()) {
             LabelValue(R.string.common_period, grade.period)
@@ -1563,17 +1644,45 @@ private fun GradeSimulationEditCard(
 }
 
 @Composable
+private fun GradeValueEditor(
+    grade: Grade,
+    resetVersion: Int,
+    onValueChange: (Double?) -> Unit
+) {
+    val initialValueText = formatNumber(grade.value)
+    var valueText by remember(grade.id, resetVersion) { mutableStateOf(initialValueText) }
+    OutlinedTextField(
+        value = valueText,
+        onValueChange = { value ->
+            valueText = value
+            onValueChange(value.toGradeNumber())
+        },
+        label = { Text(grade.subject.ifBlank { stringResource(R.string.grades_general_average) }) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
 private fun GradeDetailsDialog(
     grade: Grade,
     components: List<Grade>,
+    block: String,
+    simulationMode: Boolean,
+    resetVersion: Int,
+    onValueChange: (String, Double?) -> Unit,
+    onBlockChange: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val isComponent = grade.id.contains("-cc-") || grade.id.contains("-exam")
     val ccComponents = if (isComponent) emptyList() else components.filter { it.id.contains("-cc-") }
     val examComponent = if (isComponent) null else components.firstOrNull { it.id.contains("-exam") }
+    val editableGrades = if (ccComponents.isEmpty() && examComponent == null) listOf(grade) else ccComponents + listOfNotNull(examComponent)
     
     val ccValues = ccComponents.mapNotNull { it.value }
     val ccAverage = if (ccValues.isNotEmpty()) ccValues.average() else null
+    var blockText by remember(grade.blockKey(), resetVersion) { mutableStateOf(block) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1586,8 +1695,30 @@ private fun GradeDetailsDialog(
                     fontWeight = FontWeight.SemiBold
                 )
                 LabelValue(R.string.common_period, grade.period.orEmpty())
+                if (!isComponent) {
+                    OutlinedTextField(
+                        value = blockText,
+                        onValueChange = { value ->
+                            blockText = value
+                            onBlockChange(value.trim())
+                        },
+                        label = { Text(stringResource(R.string.grades_block)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 
-                if (ccComponents.isNotEmpty()) {
+                if (simulationMode) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    editableGrades.forEach { editableGrade ->
+                        GradeValueEditor(
+                            grade = editableGrade,
+                            resetVersion = resetVersion,
+                            onValueChange = { value -> onValueChange(editableGrade.id, value) }
+                        )
+                    }
+                } else if (ccComponents.isNotEmpty()) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     Text(
                         text = stringResource(R.string.grades_cc_title),
@@ -1620,7 +1751,7 @@ private fun GradeDetailsDialog(
                     }
                 }
                 
-                examComponent?.let { exam ->
+                if (!simulationMode) examComponent?.let { exam ->
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     Text(
                         text = stringResource(R.string.grades_exam_title),
@@ -2328,7 +2459,37 @@ private fun saveGradeSimulations(
 }
 
 private fun clearGradeSimulations(preferences: SharedPreferences) {
-    preferences.edit().remove("values").apply()
+    preferences.edit().remove("values").remove("blocks").apply()
+}
+
+private fun loadGradeBlocks(
+    preferences: SharedPreferences,
+    allowedKeys: Set<String>
+): Map<String, String> {
+    return preferences.getString("blocks", null)
+        .orEmpty()
+        .lineSequence()
+        .mapNotNull { line ->
+            val separator = line.indexOf('=')
+            if (separator <= 0) return@mapNotNull null
+            val key = line.substring(0, separator)
+            val block = line.substring(separator + 1).takeIf { it.isNotBlank() }
+            if (key in allowedKeys && block != null) key to block else null
+        }
+        .toMap()
+}
+
+private fun saveGradeBlocks(
+    preferences: SharedPreferences,
+    blocks: Map<String, String>
+) {
+    preferences.edit()
+        .putString("blocks", blocks.entries.joinToString("\n") { "${it.key}=${it.value}" })
+        .apply()
+}
+
+private fun Grade.blockKey(): String {
+    return "${academicYearLabel()}|$courseName"
 }
 
 private fun Grade.academicYearLabel(): String {
@@ -2336,6 +2497,15 @@ private fun Grade.academicYearLabel(): String {
     val gradeDate = date ?: return ""
     val startYear = if (gradeDate.monthValue >= 9) gradeDate.year else gradeDate.year - 1
     return "$startYear-${startYear + 1}"
+}
+
+private fun Course.academicYearLabel(): String? {
+    year?.takeIf { it.isNotBlank() }?.let { startYear ->
+        startYear.toIntOrNull()?.let { return "$it-${it + 1}" }
+        return startYear
+    }
+    Regex("\\d{4}\\s*-\\s*\\d{4}").find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
+    return null
 }
 
 private fun Absence.academicYearLabel(): String {
@@ -2355,6 +2525,10 @@ private fun Grade.semesterLabel(): String? {
 }
 
 private fun Absence.semesterLabel(): String? {
+    return period?.semesterLabel()
+}
+
+private fun Course.semesterLabel(): String? {
     return period?.semesterLabel()
 }
 

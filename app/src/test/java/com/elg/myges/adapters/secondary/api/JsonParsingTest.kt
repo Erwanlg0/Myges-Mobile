@@ -196,7 +196,7 @@ class JsonParsingTest {
         assertEquals("456", main.id)
         assertEquals("Algorithmique", main.courseName)
         assertEquals("", main.subject)
-        assertEquals(14.5, main.value ?: 0.0, 0.0)
+        assertEquals(14.25, main.value ?: 0.0, 0.0)
         assertEquals(2.0, main.coefficient ?: 0.0, 0.0)
 
         // CC 1 Component
@@ -210,6 +210,31 @@ class JsonParsingTest {
         assertEquals("456-cc-1", cc2.id)
         assertEquals("CC 2", cc2.subject)
         assertEquals(12.0, cc2.value ?: 0.0, 0.0)
+    }
+
+    @Test
+    fun gradesAverageCombinesCcAverageAndExamWhenBothExist() {
+        val grades = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "rc_id": 456,
+                  "course": "Algorithmique",
+                  "grades": [15, 5],
+                  "exam": 15,
+                  "trimester_name": "Semestre 1",
+                  "year": 2025
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toGrades("2025")
+
+        assertEquals(4, grades.size)
+        assertEquals(12.5, grades[0].value ?: 0.0, 0.0)
+        assertEquals("456-exam", grades[3].id)
+        assertEquals(15.0, grades[3].value ?: 0.0, 0.0)
     }
 
     @Test
