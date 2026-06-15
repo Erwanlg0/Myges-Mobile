@@ -10,6 +10,7 @@ import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
+import com.elg.myges.domain.model.DirectoryPerson
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
@@ -106,6 +107,12 @@ class ObserveDocumentsUseCase @Inject constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<AcademicDocument>> = repository.observeDocuments()
+}
+
+class ObserveDirectoryUseCase @Inject constructor(
+    private val repository: StudentDataRepository
+) {
+    operator fun invoke(): Flow<List<DirectoryPerson>> = repository.observeDirectory()
 }
 
 class ObserveNewsUseCase @Inject constructor(

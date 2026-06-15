@@ -6,8 +6,10 @@ import androidx.core.content.FileProvider
 import com.elg.myges.adapters.secondary.api.MyGesApiService
 import com.elg.myges.adapters.secondary.api.toAbsences
 import com.elg.myges.adapters.secondary.api.toAgendaEvents
+import com.elg.myges.adapters.secondary.api.toClassIds
 import com.elg.myges.adapters.secondary.api.toCourseSyllabus
 import com.elg.myges.adapters.secondary.api.toCourses
+import com.elg.myges.adapters.secondary.api.toDirectoryPeople
 import com.elg.myges.adapters.secondary.api.toDocuments
 import com.elg.myges.adapters.secondary.api.toGrades
 import com.elg.myges.adapters.secondary.api.toNews
@@ -20,6 +22,7 @@ import com.elg.myges.adapters.secondary.api.toYears
 import com.elg.myges.adapters.secondary.storage.StudentDao
 import com.elg.myges.adapters.secondary.storage.toDomain
 import com.elg.myges.adapters.secondary.storage.toEntity
+import com.elg.myges.adapters.secondary.storage.toGroupEntities
 import com.elg.myges.adapters.secondary.storage.toStepEntities
 import com.elg.myges.application.ports.NotificationScheduler
 import com.elg.myges.application.ports.SettingsRepository
@@ -31,6 +34,8 @@ import com.elg.myges.domain.model.AppError
 import com.elg.myges.domain.model.AppException
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
+import com.elg.myges.domain.model.DirectoryPerson
+import com.elg.myges.domain.model.DirectoryRole
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
@@ -42,15 +47,19 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType
 import retrofit2.HttpException
 import java.io.File
 import java.io.IOException
+import java.net.URLDecoder
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Year
 import java.time.ZoneOffset
+import java.nio.charset.StandardCharsets
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.max
 
 @Singleton
 class OfflineFirstStudentDataRepository @Inject constructor(
@@ -99,9 +108,10 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     }
 
     override fun observeProjects(): Flow<List<Project>> {
-        return combine(dao.observeProjects(), dao.observeProjectSteps()) { projects, steps ->
+        return combine(dao.observeProjects(), dao.observeProjectSteps(), dao.observeProjectGroups()) { projects, steps, groups ->
             val stepsByProject = steps.groupBy { it.projectId }
-            projects.map { project -> project.toDomain(stepsByProject[project.id].orEmpty()) }
+            val groupsByProject = groups.groupBy { it.projectId }
+            projects.map { project -> project.toDomain(stepsByProject[project.id].orEmpty(), groupsByProject[project.id].orEmpty()) }
         }
     }
 
@@ -111,6 +121,10 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
     override fun observeDocuments(): Flow<List<AcademicDocument>> {
         return dao.observeDocuments().map { documents -> documents.map { it.toDomain() } }
+    }
+
+    override fun observeDirectory(): Flow<List<DirectoryPerson>> {
+        return dao.observeDirectory().map { people -> people.map { it.toDomain() } }
     }
 
     override fun observeNews(): Flow<List<NewsItem>> {
@@ -150,7 +164,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 val nextProjectStepProjects = runCatching {
                     api.nextProjectSteps()?.toNextProjectStepProjects().orEmpty()
                 }.getOrDefault(emptyList())
-                val yearData = fetchAllYearsData(activeYears)
+                val yearData = fetchAllYearsData(activeYears, updatedProfile.id)
                     .withNextProjectSteps(nextProjectStepProjects)
                 val news = runCatching { api.minimumVersion()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
                     api.news()?.toNews().orEmpty() +
@@ -171,9 +185,11 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     absences = yearData.absences.map { it.toEntity() },
                     courses = yearData.courses.map { it.toEntity() },
                     projects = yearData.projects.map { it.toEntity() },
+                    projectGroups = yearData.projects.flatMap { it.toGroupEntities() },
                     projectSteps = yearData.projects.flatMap { it.toStepEntities() },
                     practicals = yearData.practicals.map { it.toEntity() },
                     documents = yearData.documents.map { it.toEntity() },
+                    directoryPeople = yearData.directory.map { it.toEntity() },
                     news = news.distinctBy { it.id }.map { it.toEntity() }
                 )
                 notifyAboutChanges(previousIds, agenda, yearData.grades, yearData.absences, yearData.projects, yearData.documents)
@@ -193,27 +209,41 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri {
         return withContext(Dispatchers.IO) {
             try {
-                val remoteUrl = document.downloadUrl ?: "me/annualDocuments/${document.id}"
-                val response = api.download(remoteUrl)
                 val directory = File(context.cacheDir, DOCUMENT_CACHE).apply { mkdirs() }
                 purgeExpiredDocumentCache(directory)
-                val target = File(directory, document.fileName.sanitizedFileName())
-                val contentLength = response.contentLength()
-                var copied = 0L
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                onProgress(0f.takeIf { contentLength > 0 })
-                response.byteStream().use { input ->
-                    target.outputStream().use { output ->
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            output.write(buffer, 0, read)
-                            copied += read
-                            onProgress(if (contentLength > 0) (copied.toFloat() / contentLength).coerceIn(0f, 1f) else null)
+                val inlineContent = document.inlineContent
+                val target = if (inlineContent != null) {
+                    val file = File(directory, document.fileName.sanitizedFileName())
+                    onProgress(0f)
+                    file.writeText(inlineContent, StandardCharsets.UTF_8)
+                    onProgress(1f)
+                    file
+                } else {
+                    val remoteUrl = document.downloadUrl ?: "me/annualDocuments/${document.id}"
+                    val response = api.download(remoteUrl)
+                    if (!response.isSuccessful) throw HttpException(response)
+                    val body = response.body() ?: throw AppException(AppError.EmptyResponse)
+                    val fileName = response.headers()["Content-Disposition"]?.contentDispositionFileName()
+                        ?: document.fileName.withExtension(body.contentType())
+                    val file = File(directory, fileName.sanitizedFileName())
+                    val contentLength = body.contentLength()
+                    var copied = 0L
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    onProgress(0f.takeIf { contentLength > 0 })
+                    body.byteStream().use { input ->
+                        file.outputStream().use { output ->
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read < 0) break
+                                output.write(buffer, 0, read)
+                                copied += read
+                                onProgress(if (contentLength > 0) (copied.toFloat() / contentLength).coerceIn(0f, 1f) else null)
+                            }
                         }
                     }
+                    onProgress(1f)
+                    file
                 }
-                onProgress(1f)
                 target.setLastModified(Instant.now().toEpochMilli())
                 FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
             } catch (throwable: Throwable) {
@@ -239,13 +269,49 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "document" }
     }
 
-    private suspend fun fetchAllYearsData(years: List<String>): YearData {
+    private fun String.withExtension(contentType: MediaType?): String {
+        if (substringAfterLast('.', missingDelimiterValue = "").isNotBlank()) return this
+        return contentType?.toFileExtension()?.let { "$this.$it" } ?: this
+    }
+
+    private fun MediaType.toFileExtension(): String? {
+        return when (toString().substringBefore(';').trim().lowercase()) {
+            "application/pdf" -> "pdf"
+            "application/zip" -> "zip"
+            "text/plain" -> "txt"
+            "text/markdown" -> "md"
+            "image/png" -> "png"
+            "image/jpeg" -> "jpg"
+            else -> null
+        }
+    }
+
+    private fun String.contentDispositionFileName(): String? {
+        return split(';')
+            .map { it.trim() }
+            .firstNotNullOfOrNull { part ->
+                when {
+                    part.startsWith("filename*=", ignoreCase = true) -> part.substringAfter('=')
+                        .substringAfter("''")
+                        .trim('"')
+                        .let { URLDecoder.decode(it, StandardCharsets.UTF_8.name()) }
+                        .takeIf { it.isNotBlank() }
+                    part.startsWith("filename=", ignoreCase = true) -> part.substringAfter('=')
+                        .trim('"')
+                        .takeIf { it.isNotBlank() }
+                    else -> null
+                }
+            }
+    }
+
+    private suspend fun fetchAllYearsData(years: List<String>, currentUserId: String): YearData {
         val allCourses = mutableListOf<Course>()
         val allGrades = mutableListOf<Grade>()
         val allAbsences = mutableListOf<Absence>()
         val allDocuments = mutableListOf<AcademicDocument>()
         val allProjects = mutableListOf<Project>()
         val allPracticals = mutableListOf<Practical>()
+        val allDirectory = mutableListOf<DirectoryPerson>()
         val fetchedCourseDocIds = mutableSetOf<String>()
 
         years.forEach { year ->
@@ -253,20 +319,31 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 .withRemoteSyllabus()
             val grades = runCatching { api.grades(year)?.toGrades(year).orEmpty() }.getOrDefault(emptyList())
             val projectsJson = runCatching { api.projects(year) }.getOrNull()
-            val projects = projectsJson?.toProjects().orEmpty()
             
             val newCourses = courses.filter { it.id !in fetchedCourseDocIds }
             fetchedCourseDocIds.addAll(newCourses.map { it.id })
+            val courseProjectPayloads = newCourses.mapNotNull { course ->
+                runCatching { api.courseProjects(course.id) }.getOrNull()
+            }
+            val projectPayloads = listOfNotNull(projectsJson) + courseProjectPayloads
+            val projects = projectPayloads.flatMap { it.toProjects(currentUserId, year) }.mergeProjects()
             
             val documents = runCatching { api.annualDocuments(year)?.toDocuments().orEmpty() }.getOrDefault(emptyList()) +
                 courseDocuments(newCourses) +
-                projectsJson?.toProjectDocuments().orEmpty()
+                projectPayloads.flatMap { it.toProjectDocuments(year) } +
+                syllabusDocuments(courses)
                 
             val availablePeriods = (grades.mapNotNull { it.period } + courses.mapNotNull { it.period })
                 .filter { it.isNotBlank() }
                 .distinct()
             val absences = runCatching { api.absences(year)?.toAbsences(year, availablePeriods).orEmpty() }.getOrDefault(emptyList())
-            val practicals = runCatching { api.practicals(year)?.toPracticals().orEmpty() }.getOrDefault(emptyList())
+            val practicals = (
+                runCatching { api.practicals(year)?.toPracticals(year).orEmpty() }.getOrDefault(emptyList()) +
+                    newCourses.flatMap { course ->
+                        runCatching { api.coursePracticals(course.id)?.toPracticals(year).orEmpty() }.getOrDefault(emptyList())
+                    }
+                ).distinctBy { it.id }
+            val directory = directoryPeople(year)
 
             allCourses.addAll(courses)
             allGrades.addAll(grades)
@@ -274,6 +351,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             allDocuments.addAll(documents)
             allProjects.addAll(projects)
             allPracticals.addAll(practicals)
+            allDirectory.addAll(directory)
         }
 
         return YearData(
@@ -281,8 +359,9 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             grades = allGrades.distinctBy { it.id },
             absences = allAbsences.distinctBy { it.id },
             documents = allDocuments.distinctBy { it.id },
-            projects = allProjects.distinctBy { it.id },
-            practicals = allPracticals.distinctBy { it.id }
+            projects = allProjects.mergeProjects(),
+            practicals = allPracticals.distinctBy { it.id },
+            directory = allDirectory.distinctBy { it.id }
         )
     }
 
@@ -298,6 +377,58 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                         }
                 }.getOrDefault(emptyList())
             }
+    }
+
+    private fun syllabusDocuments(courses: List<Course>): List<AcademicDocument> {
+        return courses.mapNotNull { course ->
+            val syllabus = course.syllabus?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            AcademicDocument(
+                id = "syllabus-${course.id}",
+                title = "${course.name} syllabus",
+                category = "Syllabus",
+                year = course.year,
+                mimeType = "text/plain",
+                fileName = "${course.name}_syllabus.txt",
+                downloadUrl = null,
+                updatedAt = null,
+                ownerId = course.id,
+                inlineContent = syllabus
+            )
+        }
+    }
+
+    private suspend fun directoryPeople(year: String): List<DirectoryPerson> {
+        val teachers = runCatching { api.teachers(year)?.toDirectoryPeople(DirectoryRole.Teacher, year).orEmpty() }
+            .getOrDefault(emptyList())
+        val students = runCatching { api.students(year)?.toDirectoryPeople(DirectoryRole.Student, year).orEmpty() }
+            .getOrDefault(emptyList())
+        val classStudents = runCatching { api.classes(year)?.toClassIds().orEmpty() }
+            .getOrDefault(emptyList())
+            .flatMap { classId ->
+                runCatching { api.classStudents(classId)?.toDirectoryPeople(DirectoryRole.Student, year).orEmpty() }
+                    .recoverCatching { api.classStudents(classId, year)?.toDirectoryPeople(DirectoryRole.Student, year).orEmpty() }
+                    .getOrDefault(emptyList())
+            }
+        return (teachers + students + classStudents).distinctBy { it.id }
+    }
+
+    private fun List<Project>.mergeProjects(): List<Project> {
+        return groupBy { it.id }.values.map { projects ->
+            projects.reduce { current, next ->
+                current.copy(
+                    name = current.name.ifBlank { next.name },
+                    courseName = current.courseName ?: next.courseName,
+                    groupName = current.groupName ?: next.groupName,
+                    status = current.status ?: next.status,
+                    deadline = listOfNotNull(current.deadline, next.deadline).minOrNull(),
+                    steps = (current.steps + next.steps).distinctBy { it.id },
+                    fileCount = max(current.fileCount, next.fileCount),
+                    year = current.year ?: next.year,
+                    courseId = current.courseId ?: next.courseId,
+                    groups = (current.groups + next.groups).distinctBy { it.id }
+                )
+            }
+        }
     }
 
     private suspend fun List<Course>.withRemoteSyllabus(): List<Course> {
@@ -356,7 +487,8 @@ private data class YearData(
     val absences: List<Absence>,
     val documents: List<AcademicDocument>,
     val projects: List<Project>,
-    val practicals: List<Practical>
+    val practicals: List<Practical>,
+    val directory: List<DirectoryPerson>
 ) {
     fun hasAcademicData(): Boolean {
         return courses.isNotEmpty() ||
@@ -364,7 +496,8 @@ private data class YearData(
             absences.isNotEmpty() ||
             documents.isNotEmpty() ||
             projects.isNotEmpty() ||
-            practicals.isNotEmpty()
+            practicals.isNotEmpty() ||
+            directory.isNotEmpty()
     }
 
     fun withNextProjectSteps(nextProjectStepProjects: List<Project>): YearData {
@@ -378,7 +511,10 @@ private data class YearData(
                 groupName = project.groupName ?: upcoming.groupName,
                 status = project.status ?: upcoming.status,
                 deadline = listOfNotNull(project.deadline, upcoming.deadline).minOrNull(),
-                steps = (project.steps + upcoming.steps).distinctBy { it.id }
+                steps = (project.steps + upcoming.steps).distinctBy { it.id },
+                year = project.year ?: upcoming.year,
+                courseId = project.courseId ?: upcoming.courseId,
+                groups = (project.groups + upcoming.groups).distinctBy { it.id }
             )
         }
         val existingProjectIds = projects.map { it.id }.toSet()

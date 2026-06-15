@@ -2,8 +2,10 @@ package com.elg.myges.adapters.secondary.api
 
 import kotlinx.serialization.json.JsonElement
 import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -58,6 +60,9 @@ interface MyGesApiService {
         @Path("puid") puid: String,
         @Path("year") year: String
     ): JsonElement?
+
+    @GET("me/classes/{puid}/students")
+    suspend fun classStudents(@Path("puid") puid: String): JsonElement?
 
     @GET("me/{rcId}/files")
     suspend fun courseFiles(@Path("rcId") rcId: String): JsonElement?
@@ -134,5 +139,6 @@ interface MyGesApiService {
 
     @GET
     @Streaming
-    suspend fun download(@Url url: String): ResponseBody
+    @Headers("Accept: */*")
+    suspend fun download(@Url url: String): Response<ResponseBody>
 }

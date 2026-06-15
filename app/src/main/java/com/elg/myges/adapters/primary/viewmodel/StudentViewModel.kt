@@ -1,6 +1,7 @@
 package com.elg.myges.adapters.primary.viewmodel
 
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elg.myges.adapters.primary.state.FeatureUiState
@@ -11,6 +12,7 @@ import com.elg.myges.application.usecase.LogoutUseCase
 import com.elg.myges.application.usecase.ObserveAbsencesUseCase
 import com.elg.myges.application.usecase.ObserveAgendaUseCase
 import com.elg.myges.application.usecase.ObserveCoursesUseCase
+import com.elg.myges.application.usecase.ObserveDirectoryUseCase
 import com.elg.myges.application.usecase.ObserveDashboardUseCase
 import com.elg.myges.application.usecase.ObserveDocumentsUseCase
 import com.elg.myges.application.usecase.ObserveGradesUseCase
@@ -25,6 +27,7 @@ import com.elg.myges.domain.model.AgendaEvent
 import com.elg.myges.domain.model.AppError
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
+import com.elg.myges.domain.model.DirectoryPerson
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
@@ -59,6 +62,7 @@ class StudentViewModel @Inject constructor(
     observeProjects: ObserveProjectsUseCase,
     observePracticals: ObservePracticalsUseCase,
     observeDocuments: ObserveDocumentsUseCase,
+    observeDirectory: ObserveDirectoryUseCase,
     observeNews: ObserveNewsUseCase,
     private val refreshStudentDataUseCase: RefreshStudentDataUseCase,
     private val syncAgendaToCalendarUseCase: SyncAgendaToCalendarUseCase,
@@ -122,6 +126,9 @@ class StudentViewModel @Inject constructor(
     val documents: StateFlow<FeatureUiState<List<AcademicDocument>>> = observeDocuments()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
+    val directory: StateFlow<FeatureUiState<List<DirectoryPerson>>> = observeDirectory()
+        .asFeatureState(emptyList(), networkMonitor.isOnline)
+
     val news: StateFlow<FeatureUiState<List<NewsItem>>> = observeNews()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
@@ -162,7 +169,7 @@ class StudentViewModel @Inject constructor(
                     _documentDownloadProgress.update { it + (document.id to progress) }
                 }
             }
-                .onSuccess { uri -> documentOpenRequests.emit(DocumentOpenRequest(uri, document.mimeType)) }
+                .onSuccess { uri -> documentOpenRequests.emit(DocumentOpenRequest(uri, document.resolvedMimeType())) }
                 .onFailure { handleFailure(it) }
             _downloadingDocumentIds.update { it - document.id }
             _documentDownloadProgress.update { it - document.id }
@@ -209,4 +216,11 @@ class StudentViewModel @Inject constructor(
             initialValue = FeatureUiState(initialValue)
         )
     }
+}
+
+private fun AcademicDocument.resolvedMimeType(): String? {
+    mimeType?.takeIf { it.isNotBlank() }?.let { return it }
+    val extension = fileName.substringAfterLast('.', missingDelimiterValue = "")
+        .takeIf { it.isNotBlank() }
+    return extension?.let { MimeTypeMap.getSingleton().getMimeTypeFromExtension(it.lowercase()) }
 }

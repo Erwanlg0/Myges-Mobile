@@ -6,6 +6,7 @@ import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
+import com.elg.myges.domain.model.DirectoryPerson
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
@@ -34,6 +35,7 @@ interface StudentDataRepository {
     fun observeProjects(): Flow<List<Project>>
     fun observePracticals(): Flow<List<Practical>>
     fun observeDocuments(): Flow<List<AcademicDocument>>
+    fun observeDirectory(): Flow<List<DirectoryPerson>>
     fun observeNews(): Flow<List<NewsItem>>
     suspend fun syncAll()
     suspend fun clearCache()

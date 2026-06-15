@@ -30,11 +30,17 @@ abstract class StudentDao {
     @Query("SELECT * FROM project_steps ORDER BY deadlineEpochMillis ASC, title ASC")
     abstract fun observeProjectSteps(): Flow<List<ProjectStepEntity>>
 
+    @Query("SELECT * FROM project_groups ORDER BY name ASC")
+    abstract fun observeProjectGroups(): Flow<List<ProjectGroupEntity>>
+
     @Query("SELECT * FROM practicals ORDER BY startsAtEpochMillis ASC, name ASC")
     abstract fun observePracticals(): Flow<List<PracticalEntity>>
 
     @Query("SELECT * FROM documents ORDER BY updatedAtEpochMillis DESC, title ASC")
     abstract fun observeDocuments(): Flow<List<AcademicDocumentEntity>>
+
+    @Query("SELECT * FROM directory_people ORDER BY role ASC, displayName ASC")
+    abstract fun observeDirectory(): Flow<List<DirectoryPersonEntity>>
 
     @Query("SELECT * FROM news ORDER BY publishedAtEpochMillis DESC, title ASC")
     abstract fun observeNews(): Flow<List<NewsEntity>>
@@ -75,11 +81,17 @@ abstract class StudentDao {
     @Query("SELECT * FROM project_steps")
     abstract suspend fun projectSteps(): List<ProjectStepEntity>
 
+    @Query("SELECT * FROM project_groups")
+    abstract suspend fun projectGroups(): List<ProjectGroupEntity>
+
     @Query("SELECT * FROM practicals")
     abstract suspend fun practicals(): List<PracticalEntity>
 
     @Query("SELECT * FROM documents")
     abstract suspend fun documents(): List<AcademicDocumentEntity>
+
+    @Query("SELECT * FROM directory_people")
+    abstract suspend fun directoryPeople(): List<DirectoryPersonEntity>
 
     @Query("SELECT * FROM news")
     abstract suspend fun news(): List<NewsEntity>
@@ -106,10 +118,16 @@ abstract class StudentDao {
     abstract suspend fun upsertProjectSteps(steps: List<ProjectStepEntity>)
 
     @Upsert
+    abstract suspend fun upsertProjectGroups(groups: List<ProjectGroupEntity>)
+
+    @Upsert
     abstract suspend fun upsertPracticals(practicals: List<PracticalEntity>)
 
     @Upsert
     abstract suspend fun upsertDocuments(documents: List<AcademicDocumentEntity>)
+
+    @Upsert
+    abstract suspend fun upsertDirectoryPeople(people: List<DirectoryPersonEntity>)
 
     @Upsert
     abstract suspend fun upsertNews(news: List<NewsEntity>)
@@ -133,10 +151,16 @@ abstract class StudentDao {
     abstract suspend fun deleteProjectSteps(steps: List<ProjectStepEntity>)
 
     @Delete
+    abstract suspend fun deleteProjectGroups(groups: List<ProjectGroupEntity>)
+
+    @Delete
     abstract suspend fun deletePracticals(practicals: List<PracticalEntity>)
 
     @Delete
     abstract suspend fun deleteDocuments(documents: List<AcademicDocumentEntity>)
+
+    @Delete
+    abstract suspend fun deleteDirectoryPeople(people: List<DirectoryPersonEntity>)
 
     @Delete
     abstract suspend fun deleteNews(news: List<NewsEntity>)
@@ -162,11 +186,17 @@ abstract class StudentDao {
     @Query("DELETE FROM project_steps")
     abstract suspend fun clearProjectSteps()
 
+    @Query("DELETE FROM project_groups")
+    abstract suspend fun clearProjectGroups()
+
     @Query("DELETE FROM practicals")
     abstract suspend fun clearPracticals()
 
     @Query("DELETE FROM documents")
     abstract suspend fun clearDocuments()
+
+    @Query("DELETE FROM directory_people")
+    abstract suspend fun clearDirectoryPeople()
 
     @Query("DELETE FROM news")
     abstract suspend fun clearNews()
@@ -179,9 +209,11 @@ abstract class StudentDao {
         absences: List<AbsenceEntity>,
         courses: List<CourseEntity>,
         projects: List<ProjectEntity>,
+        projectGroups: List<ProjectGroupEntity>,
         projectSteps: List<ProjectStepEntity>,
         practicals: List<PracticalEntity>,
         documents: List<AcademicDocumentEntity>,
+        directoryPeople: List<DirectoryPersonEntity>,
         news: List<NewsEntity>
     ) {
         replaceProfile(profile)
@@ -190,9 +222,11 @@ abstract class StudentDao {
         replaceAbsences(absences)
         replaceCourses(courses)
         replaceProjects(projects)
+        replaceProjectGroups(projectGroups)
         replaceProjectSteps(projectSteps)
         replacePracticals(practicals)
         replaceDocuments(documents)
+        replaceDirectoryPeople(directoryPeople)
         replaceNews(news)
     }
 
@@ -204,9 +238,11 @@ abstract class StudentDao {
         clearAbsences()
         clearCourses()
         clearProjects()
+        clearProjectGroups()
         clearProjectSteps()
         clearPracticals()
         clearDocuments()
+        clearDirectoryPeople()
         clearNews()
     }
 
@@ -252,6 +288,12 @@ abstract class StudentDao {
         if (plan.upserts.isNotEmpty()) upsertProjectSteps(plan.upserts)
     }
 
+    private suspend fun replaceProjectGroups(incoming: List<ProjectGroupEntity>) {
+        val plan = entitySyncPlan(projectGroups(), incoming) { "${it.projectId}:${it.id}" }
+        if (plan.deletes.isNotEmpty()) deleteProjectGroups(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertProjectGroups(plan.upserts)
+    }
+
     private suspend fun replacePracticals(incoming: List<PracticalEntity>) {
         val plan = entitySyncPlan(practicals(), incoming, PracticalEntity::id)
         if (plan.deletes.isNotEmpty()) deletePracticals(plan.deletes)
@@ -262,6 +304,12 @@ abstract class StudentDao {
         val plan = entitySyncPlan(documents(), incoming, AcademicDocumentEntity::id)
         if (plan.deletes.isNotEmpty()) deleteDocuments(plan.deletes)
         if (plan.upserts.isNotEmpty()) upsertDocuments(plan.upserts)
+    }
+
+    private suspend fun replaceDirectoryPeople(incoming: List<DirectoryPersonEntity>) {
+        val plan = entitySyncPlan(directoryPeople(), incoming, DirectoryPersonEntity::id)
+        if (plan.deletes.isNotEmpty()) deleteDirectoryPeople(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertDirectoryPeople(plan.upserts)
     }
 
     private suspend fun replaceNews(incoming: List<NewsEntity>) {

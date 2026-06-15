@@ -11,9 +11,12 @@ class MygesAuthInterceptor(
     private val sessionRepository: SessionRepository
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val requestBuilder = chain.request().newBuilder()
-            .header("Accept", "application/json")
+        val request = chain.request()
+        val requestBuilder = request.newBuilder()
             .header("User-Agent", userAgent)
+        if (request.header("Accept") == null) {
+            requestBuilder.header("Accept", "application/json")
+        }
         val session = sessionRepository.currentSession()
         if (session?.isExpired == true || session?.requiresRefresh == true) {
             sessionRepository.invalidateSession()

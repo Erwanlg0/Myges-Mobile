@@ -37,6 +37,7 @@ import android.net.Uri
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.core.content.FileProvider
 import java.io.File
@@ -92,6 +93,8 @@ import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
+import com.elg.myges.domain.model.DirectoryPerson
+import com.elg.myges.domain.model.DirectoryRole
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
@@ -272,7 +275,14 @@ fun DashboardScreen(
             items(dashboard.dueProjects, key = { it.id }) { project ->
                 var showDialog by remember { mutableStateOf(false) }
                 if (showDialog) {
-                    ProjectDetailsDialog(project) { showDialog = false }
+                    ProjectDetailsDialog(
+                        project = project,
+                        documents = emptyList(),
+                        downloadingDocumentIds = emptySet(),
+                        documentDownloadProgress = emptyMap(),
+                        onOpenDocument = {},
+                        onDismiss = { showDialog = false }
+                    )
                 }
                 ProjectCard(project, onOpen = { showDialog = true })
             }
@@ -774,10 +784,24 @@ fun CoursesScreen(viewModel: StudentViewModel) {
 @Composable
 fun ProjectsScreen(viewModel: StudentViewModel) {
     val state by viewModel.projects.collectAsStateWithLifecycle()
+    val documentsState by viewModel.documents.collectAsStateWithLifecycle()
+    val downloadingDocumentIds by viewModel.downloadingDocumentIds.collectAsStateWithLifecycle()
+    val documentDownloadProgress by viewModel.documentDownloadProgress.collectAsStateWithLifecycle()
     var selectedProject by remember { mutableStateOf<Project?>(null) }
+    var selectedYear by remember(state.data) { mutableStateOf<String?>(null) }
+    val years = remember(state.data) { state.data.mapNotNull { it.year }.distinct().sortedDescending() }
+    val filteredProjects = remember(state.data, selectedYear) {
+        state.data
+            .filter { selectedYear == null || it.year == selectedYear }
+            .sortedWith(compareByDescending<Project> { it.year }.thenBy { it.deadline }.thenBy { it.name })
+    }
     selectedProject?.let { project ->
         ProjectDetailsDialog(
             project = project,
+            documents = documentsState.data.filter { it.ownerId == project.id },
+            downloadingDocumentIds = downloadingDocumentIds,
+            documentDownloadProgress = documentDownloadProgress,
+            onOpenDocument = viewModel::openDocument,
             onDismiss = { selectedProject = null }
         )
     }
@@ -787,8 +811,17 @@ fun ProjectsScreen(viewModel: StudentViewModel) {
         emptyTitle = R.string.projects_empty_title,
         emptyBody = R.string.projects_empty_body,
         onRetry = viewModel::refresh
-    ) { projects ->
-        items(projects, key = { it.id }) { project ->
+    ) {
+        if (years.size > 1) {
+            item {
+                YearFilterRow(
+                    years = years,
+                    selectedYear = selectedYear,
+                    onYearSelected = { selectedYear = it }
+                )
+            }
+        }
+        items(filteredProjects, key = { it.id }) { project ->
             ProjectCard(
                 project = project,
                 onOpen = { selectedProject = project }
@@ -800,14 +833,164 @@ fun ProjectsScreen(viewModel: StudentViewModel) {
 @Composable
 fun PracticalsScreen(viewModel: StudentViewModel) {
     val state by viewModel.practicals.collectAsStateWithLifecycle()
+    var selectedYear by remember(state.data) { mutableStateOf<String?>(null) }
+    val years = remember(state.data) { state.data.mapNotNull { it.year }.distinct().sortedDescending() }
+    val filteredPracticals = remember(state.data, selectedYear) {
+        state.data
+            .filter { selectedYear == null || it.year == selectedYear }
+            .sortedWith(compareByDescending<Practical> { it.year }.thenBy { it.startsAt }.thenBy { it.name })
+    }
     FeatureStateContent(
         state = state,
         empty = List<Practical>::isEmpty,
         emptyTitle = R.string.practicals_empty_title,
         emptyBody = R.string.practicals_empty_body,
         onRetry = viewModel::refresh
-    ) { practicals ->
-        items(practicals, key = { it.id }) { practical -> PracticalCard(practical) }
+    ) {
+        if (years.size > 1) {
+            item {
+                YearFilterRow(
+                    years = years,
+                    selectedYear = selectedYear,
+                    onYearSelected = { selectedYear = it }
+                )
+            }
+        }
+        items(filteredPracticals, key = { it.id }) { practical -> PracticalCard(practical) }
+    }
+}
+
+@Composable
+fun DirectoryScreen(viewModel: StudentViewModel) {
+    val state by viewModel.directory.collectAsStateWithLifecycle()
+    var selectedYear by remember(state.data) { mutableStateOf<String?>(null) }
+    var selectedRole by remember(state.data) { mutableStateOf<DirectoryRole?>(null) }
+    val years = remember(state.data) { state.data.mapNotNull { it.year }.distinct().sortedDescending() }
+    val filteredPeople = remember(state.data, selectedYear, selectedRole) {
+        state.data.filter { person ->
+            (selectedYear == null || person.year == selectedYear) &&
+                (selectedRole == null || person.role == selectedRole)
+        }
+    }
+    FeatureStateContent(
+        state = state,
+        empty = List<DirectoryPerson>::isEmpty,
+        emptyTitle = R.string.directory_empty_title,
+        emptyBody = R.string.directory_empty_body,
+        onRetry = viewModel::refresh
+    ) {
+        item {
+            DirectoryFilterRow(
+                years = years,
+                selectedYear = selectedYear,
+                selectedRole = selectedRole,
+                onYearSelected = { selectedYear = it },
+                onRoleSelected = { selectedRole = it }
+            )
+        }
+        items(filteredPeople, key = { it.id }) { person -> DirectoryPersonCard(person) }
+    }
+}
+
+@Composable
+private fun YearFilterRow(
+    years: List<String>,
+    selectedYear: String?,
+    onYearSelected: (String?) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        FilterChip(
+            selected = selectedYear == null,
+            onClick = { onYearSelected(null) },
+            label = { Text(stringResource(R.string.filter_all_years)) }
+        )
+        years.forEach { year ->
+            FilterChip(
+                selected = selectedYear == year,
+                onClick = { onYearSelected(year) },
+                label = { Text(year) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun DirectoryFilterRow(
+    years: List<String>,
+    selectedYear: String?,
+    selectedRole: DirectoryRole?,
+    onYearSelected: (String?) -> Unit,
+    onRoleSelected: (DirectoryRole?) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = selectedRole == null,
+                onClick = { onRoleSelected(null) },
+                label = { Text(stringResource(R.string.directory_all_roles)) }
+            )
+            FilterChip(
+                selected = selectedRole == DirectoryRole.Student,
+                onClick = { onRoleSelected(DirectoryRole.Student) },
+                label = { Text(stringResource(R.string.directory_students)) }
+            )
+            FilterChip(
+                selected = selectedRole == DirectoryRole.Teacher,
+                onClick = { onRoleSelected(DirectoryRole.Teacher) },
+                label = { Text(stringResource(R.string.directory_teachers)) }
+            )
+        }
+        if (years.size > 1) {
+            YearFilterRow(
+                years = years,
+                selectedYear = selectedYear,
+                onYearSelected = onYearSelected
+            )
+        }
+    }
+}
+
+@Composable
+private fun DirectoryPersonCard(person: DirectoryPerson) {
+    CompactCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StudentAvatar(
+                avatarUrl = person.avatarUrl,
+                displayName = person.displayName,
+                modifier = Modifier.size(48.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = person.displayName.orUntitled(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = stringResource(
+                        if (person.role == DirectoryRole.Teacher) R.string.directory_teacher
+                        else R.string.directory_student
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        LabelValue(R.string.profile_email, person.email.orEmpty())
+        LabelValue(R.string.profile_year, person.year.orEmpty())
+        LabelValue(R.string.projects_group, person.groupName.orEmpty())
     }
 }
 
@@ -1561,13 +1744,22 @@ private fun ProjectProgress(project: Project) {
 @Composable
 private fun ProjectDetailsDialog(
     project: Project,
+    documents: List<AcademicDocument>,
+    downloadingDocumentIds: Set<String>,
+    documentDownloadProgress: Map<String, Float?>,
+    onOpenDocument: (AcademicDocument) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var selectedStepId by remember(project.id) { mutableStateOf(project.steps.firstOrNull()?.id) }
+    val selectedStep = project.steps.firstOrNull { it.id == selectedStepId }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.projects_detail_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text(
                     text = project.name.orUntitled(),
                     style = MaterialTheme.typography.titleMedium,
@@ -1589,6 +1781,27 @@ private fun ProjectDetailsDialog(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        project.steps.forEach { step ->
+                            FilterChip(
+                                selected = selectedStepId == step.id,
+                                onClick = { selectedStepId = step.id },
+                                label = { Text(step.title.orUntitled()) }
+                            )
+                        }
+                    }
+                    selectedStep?.let { step ->
+                        CompactCard {
+                            Text(step.title.orUntitled(), fontWeight = FontWeight.Medium)
+                            LabelValue(R.string.projects_deadline, formatInstant(step.deadline))
+                            LabelValue(R.string.projects_status, step.status.orEmpty())
+                        }
+                    }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         project.steps.forEach { step ->
                             Column {
@@ -1615,6 +1828,47 @@ private fun ProjectDetailsDialog(
                                 }
                             }
                         }
+                    }
+                }
+                if (project.groups.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(
+                        text = stringResource(R.string.projects_groups_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    project.groups.sortedBy { !it.isMine }.forEach { group ->
+                        CompactCard {
+                            Text(
+                                text = if (group.isMine) {
+                                    stringResource(R.string.projects_my_group, group.name)
+                                } else {
+                                    group.name
+                                },
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = group.students.joinToString(", ").ifBlank { stringResource(R.string.projects_group_empty) },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                if (documents.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(
+                        text = stringResource(R.string.projects_files_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    documents.forEach { document ->
+                        DocumentCard(
+                            document = document,
+                            downloading = document.id in downloadingDocumentIds,
+                            progress = documentDownloadProgress[document.id],
+                            onOpen = { onOpenDocument(document) }
+                        )
                     }
                 }
             }

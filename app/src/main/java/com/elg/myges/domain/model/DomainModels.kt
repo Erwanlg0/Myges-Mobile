@@ -68,6 +68,13 @@ data class ProjectStep(
     val status: String?
 )
 
+data class ProjectGroup(
+    val id: String,
+    val name: String,
+    val students: List<String>,
+    val isMine: Boolean
+)
+
 data class Project(
     val id: String,
     val name: String,
@@ -76,7 +83,10 @@ data class Project(
     val status: String?,
     val deadline: Instant?,
     val steps: List<ProjectStep>,
-    val fileCount: Int
+    val fileCount: Int,
+    val year: String? = null,
+    val courseId: String? = null,
+    val groups: List<ProjectGroup> = emptyList()
 )
 
 data class Practical(
@@ -86,7 +96,8 @@ data class Practical(
     val startsAt: Instant?,
     val endsAt: Instant?,
     val room: String?,
-    val status: String?
+    val status: String?,
+    val year: String? = null
 )
 
 data class AcademicDocument(
@@ -97,7 +108,25 @@ data class AcademicDocument(
     val mimeType: String?,
     val fileName: String,
     val downloadUrl: String?,
-    val updatedAt: Instant?
+    val updatedAt: Instant?,
+    val ownerId: String? = null,
+    val groupId: String? = null,
+    val inlineContent: String? = null
+)
+
+enum class DirectoryRole {
+    Student,
+    Teacher
+}
+
+data class DirectoryPerson(
+    val id: String,
+    val displayName: String,
+    val email: String?,
+    val role: DirectoryRole,
+    val year: String?,
+    val groupName: String?,
+    val avatarUrl: String?
 )
 
 data class NewsItem(

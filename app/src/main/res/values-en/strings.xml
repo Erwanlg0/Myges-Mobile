@@ -10,6 +10,7 @@
     <string name="cd_next">Next</string>
 
     <string name="common_date">Date</string>
+    <string name="filter_all_years">All years</string>
     <string name="common_no_period">No period</string>
     <string name="common_period">Period</string>
     <string name="common_untitled">Untitled</string>
@@ -141,6 +142,10 @@
     <string name="projects_deadline">Deadline</string>
     <string name="projects_files">Files</string>
     <string name="projects_group">Group</string>
+    <string name="projects_group_empty">No student listed</string>
+    <string name="projects_groups_title">Groups</string>
+    <string name="projects_files_title">Project files</string>
+    <string name="projects_my_group">%1$s (my group)</string>
     <string name="projects_no_steps">No detailed step available</string>
     <string name="projects_progress">Progress</string>
     <string name="projects_status">Status</string>
@@ -160,6 +165,15 @@
     <string name="documents_downloading">Downloading</string>
     <string name="documents_open">Download and open</string>
     <string name="documents_updated_at">Updated</string>
+
+    <string name="directory_title">Directory</string>
+    <string name="directory_empty_title">No contacts</string>
+    <string name="directory_empty_body">Synced students and faculty will appear here.</string>
+    <string name="directory_all_roles">All</string>
+    <string name="directory_student">Student</string>
+    <string name="directory_students">Students</string>
+    <string name="directory_teacher">Faculty</string>
+    <string name="directory_teachers">Faculty</string>
 
     <string name="notifications_title">Notifications</string>
     <string name="notifications_action_open">Open</string>

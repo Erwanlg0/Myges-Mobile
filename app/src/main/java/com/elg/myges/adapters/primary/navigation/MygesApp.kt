@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Warning
@@ -60,6 +61,7 @@ import com.elg.myges.adapters.primary.ui.AgendaScreen
 import com.elg.myges.adapters.primary.ui.AuthRoute
 import com.elg.myges.adapters.primary.ui.CoursesScreen
 import com.elg.myges.adapters.primary.ui.DashboardScreen
+import com.elg.myges.adapters.primary.ui.DirectoryScreen
 import com.elg.myges.adapters.primary.ui.DocumentsScreen
 import com.elg.myges.adapters.primary.ui.GradesScreen
 import com.elg.myges.adapters.primary.ui.NotificationsScreen
@@ -87,6 +89,7 @@ private val destinations = listOf(
     Destination("projects", R.string.projects_title, Icons.Rounded.Work),
     Destination("practicals", R.string.practicals_title, Icons.Rounded.Science),
     Destination("documents", R.string.documents_title, Icons.Rounded.Description),
+    Destination("directory", R.string.directory_title, Icons.Rounded.People),
     Destination("notifications", R.string.notifications_title, Icons.Rounded.Notifications),
     Destination("settings", R.string.settings_title, Icons.Rounded.Settings)
 )
@@ -290,6 +293,7 @@ private fun StudentScaffold(
             composable("projects") { ProjectsScreen(studentViewModel) }
             composable("practicals") { PracticalsScreen(studentViewModel) }
             composable("documents") { DocumentsScreen(studentViewModel) }
+            composable("directory") { DirectoryScreen(studentViewModel) }
             composable("notifications") { NotificationsScreen(studentViewModel, settingsViewModel) }
             composable("settings") { SettingsScreen(settingsViewModel, studentViewModel) }
         }

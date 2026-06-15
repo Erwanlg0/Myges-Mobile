@@ -74,7 +74,18 @@ data class ProjectEntity(
     val groupName: String?,
     val status: String?,
     val deadlineEpochMillis: Long?,
-    val fileCount: Int
+    val fileCount: Int,
+    val year: String?,
+    val courseId: String?
+)
+
+@Entity(tableName = "project_groups", primaryKeys = ["projectId", "id"])
+data class ProjectGroupEntity(
+    val projectId: String,
+    val id: String,
+    val name: String,
+    val students: String,
+    val isMine: Boolean
 )
 
 @Entity(tableName = "project_steps", primaryKeys = ["projectId", "id"])
@@ -94,7 +105,8 @@ data class PracticalEntity(
     val startsAtEpochMillis: Long?,
     val endsAtEpochMillis: Long?,
     val room: String?,
-    val status: String?
+    val status: String?,
+    val year: String?
 )
 
 @Entity(tableName = "documents")
@@ -106,7 +118,21 @@ data class AcademicDocumentEntity(
     val mimeType: String?,
     val fileName: String,
     val downloadUrl: String?,
-    val updatedAtEpochMillis: Long?
+    val updatedAtEpochMillis: Long?,
+    val ownerId: String?,
+    val groupId: String?,
+    val inlineContent: String?
+)
+
+@Entity(tableName = "directory_people")
+data class DirectoryPersonEntity(
+    @PrimaryKey val id: String,
+    val displayName: String,
+    val email: String?,
+    val role: String,
+    val year: String?,
+    val groupName: String?,
+    val avatarUrl: String?
 )
 
 @Entity(tableName = "news")

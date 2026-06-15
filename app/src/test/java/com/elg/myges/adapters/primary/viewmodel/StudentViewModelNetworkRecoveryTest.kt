@@ -14,6 +14,7 @@ import com.elg.myges.application.usecase.ObserveAbsencesUseCase
 import com.elg.myges.application.usecase.ObserveAgendaUseCase
 import com.elg.myges.application.usecase.ObserveCoursesUseCase
 import com.elg.myges.application.usecase.ObserveDashboardUseCase
+import com.elg.myges.application.usecase.ObserveDirectoryUseCase
 import com.elg.myges.application.usecase.ObserveDocumentsUseCase
 import com.elg.myges.application.usecase.ObserveGradesUseCase
 import com.elg.myges.application.usecase.ObserveNewsUseCase
@@ -28,6 +29,7 @@ import com.elg.myges.domain.model.AppError
 import com.elg.myges.domain.model.AppException
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
+import com.elg.myges.domain.model.DirectoryPerson
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.NotificationPreferences
@@ -41,6 +43,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -209,6 +212,7 @@ class StudentViewModelNetworkRecoveryTest {
             ObserveProjectsUseCase(repository),
             ObservePracticalsUseCase(repository),
             ObserveDocumentsUseCase(repository),
+            ObserveDirectoryUseCase(repository),
             ObserveNewsUseCase(repository),
             RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort),
             SyncAgendaToCalendarUseCase(calendarSyncPort),
@@ -246,6 +250,7 @@ private class FakeStudentDataRepository : StudentDataRepository {
     override fun observeProjects(): Flow<List<Project>> = projects
     override fun observePracticals(): Flow<List<Practical>> = practicals
     override fun observeDocuments(): Flow<List<AcademicDocument>> = documents
+    override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = news
     override suspend fun syncAll() {
         syncFailure?.let { throw it }

@@ -4,10 +4,13 @@ import com.elg.myges.domain.model.Absence
 import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
 import com.elg.myges.domain.model.Course
+import com.elg.myges.domain.model.DirectoryPerson
+import com.elg.myges.domain.model.DirectoryRole
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
 import com.elg.myges.domain.model.Project
+import com.elg.myges.domain.model.ProjectGroup
 import com.elg.myges.domain.model.ProjectStep
 import com.elg.myges.domain.model.StudentProfile
 import kotlinx.serialization.json.JsonArray
@@ -325,14 +328,18 @@ fun JsonElement.toCourseSyllabus(): String? {
         .takeIf { it.isNotBlank() }
 }
 
-fun JsonElement.toProjects(): List<Project> {
+fun JsonElement.toProjects(currentUserId: String? = null, fallbackYear: String? = null): List<Project> {
     val projectDateKeys = arrayOf(
         "deadline", "dueDate", "endDate", "psp_limit_date", "limit_date", 
         "limitDate", "date_limit", "dateLimit", "date", "due_date", "due", 
         "update_date", "date_limite", "dateLimite"
     )
-    return arrayOrNested("projects", "items", "data").map { element ->
+    return arrayOrNested("projects", "items", "data")
+        .ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }
+        .map { element ->
         val root = element.objectOrData()
+        val projectId = root.text("id", "projectId", "project_id", "uid") ?: stableId(root)
+        val year = root.text("year", "academicYear") ?: fallbackYear
         val steps = root.array("steps", "projectSteps").map { step ->
             val stepRoot = step.objectOrData()
             ProjectStep(
@@ -342,16 +349,38 @@ fun JsonElement.toProjects(): List<Project> {
                 status = stepRoot.text("status", "state")
             )
         }
+        val userGroupIds = root.array("project_group_logs")
+            .mapNotNull { it.objectOrData() }
+            .filter { log -> currentUserId != null && log.text("user_id", "uid", "u_id") == currentUserId }
+            .mapNotNull { it.text("pgr_id", "project_group_id", "group_id") }
+            .toSet()
+        val groups = root.array("groups").map { group ->
+            val groupRoot = group.objectOrData()
+            val groupId = groupRoot.text("project_group_id", "pgr_id", "group_id", "id") ?: stableId(groupRoot)
+            ProjectGroup(
+                id = groupId,
+                name = groupRoot.text("group_name", "name", "label") ?: groupId,
+                students = groupRoot.array("project_group_students", "students").mapNotNull { student ->
+                    student.objectOrData().directoryDisplayName()
+                },
+                isMine = groupId in userGroupIds
+            )
+        }
         val stepFileCount = root.array("steps", "projectSteps").sumOf { it.objectOrData().array("files").size }
         Project(
-            id = root.text("id", "projectId", "project_id", "uid") ?: stableId(root),
+            id = projectId,
             name = root.text("name", "title") ?: "",
             courseName = root.text("courseName", "course_name", "course", "module"),
-            groupName = root.text("groupName", "group", "projectGroup") ?: root.arrayText("groups", "group_name", "name"),
+            groupName = root.text("groupName", "group", "projectGroup")
+                ?: groups.firstOrNull { it.isMine }?.name
+                ?: root.arrayText("groups", "group_name", "name"),
             status = root.text("status", "state"),
             deadline = root.instant(*projectDateKeys) ?: steps.mapNotNull { it.deadline }.minOrNull(),
             steps = steps,
-            fileCount = root.array("files", "project_files", "documents", "deliverables").size + stepFileCount
+            fileCount = root.array("files", "project_files", "documents", "deliverables").size + stepFileCount,
+            year = year,
+            courseId = root.text("rc_id", "rcId", "courseId"),
+            groups = groups
         )
     }
 }
@@ -379,12 +408,13 @@ fun JsonElement.toNextProjectStepProjects(): List<Project> {
             status = root.text("status", "state", "type"),
             deadline = step.deadline,
             steps = listOf(step),
-            fileCount = 0
+            fileCount = 0,
+            year = root.text("year", "academicYear")
         )
     }
 }
 
-fun JsonElement.toPracticals(): List<Practical> {
+fun JsonElement.toPracticals(fallbackYear: String? = null): List<Practical> {
     return arrayOrNested("practicals", "items", "data").map { element ->
         val root = element.objectOrData()
         val stepDates = root.array("steps", "projectSteps")
@@ -397,7 +427,8 @@ fun JsonElement.toPracticals(): List<Practical> {
             startsAt = root.instant("startsAt", "start", "startDate", "dateStart", "project_create_date") ?: stepDates.firstOrNull(),
             endsAt = root.instant("endsAt", "end", "endDate", "dateEnd") ?: stepDates.lastOrNull(),
             room = root.text("room", "classroom", "salle"),
-            status = root.text("status", "state")
+            status = root.text("status", "state"),
+            year = root.text("year", "academicYear") ?: fallbackYear
         )
     }
 }
@@ -409,24 +440,60 @@ fun JsonElement.toDocuments(): List<AcademicDocument> {
     }
 }
 
-fun JsonElement.toProjectDocuments(): List<AcademicDocument> {
-    return arrayOrNested("projects", "items", "data").flatMap { element ->
+fun JsonElement.toProjectDocuments(fallbackYear: String? = null): List<AcademicDocument> {
+    return arrayOrNested("projects", "items", "data")
+        .ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }
+        .flatMap { element ->
         val projectRoot = element.objectOrData()
+        val projectId = projectRoot.text("id", "projectId", "project_id", "uid") ?: stableId(projectRoot)
+        val projectYear = projectRoot.text("year", "academicYear") ?: fallbackYear
         val projectFiles = projectRoot.array("project_files").map { file ->
             val root = file.objectOrData()
-            val document = root.toDocument(parentTitle = projectRoot.text("name", "title"), parentYear = projectRoot.text("year", "academicYear"))
+            val document = root.toDocument(
+                parentTitle = projectRoot.text("name", "title"),
+                parentYear = projectYear,
+                ownerId = projectId
+            )
             document.copy(downloadUrl = document.downloadUrl ?: "me/projectFiles/${document.id}")
         }
         val stepFiles = projectRoot.array("steps", "projectSteps").flatMap { step ->
             val stepRoot = step.objectOrData()
             stepRoot.array("files").map { file ->
                 val root = file.objectOrData()
-                val document = root.toDocument(parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"), parentYear = projectRoot.text("year", "academicYear"))
+                val document = root.toDocument(
+                    parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"),
+                    parentYear = projectYear,
+                    ownerId = projectId,
+                    groupId = root.text("pgr_id", "project_group_id", "group_id")
+                )
                 document.copy(downloadUrl = document.downloadUrl ?: "me/projectStepFiles/${document.id}")
             }
         }
         projectFiles + stepFiles
     }
+}
+
+fun JsonElement.toDirectoryPeople(role: DirectoryRole, year: String? = null): List<DirectoryPerson> {
+    return arrayOrNested("students", "teachers", "items", "data").map { element ->
+        val root = element.objectOrData()
+        val rawId = root.text("id", "uid", "puid", "student_id", "studentId", "teacher_id") ?: stableId(root)
+        DirectoryPerson(
+            id = "${role.name}:$year:$rawId",
+            displayName = root.directoryDisplayName() ?: rawId,
+            email = root.text("email", "mail"),
+            role = role,
+            year = root.text("year", "academicYear") ?: year,
+            groupName = root.text("groupName", "className", "promotion", "student_group_name"),
+            avatarUrl = root.text("avatarUrl", "avatar", "picture", "photo") ?: root.namedLinkHref("photo")
+        )
+    }
+}
+
+fun JsonElement.toClassIds(): List<String> {
+    return arrayOrNested("classes", "items", "data").mapNotNull { element ->
+        val root = element.objectOrData()
+        root.text("puid", "id", "class_id") ?: root.linkHref("self")?.substringAfterLast('/')
+    }.distinct()
 }
 
 fun JsonElement.toNews(): List<NewsItem> {
@@ -532,9 +599,21 @@ private fun JsonObject.arrayText(key: String, vararg textKeys: String): String? 
         ?.joinToString(", ")
 }
 
+private fun JsonObject.directoryDisplayName(): String? {
+    return text("displayName", "fullName", "fullname", "nomComplet")
+        ?: listOfNotNull(
+            text("civility", "civilite"),
+            text("firstName", "firstname", "prenom"),
+            text("lastName", "lastname", "name", "nom")
+        ).joinToString(" ").ifBlank { text("name", "email", "mail") }
+}
+
 private fun JsonObject.toDocument(
     parentTitle: String? = null,
-    parentYear: String? = null
+    parentYear: String? = null,
+    ownerId: String? = null,
+    groupId: String? = null,
+    inlineContent: String? = null
 ): AcademicDocument {
     val title = text("title", "name", "label", "pf_title", "psf_name", "psf_desc") ?: parentTitle ?: ""
     val extension = text("extension", "psf_file_type")
@@ -545,8 +624,11 @@ private fun JsonObject.toDocument(
         year = text("year", "academicYear") ?: parentYear,
         mimeType = text("mimeType", "contentType")?.toMimeType() ?: extension?.toMimeType(),
         fileName = text("fileName", "filename", "file", "pf_file", "psf_file", "psf_name") ?: title.toDocumentFileName(extension),
-        downloadUrl = text("downloadUrl", "url", "href") ?: linkHref(),
-        updatedAt = instant("updatedAt", "last_update", "update_date", "pf_crea_date", "psf_end_upload", "psf_begin_upload", "date", "createdAt")
+        downloadUrl = text("downloadUrl", "url", "href") ?: linkHref("url", "download", "file"),
+        updatedAt = instant("updatedAt", "last_update", "update_date", "pf_crea_date", "psf_end_upload", "psf_begin_upload", "date", "createdAt"),
+        ownerId = ownerId,
+        groupId = groupId,
+        inlineContent = inlineContent
     )
 }
 
@@ -560,16 +642,21 @@ private fun String.toDocumentFileName(extension: String?): String {
     return name + suffix
 }
 
-private fun JsonObject.linkHref(): String? {
-    return array("links")
-        .mapNotNull { (it as? JsonObject)?.text("href", "url") }
-        .firstOrNull()
+private fun JsonObject.linkHref(vararg rels: String): String? {
+    val links = array("links").mapNotNull { it as? JsonObject }
+    if (rels.isNotEmpty()) {
+        links.firstOrNull { link -> link.text("rel") in rels }
+            ?.text("href", "url")
+            ?.let { return it }
+    }
+    return links.mapNotNull { it.text("href", "url") }.firstOrNull()
 }
 
 private fun JsonObject.namedLinkHref(key: String): String? {
     return (this["_links"] as? JsonObject)
         ?.get(key)
         ?.let { (it as? JsonObject)?.text("href", "url") }
+        ?: linkHref(key)
 }
 
 private fun JsonObject.newsFallbackBody(): String? {

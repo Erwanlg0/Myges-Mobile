@@ -11,12 +11,14 @@ import androidx.room.RoomDatabase
         AbsenceEntity::class,
         CourseEntity::class,
         ProjectEntity::class,
+        ProjectGroupEntity::class,
         ProjectStepEntity::class,
         PracticalEntity::class,
         AcademicDocumentEntity::class,
+        DirectoryPersonEntity::class,
         NewsEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class MygesDatabase : RoomDatabase() {

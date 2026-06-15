@@ -6,10 +6,12 @@ import com.elg.myges.adapters.secondary.storage.AbsenceEntity
 import com.elg.myges.adapters.secondary.storage.AcademicDocumentEntity
 import com.elg.myges.adapters.secondary.storage.AgendaEventEntity
 import com.elg.myges.adapters.secondary.storage.CourseEntity
+import com.elg.myges.adapters.secondary.storage.DirectoryPersonEntity
 import com.elg.myges.adapters.secondary.storage.GradeEntity
 import com.elg.myges.adapters.secondary.storage.NewsEntity
 import com.elg.myges.adapters.secondary.storage.PracticalEntity
 import com.elg.myges.adapters.secondary.storage.ProjectEntity
+import com.elg.myges.adapters.secondary.storage.ProjectGroupEntity
 import com.elg.myges.adapters.secondary.storage.ProjectStepEntity
 import com.elg.myges.adapters.secondary.storage.StudentDao
 import com.elg.myges.adapters.secondary.storage.StudentProfileEntity
@@ -33,6 +35,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import okhttp3.ResponseBody
+import retrofit2.Response
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -70,7 +73,7 @@ class OfflineFirstStudentDataRepositoryTest {
         assertEquals(listOf("project-1"), dao.projectState.value.map { it.id })
         assertEquals(setOf("step-1", "upcoming-step-1"), dao.projectStepState.value.map { it.id }.toSet())
         assertEquals(listOf("practical-1"), dao.practicalState.value.map { it.id })
-        assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1"), dao.documentState.value.map { it.id }.toSet())
+        assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1", "syllabus-course-1"), dao.documentState.value.map { it.id }.toSet())
         assertEquals("me/course-1/files/course-doc-1", dao.documentState.value.first { it.id == "course-doc-1" }.downloadUrl)
         assertEquals(setOf("skolae_app_version", "news-1", "banner-1", "partner-1", "speed-1"), dao.newsState.value.map { it.id }.toSet())
         assertEquals(listOf("course-1"), api.courseFileRequests)
@@ -96,7 +99,7 @@ class OfflineFirstStudentDataRepositoryTest {
         assertEquals(listOf("grade-1"), notifications.grades)
         assertEquals(listOf("absence-1"), notifications.absences)
         assertEquals(listOf("project-1"), notifications.projects)
-        assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1"), notifications.documents.toSet())
+        assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1", "syllabus-course-1"), notifications.documents.toSet())
     }
 
     @Test
@@ -186,6 +189,8 @@ private class RepositoryApi : MyGesApiService {
 
     override suspend fun classStudents(puid: String, year: String): JsonElement = jsonElement("""{"result":[]}""")
 
+    override suspend fun classStudents(puid: String): JsonElement = jsonElement("""{"result":[]}""")
+
     override suspend fun courseFiles(rcId: String): JsonElement {
         courseFileRequests += rcId
         return jsonElement(
@@ -261,7 +266,7 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"ss_id":"speed-1","title":"Speed meeting","corporate_name":"Company","location":"ONLINE","appointment_start":"2026-06-03T08:00:00Z"}]}"""
     )
 
-    override suspend fun download(url: String): ResponseBody {
+    override suspend fun download(url: String): Response<ResponseBody> {
         error("unused")
     }
 }
@@ -273,9 +278,11 @@ private class RepositoryDao : StudentDao() {
     val absenceState = MutableStateFlow(emptyList<AbsenceEntity>())
     val courseState = MutableStateFlow(emptyList<CourseEntity>())
     val projectState = MutableStateFlow(emptyList<ProjectEntity>())
+    val projectGroupState = MutableStateFlow(emptyList<ProjectGroupEntity>())
     val projectStepState = MutableStateFlow(emptyList<ProjectStepEntity>())
     val practicalState = MutableStateFlow(emptyList<PracticalEntity>())
     val documentState = MutableStateFlow(emptyList<AcademicDocumentEntity>())
+    val directoryState = MutableStateFlow(emptyList<DirectoryPersonEntity>())
     val newsState = MutableStateFlow(emptyList<NewsEntity>())
 
     override fun observeProfile(): Flow<StudentProfileEntity?> = profileState
@@ -284,9 +291,11 @@ private class RepositoryDao : StudentDao() {
     override fun observeAbsences(): Flow<List<AbsenceEntity>> = absenceState
     override fun observeCourses(): Flow<List<CourseEntity>> = courseState
     override fun observeProjects(): Flow<List<ProjectEntity>> = projectState
+    override fun observeProjectGroups(): Flow<List<ProjectGroupEntity>> = projectGroupState
     override fun observeProjectSteps(): Flow<List<ProjectStepEntity>> = projectStepState
     override fun observePracticals(): Flow<List<PracticalEntity>> = practicalState
     override fun observeDocuments(): Flow<List<AcademicDocumentEntity>> = documentState
+    override fun observeDirectory(): Flow<List<DirectoryPersonEntity>> = directoryState
     override fun observeNews(): Flow<List<NewsEntity>> = newsState
     override suspend fun agendaIds(): List<String> = agendaState.value.map { it.id }
     override suspend fun gradeIds(): List<String> = gradeState.value.map { it.id }
@@ -299,9 +308,11 @@ private class RepositoryDao : StudentDao() {
     override suspend fun absences(): List<AbsenceEntity> = absenceState.value
     override suspend fun courses(): List<CourseEntity> = courseState.value
     override suspend fun projects(): List<ProjectEntity> = projectState.value
+    override suspend fun projectGroups(): List<ProjectGroupEntity> = projectGroupState.value
     override suspend fun projectSteps(): List<ProjectStepEntity> = projectStepState.value
     override suspend fun practicals(): List<PracticalEntity> = practicalState.value
     override suspend fun documents(): List<AcademicDocumentEntity> = documentState.value
+    override suspend fun directoryPeople(): List<DirectoryPersonEntity> = directoryState.value
     override suspend fun news(): List<NewsEntity> = newsState.value
     override suspend fun upsertProfile(profile: StudentProfileEntity) {
         profileState.value = profile
@@ -321,6 +332,9 @@ private class RepositoryDao : StudentDao() {
     override suspend fun upsertProjects(projects: List<ProjectEntity>) {
         projectState.value = projects
     }
+    override suspend fun upsertProjectGroups(groups: List<ProjectGroupEntity>) {
+        projectGroupState.value = groups
+    }
     override suspend fun upsertProjectSteps(steps: List<ProjectStepEntity>) {
         projectStepState.value = steps
     }
@@ -330,6 +344,9 @@ private class RepositoryDao : StudentDao() {
     override suspend fun upsertDocuments(documents: List<AcademicDocumentEntity>) {
         documentState.value = documents
     }
+    override suspend fun upsertDirectoryPeople(people: List<DirectoryPersonEntity>) {
+        directoryState.value = people
+    }
     override suspend fun upsertNews(news: List<NewsEntity>) {
         newsState.value = news
     }
@@ -338,9 +355,11 @@ private class RepositoryDao : StudentDao() {
     override suspend fun deleteAbsences(absences: List<AbsenceEntity>) = Unit
     override suspend fun deleteCourses(courses: List<CourseEntity>) = Unit
     override suspend fun deleteProjects(projects: List<ProjectEntity>) = Unit
+    override suspend fun deleteProjectGroups(groups: List<ProjectGroupEntity>) = Unit
     override suspend fun deleteProjectSteps(steps: List<ProjectStepEntity>) = Unit
     override suspend fun deletePracticals(practicals: List<PracticalEntity>) = Unit
     override suspend fun deleteDocuments(documents: List<AcademicDocumentEntity>) = Unit
+    override suspend fun deleteDirectoryPeople(people: List<DirectoryPersonEntity>) = Unit
     override suspend fun deleteNews(news: List<NewsEntity>) = Unit
     override suspend fun clearProfile() {
         profileState.value = null
@@ -360,6 +379,9 @@ private class RepositoryDao : StudentDao() {
     override suspend fun clearProjects() {
         projectState.value = emptyList()
     }
+    override suspend fun clearProjectGroups() {
+        projectGroupState.value = emptyList()
+    }
     override suspend fun clearProjectSteps() {
         projectStepState.value = emptyList()
     }
@@ -368,6 +390,9 @@ private class RepositoryDao : StudentDao() {
     }
     override suspend fun clearDocuments() {
         documentState.value = emptyList()
+    }
+    override suspend fun clearDirectoryPeople() {
+        directoryState.value = emptyList()
     }
     override suspend fun clearNews() {
         newsState.value = emptyList()
@@ -430,5 +455,5 @@ private fun jsonElement(value: String): JsonElement {
 private fun agendaEntity(id: String) = AgendaEventEntity(id, "Old", 1L, 2L, null, null, null, null, null)
 private fun gradeEntity(id: String) = GradeEntity(id, "Old", "Old", 10.0, 20.0, null, null, null, null)
 private fun absenceEntity(id: String) = AbsenceEntity(id, "Old", 1L, 2L, false, null, null)
-private fun projectEntity(id: String) = ProjectEntity(id, "Old", null, null, null, null, 0)
-private fun documentEntity(id: String) = AcademicDocumentEntity(id, "Old", null, null, null, "old.pdf", null, null)
+private fun projectEntity(id: String) = ProjectEntity(id, "Old", null, null, null, null, 0, null, null)
+private fun documentEntity(id: String) = AcademicDocumentEntity(id, "Old", null, null, null, "old.pdf", null, null, null, null, null)

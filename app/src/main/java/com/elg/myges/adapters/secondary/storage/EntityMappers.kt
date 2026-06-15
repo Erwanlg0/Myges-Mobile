@@ -4,10 +4,13 @@ import com.elg.myges.domain.model.Absence
 import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
 import com.elg.myges.domain.model.Course
+import com.elg.myges.domain.model.DirectoryPerson
+import com.elg.myges.domain.model.DirectoryRole
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
 import com.elg.myges.domain.model.Project
+import com.elg.myges.domain.model.ProjectGroup
 import com.elg.myges.domain.model.ProjectStep
 import com.elg.myges.domain.model.StudentProfile
 import java.time.Instant
@@ -136,8 +139,20 @@ fun Project.toEntity() = ProjectEntity(
     groupName = groupName,
     status = status,
     deadlineEpochMillis = deadline?.toEpochMilli(),
-    fileCount = fileCount
+    fileCount = fileCount,
+    year = year,
+    courseId = courseId
 )
+
+fun Project.toGroupEntities() = groups.map { group ->
+    ProjectGroupEntity(
+        projectId = id,
+        id = group.id,
+        name = group.name,
+        students = group.students.joinToString("\n"),
+        isMine = group.isMine
+    )
+}
 
 fun Project.toStepEntities() = steps.map { step ->
     ProjectStepEntity(
@@ -149,7 +164,10 @@ fun Project.toStepEntities() = steps.map { step ->
     )
 }
 
-fun ProjectEntity.toDomain(steps: List<ProjectStepEntity>) = Project(
+fun ProjectEntity.toDomain(
+    steps: List<ProjectStepEntity>,
+    groups: List<ProjectGroupEntity> = emptyList()
+) = Project(
     id = id,
     name = name,
     courseName = courseName,
@@ -157,7 +175,17 @@ fun ProjectEntity.toDomain(steps: List<ProjectStepEntity>) = Project(
     status = status,
     deadline = deadlineEpochMillis?.let { Instant.ofEpochMilli(it) },
     steps = steps.map { it.toDomain() },
-    fileCount = fileCount
+    fileCount = fileCount,
+    year = year,
+    courseId = courseId,
+    groups = groups.map { it.toDomain() }
+)
+
+fun ProjectGroupEntity.toDomain() = ProjectGroup(
+    id = id,
+    name = name,
+    students = students.lines().filter { it.isNotBlank() },
+    isMine = isMine
 )
 
 fun ProjectStepEntity.toDomain() = ProjectStep(
@@ -174,7 +202,8 @@ fun Practical.toEntity() = PracticalEntity(
     startsAtEpochMillis = startsAt?.toEpochMilli(),
     endsAtEpochMillis = endsAt?.toEpochMilli(),
     room = room,
-    status = status
+    status = status,
+    year = year
 )
 
 fun PracticalEntity.toDomain() = Practical(
@@ -184,7 +213,8 @@ fun PracticalEntity.toDomain() = Practical(
     startsAt = startsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
     endsAt = endsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
     room = room,
-    status = status
+    status = status,
+    year = year
 )
 
 fun AcademicDocument.toEntity() = AcademicDocumentEntity(
@@ -195,7 +225,10 @@ fun AcademicDocument.toEntity() = AcademicDocumentEntity(
     mimeType = mimeType,
     fileName = fileName,
     downloadUrl = downloadUrl,
-    updatedAtEpochMillis = updatedAt?.toEpochMilli()
+    updatedAtEpochMillis = updatedAt?.toEpochMilli(),
+    ownerId = ownerId,
+    groupId = groupId,
+    inlineContent = inlineContent
 )
 
 fun AcademicDocumentEntity.toDomain() = AcademicDocument(
@@ -206,7 +239,30 @@ fun AcademicDocumentEntity.toDomain() = AcademicDocument(
     mimeType = mimeType,
     fileName = fileName,
     downloadUrl = downloadUrl,
-    updatedAt = updatedAtEpochMillis?.let { Instant.ofEpochMilli(it) }
+    updatedAt = updatedAtEpochMillis?.let { Instant.ofEpochMilli(it) },
+    ownerId = ownerId,
+    groupId = groupId,
+    inlineContent = inlineContent
+)
+
+fun DirectoryPerson.toEntity() = DirectoryPersonEntity(
+    id = id,
+    displayName = displayName,
+    email = email,
+    role = role.name,
+    year = year,
+    groupName = groupName,
+    avatarUrl = avatarUrl
+)
+
+fun DirectoryPersonEntity.toDomain() = DirectoryPerson(
+    id = id,
+    displayName = displayName,
+    email = email,
+    role = runCatching { DirectoryRole.valueOf(role) }.getOrDefault(DirectoryRole.Student),
+    year = year,
+    groupName = groupName,
+    avatarUrl = avatarUrl
 )
 
 fun NewsItem.toEntity() = NewsEntity(

@@ -16,6 +16,7 @@ import com.elg.myges.domain.model.AppError
 import com.elg.myges.domain.model.AppException
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
+import com.elg.myges.domain.model.DirectoryPerson
 import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.NotificationPreferences
@@ -211,6 +212,7 @@ private class RecordingStudentDataRepository(
     override fun observeProjects(): Flow<List<Project>> = flowOf(emptyList())
     override fun observePracticals(): Flow<List<Practical>> = flowOf(emptyList())
     override fun observeDocuments(): Flow<List<AcademicDocument>> = flowOf(emptyList())
+    override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = flowOf(emptyList())
     override suspend fun syncAll() = Unit
     override suspend fun clearCache() {
