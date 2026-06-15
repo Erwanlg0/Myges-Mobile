@@ -20,6 +20,7 @@
     <string name="state_offline_empty_title">Hors ligne</string>
     <string name="state_offline_empty_body">Aucune donnée locale n’est encore disponible. Reconnectez-vous au réseau pour synchroniser MyGES.</string>
     <string name="state_refreshing">Synchronisation en cours</string>
+    <string name="state_loading">Chargement en cours…</string>
 
     <string name="error_empty_response">La réponse reçue est vide.</string>
     <string name="error_network">Connexion impossible. Vérifiez votre réseau.</string>

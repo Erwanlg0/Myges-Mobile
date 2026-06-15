@@ -282,6 +282,7 @@ private class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setLanguageTag(languageTag: String?) = Unit
     override suspend fun setCalendarSyncEnabled(enabled: Boolean) = Unit
+    override suspend fun setBiometricEnabled(enabled: Boolean) = Unit
     override suspend fun setGradeNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setAbsenceNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setAgendaNotificationsEnabled(enabled: Boolean) = Unit

@@ -39,6 +39,11 @@ class MygesAuthInterceptor(
 
 internal fun String.withBearerScheme(): String {
     val trimmed = trim()
-    if (trimmed.isBlank() || trimmed.any(Char::isWhitespace)) return trimmed
-    return "bearer $trimmed"
+    if (trimmed.isBlank()) return trimmed
+    val parts = trimmed.split(Regex("\\s+"), limit = 2)
+    if (parts.size == 2 && parts[0].equals("bearer", ignoreCase = true)) {
+        return "Bearer ${parts[1]}"
+    }
+    if (trimmed.any(Char::isWhitespace)) return trimmed
+    return "Bearer $trimmed"
 }

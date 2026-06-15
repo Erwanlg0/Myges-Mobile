@@ -167,6 +167,7 @@ class UpdateSettingsUseCase @Inject constructor(
 ) {
     suspend fun language(languageTag: String?) = repository.setLanguageTag(languageTag)
     suspend fun calendarSync(enabled: Boolean) = repository.setCalendarSyncEnabled(enabled)
+    suspend fun biometric(enabled: Boolean) = repository.setBiometricEnabled(enabled)
     suspend fun gradeNotifications(enabled: Boolean) = repository.setGradeNotificationsEnabled(enabled)
     suspend fun absenceNotifications(enabled: Boolean) = repository.setAbsenceNotificationsEnabled(enabled)
     suspend fun agendaNotifications(enabled: Boolean) = repository.setAgendaNotificationsEnabled(enabled)

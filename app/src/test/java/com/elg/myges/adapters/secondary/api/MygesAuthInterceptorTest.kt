@@ -28,7 +28,7 @@ class MygesAuthInterceptorTest {
 
         verify {
             chain.proceed(withArg { request ->
-                assertEquals("bearer raw-token", request.header("Authorization"))
+                assertEquals("Bearer raw-token", request.header("Authorization"))
                 assertEquals("application/json", request.header("Accept"))
                 assertEquals("agent", request.header("User-Agent"))
             })
@@ -45,7 +45,7 @@ class MygesAuthInterceptorTest {
 
         verify {
             chain.proceed(withArg { request ->
-                assertEquals("bearer token", request.header("Authorization"))
+                assertEquals("Bearer token", request.header("Authorization"))
             })
         }
     }

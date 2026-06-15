@@ -3,6 +3,7 @@ package com.elg.myges.adapters.secondary.repository
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
+import com.elg.myges.adapters.secondary.pdf.PdfGenerator
 import com.elg.myges.adapters.secondary.api.MyGesApiService
 import com.elg.myges.adapters.secondary.api.toAbsences
 import com.elg.myges.adapters.secondary.api.toAgendaEvents
@@ -215,7 +216,13 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 val target = if (inlineContent != null) {
                     val file = File(directory, document.fileName.sanitizedFileName())
                     onProgress(0f)
-                    file.writeText(inlineContent, StandardCharsets.UTF_8)
+                    if (document.mimeType == "application/pdf") {
+                        file.outputStream().use {
+                            PdfGenerator.generatePdfFromText(inlineContent, document.title, it)
+                        }
+                    } else {
+                        file.writeText(inlineContent, StandardCharsets.UTF_8)
+                    }
                     onProgress(1f)
                     file
                 } else {
@@ -365,13 +372,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         )
     }
 
-    private suspend fun fetchCurrentYearData(years: List<String>): YearData {
-        years.forEach { year ->
-            val yearData = fetchAllYearsData(listOf(year))
-            if (yearData.hasAcademicData()) return yearData
-        }
-        return fetchAllYearsData(listOf(years.firstOrNull() ?: Year.now().value.toString()))
-    }
+
 
     private suspend fun YearData.withCachedOutsideFetchedYears(): YearData {
         val refreshedYears = courses.mapNotNull { it.year }.toSet() +
@@ -427,8 +428,8 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 title = "${course.name} syllabus",
                 category = "Syllabus",
                 year = course.year,
-                mimeType = "text/plain",
-                fileName = "${course.name}_syllabus.txt",
+                mimeType = "application/pdf",
+                fileName = "${course.name}_syllabus.pdf",
                 downloadUrl = null,
                 updatedAt = null,
                 ownerId = course.id,
@@ -577,7 +578,7 @@ internal data class AgendaWindow(
         }
 
         fun subsequentSync(today: LocalDate = LocalDate.now(ZoneOffset.UTC)): AgendaWindow {
-            val start = today.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+            val start = today.minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
             val end = today.plusDays(365)
                 .atTime(23, 59, 59, 999_000_000)
                 .toInstant(ZoneOffset.UTC)

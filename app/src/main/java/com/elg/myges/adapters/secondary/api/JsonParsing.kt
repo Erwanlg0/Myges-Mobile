@@ -337,9 +337,9 @@ fun JsonElement.toProjects(currentUserId: String? = null, fallbackYear: String? 
         "limitDate", "date_limit", "dateLimit", "date", "due_date", "due", 
         "update_date", "date_limite", "dateLimite"
     )
-    return arrayOrNested("projects", "items", "data")
-        .ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }
-        .map { element ->
+    val arrayResult = arrayOrNested("projects", "items", "data")
+    if (arrayResult.isEmpty() && hasArrayPayload()) return emptyList()
+    return (arrayResult.ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }).map { element ->
         val root = element.objectOrData()
         val projectId = root.text("id", "projectId", "project_id", "uid") ?: stableId(root)
         val year = root.text("year", "academicYear") ?: fallbackYear
@@ -378,7 +378,7 @@ fun JsonElement.toProjects(currentUserId: String? = null, fallbackYear: String? 
                 ?: groups.firstOrNull { it.isMine }?.name
                 ?: root.arrayText("groups", "group_name", "name"),
             status = root.text("status", "state"),
-            deadline = root.instant(*projectDateKeys) ?: steps.mapNotNull { it.deadline }.minOrNull(),
+            deadline = root.instant(*projectDateKeys) ?: steps.mapNotNull { it.deadline }.maxOrNull(),
             steps = steps,
             fileCount = root.array("files", "project_files", "documents", "deliverables").size + stepFileCount,
             year = year,
@@ -444,9 +444,9 @@ fun JsonElement.toDocuments(): List<AcademicDocument> {
 }
 
 fun JsonElement.toProjectDocuments(fallbackYear: String? = null): List<AcademicDocument> {
-    return arrayOrNested("projects", "items", "data")
-        .ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }
-        .flatMap { element ->
+    val arrayResult = arrayOrNested("projects", "items", "data")
+    if (arrayResult.isEmpty() && hasArrayPayload()) return emptyList()
+    return (arrayResult.ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }).flatMap { element ->
         val projectRoot = element.objectOrData()
         val projectId = projectRoot.text("id", "projectId", "project_id", "uid") ?: stableId(projectRoot)
         val projectYear = projectRoot.text("year", "academicYear") ?: fallbackYear
@@ -500,8 +500,9 @@ fun JsonElement.toClassIds(): List<String> {
 }
 
 fun JsonElement.toNews(): List<NewsItem> {
-    val items = arrayOrNested("news", "banners", "content", "items", "data")
-        .ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }
+    val arrayResult = arrayOrNested("news", "banners", "content", "items", "data")
+    if (arrayResult.isEmpty() && hasArrayPayload()) return emptyList()
+    val items = arrayResult.ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }
     return items.map { element ->
         val root = element.objectOrData()
         NewsItem(
@@ -516,6 +517,13 @@ fun JsonElement.toNews(): List<NewsItem> {
 private fun JsonElement.objectOrData(): JsonObject {
     val root = this as? JsonObject ?: return JsonObject(emptyMap())
     return (root["result"] as? JsonObject) ?: (root["data"] as? JsonObject) ?: root
+}
+
+private fun JsonElement.hasArrayPayload(): Boolean {
+    if (this is JsonArray) return true
+    val root = this as? JsonObject ?: return false
+    val keys = listOf("result", "data", "items", "results")
+    return keys.any { root[it] is JsonArray } || root.values.any { it is JsonArray }
 }
 
 private fun JsonElement.arrayOrNested(vararg keys: String): List<JsonElement> {

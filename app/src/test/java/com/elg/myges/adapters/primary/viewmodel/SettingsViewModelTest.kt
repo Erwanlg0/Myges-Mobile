@@ -164,6 +164,10 @@ private class RecordingSettingsRepository(
         )
     )
 
+    override suspend fun setBiometricEnabled(enabled: Boolean) {
+        failure?.let { throw it }
+    }
+
     override suspend fun setLanguageTag(languageTag: String?) {
         failure?.let { throw it }
         this.languageTag = languageTag

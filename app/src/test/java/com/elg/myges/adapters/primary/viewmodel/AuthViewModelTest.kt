@@ -58,7 +58,6 @@ class AuthViewModelTest {
         val viewModel = authViewModel(sessionRepository, notificationScheduler)
         val stateCollection = collectState(viewModel)
 
-        viewModel.setBiometricEnabled(false)
         viewModel.completeOAuthCallback(
             oauthUri("access_token=token-1&token_type=Bearer&expires_in=3600")
         )

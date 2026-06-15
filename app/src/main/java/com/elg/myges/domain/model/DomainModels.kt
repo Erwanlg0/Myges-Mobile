@@ -173,6 +173,7 @@ data class UserSettings(
     val languageTag: String?,
     val notifications: NotificationPreferences,
     val calendarSyncEnabled: Boolean,
+    val biometricEnabled: Boolean = false,
     val lastSyncAt: Instant?
 )
 

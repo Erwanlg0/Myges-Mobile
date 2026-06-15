@@ -20,6 +20,7 @@
     <string name="state_offline_empty_title">Offline</string>
     <string name="state_offline_empty_body">No local data is available yet. Reconnect to the network to sync MyGES.</string>
     <string name="state_refreshing">Syncing</string>
+    <string name="state_loading">Loading…</string>
 
     <string name="error_empty_response">The received response is empty.</string>
     <string name="error_network">Unable to connect. Check your network.</string>

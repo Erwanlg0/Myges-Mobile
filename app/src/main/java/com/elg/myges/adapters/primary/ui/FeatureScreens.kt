@@ -44,6 +44,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.core.content.FileProvider
 import java.io.File
+import com.elg.myges.adapters.secondary.pdf.PdfGenerator
 import java.time.format.DateTimeFormatter
 import java.time.ZoneOffset
 import androidx.compose.material3.Button
@@ -2076,11 +2077,13 @@ internal fun CourseCard(
                     TextButton(
                         onClick = {
                             runCatching {
-                                val file = File(context.cacheDir, "${course.name}_syllabus.txt")
-                                file.writeText(course.syllabus)
+                                val file = File(context.cacheDir, "${course.name}_syllabus.pdf")
+                                file.outputStream().use {
+                                    PdfGenerator.generatePdfFromText(course.syllabus, "${course.name} - Syllabus", it)
+                                }
                                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                                 val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
+                                    type = "application/pdf"
                                     putExtra(Intent.EXTRA_STREAM, uri)
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }

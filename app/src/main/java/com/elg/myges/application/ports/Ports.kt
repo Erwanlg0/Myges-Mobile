@@ -46,6 +46,7 @@ interface SettingsRepository {
     val settings: Flow<UserSettings>
     suspend fun setLanguageTag(languageTag: String?)
     suspend fun setCalendarSyncEnabled(enabled: Boolean)
+    suspend fun setBiometricEnabled(enabled: Boolean)
     suspend fun setGradeNotificationsEnabled(enabled: Boolean)
     suspend fun setAbsenceNotificationsEnabled(enabled: Boolean)
     suspend fun setAgendaNotificationsEnabled(enabled: Boolean)
