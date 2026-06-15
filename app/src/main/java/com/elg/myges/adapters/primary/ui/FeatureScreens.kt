@@ -2,6 +2,7 @@ package com.elg.myges.adapters.primary.ui
 
 import android.Manifest
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -71,6 +72,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -235,10 +237,10 @@ fun DashboardScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                dashboard.recentAbsences.firstOrNull()?.period?.let { period ->
+                dashboard.recentAbsences.firstOrNull()?.let { absence ->
                     IconButton(
                         onClick = {
-                            viewModel.navigateToAbsencesPeriod(period)
+                            viewModel.navigateToAbsencesPeriod(absence.academicYearLabel())
                             onNavigateToTab("absences")
                         }
                     ) {
@@ -259,10 +261,8 @@ fun DashboardScreen(
                 AbsenceCard(
                     absence = lastAbsence,
                     onOpen = {
-                        lastAbsence.period?.let { period ->
-                            viewModel.navigateToAbsencesPeriod(period)
-                            onNavigateToTab("absences")
-                        }
+                        viewModel.navigateToAbsencesPeriod(lastAbsence.academicYearLabel())
+                        onNavigateToTab("absences")
                     }
                 )
             }
@@ -548,41 +548,54 @@ fun AgendaScreen(viewModel: StudentViewModel) {
 @Composable
 fun GradesScreen(viewModel: StudentViewModel) {
     val state by viewModel.grades.collectAsStateWithLifecycle()
-    val coursesState by viewModel.courses.collectAsStateWithLifecycle()
-    val absencesState by viewModel.absences.collectAsStateWithLifecycle()
     var selectedGrade by remember { mutableStateOf<Grade?>(null) }
+    val context = LocalContext.current
+    val simulationPrefs = remember(context) {
+        context.getSharedPreferences("grade_simulation", Context.MODE_PRIVATE)
+    }
     
     val gradesList = state.data.orEmpty()
-    val coursesList = coursesState.data.orEmpty()
-    val absencesList = absencesState.data.orEmpty()
 
-    val periods = remember(gradesList, coursesList, absencesList) {
-        val all = (gradesList.mapNotNull { it.period } + 
-                   coursesList.mapNotNull { it.period } + 
-                   absencesList.mapNotNull { it.period })
+    val years = remember(gradesList) {
+        gradesList.mapNotNull { it.academicYearLabel().takeIf(String::isNotBlank) }
+            .distinct()
+            .sortedDescending()
+    }
+    var selectedYear by remember(years) {
+        mutableStateOf(years.firstOrNull())
+    }
+    val semesters = remember(gradesList, selectedYear) {
+        gradesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }
+            .mapNotNull { it.semesterLabel() }
             .filter { it.isNotBlank() }
             .distinct()
-        all.sortedWith { p1, p2 -> comparePeriods(p2, p1) }
+            .sortedWith { p1, p2 -> comparePeriods(p2, p1) }
     }
-    var selectedPeriod by remember(periods) {
-        val defaultPeriod = periods.firstOrNull { period ->
-            gradesList.any { it.period == period }
-        } ?: periods.firstOrNull()
-        mutableStateOf(defaultPeriod)
+    var selectedSemester by remember(selectedYear, semesters) {
+        mutableStateOf<String?>(null)
+    }
+    var simulationMode by remember {
+        mutableStateOf(simulationPrefs.getBoolean("enabled", false))
+    }
+    var simulationResetVersion by remember { mutableStateOf(0) }
+    var simulatedValues by remember(gradesList) {
+        mutableStateOf(loadGradeSimulations(simulationPrefs, gradesList.map { it.id }.toSet()))
     }
 
     LaunchedEffect(viewModel) {
         viewModel.gradesPeriodToNavigate.collect { targetPeriod ->
-            selectedPeriod = targetPeriod
+            selectedYear = targetPeriod.academicYearLabel()
+            selectedSemester = targetPeriod.semesterLabel()
         }
     }
 
     selectedGrade?.let { grade ->
-        val components = remember(grade, gradesList) {
+        val components = remember(grade, gradesList, simulatedValues, simulationMode) {
             gradesList.filter { it.courseName == grade.courseName && it.period == grade.period }
+                .let { if (simulationMode) it.withSimulatedValues(simulatedValues) else it }
         }
         GradeDetailsDialog(
-            grade = grade,
+            grade = if (simulationMode) grade.withSimulatedValue(simulatedValues[grade.id]) else grade,
             components = components,
             onDismiss = { selectedGrade = null }
         )
@@ -595,63 +608,154 @@ fun GradesScreen(viewModel: StudentViewModel) {
         emptyBody = R.string.grades_empty_body,
         onRetry = viewModel::refresh
     ) { grades ->
-        val filteredGrades = if (selectedPeriod != null) {
-            grades.filter { it.period == selectedPeriod }
-        } else {
-            grades
+        val filteredGrades = grades.filter { grade ->
+            (selectedYear == null || grade.academicYearLabel() == selectedYear) &&
+                (selectedSemester == null || grade.semesterLabel() == selectedSemester)
         }
+        val displayedGrades = if (simulationMode) {
+            filteredGrades.withSimulatedValues(simulatedValues)
+        } else {
+            filteredGrades
+        }.withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet())
 
-        if (periods.isNotEmpty()) {
+        if (years.isNotEmpty()) {
             item {
-                var expanded by remember { mutableStateOf(false) }
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    CompactCard(
-                        modifier = Modifier.clickable { expanded = true }
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    var yearExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        CompactCard(
+                            modifier = Modifier.clickable { yearExpanded = true }
                         ) {
-                            Text(
-                                text = selectedPeriod ?: "",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Icon(
-                                imageVector = Icons.Rounded.ArrowDropDown,
-                                contentDescription = null
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = selectedYear ?: stringResource(R.string.common_all),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = yearExpanded,
+                            onDismissRequest = { yearExpanded = false }
+                        ) {
+                            (listOf(null) + years).forEach { year ->
+                                DropdownMenuItem(
+                                    text = { Text(year ?: stringResource(R.string.common_all)) },
+                                    onClick = {
+                                        selectedYear = year
+                                        selectedSemester = null
+                                        yearExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        periods.forEach { period ->
-                            DropdownMenuItem(
-                                text = { Text(period) },
-                                onClick = {
-                                    selectedPeriod = period
-                                    expanded = false
-                                }
-                            )
+
+                    var semesterExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        CompactCard(
+                            modifier = Modifier.clickable { semesterExpanded = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = selectedSemester ?: stringResource(R.string.common_all),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = semesterExpanded,
+                            onDismissRequest = { semesterExpanded = false }
+                        ) {
+                            (listOf(null) + semesters).forEach { semester ->
+                                DropdownMenuItem(
+                                    text = { Text(semester ?: stringResource(R.string.common_all)) },
+                                    onClick = {
+                                        selectedSemester = semester
+                                        semesterExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        val mainGrades = filteredGrades.filter { !it.id.contains("-cc-") && !it.id.contains("-exam") }
+        val mainGrades = displayedGrades.filter { !it.id.contains("-cc-") && !it.id.contains("-exam") }
 
         item { GradeSummaryCard(mainGrades) }
-        item { GradeSimulationCard(mainGrades) }
+        item {
+            DataCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.grades_simulation_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Button(
+                        onClick = {
+                            simulationMode = !simulationMode
+                            simulationPrefs.edit().putBoolean("enabled", simulationMode).apply()
+                        }
+                    ) {
+                        Text(stringResource(if (simulationMode) R.string.grades_real_mode else R.string.grades_simulation_mode))
+                    }
+                }
+                if (simulationMode) {
+                    TextButton(
+                        onClick = {
+                            simulatedValues = emptyMap()
+                            clearGradeSimulations(simulationPrefs)
+                            simulationResetVersion++
+                        },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(stringResource(R.string.grades_simulation_reset))
+                    }
+                }
+            }
+        }
         
-        items(filteredGrades, key = { it.id }) { grade ->
-            GradeCard(
-                grade = grade,
-                onOpen = { selectedGrade = grade }
-            )
+        items(displayedGrades, key = { it.id }) { grade ->
+            if (simulationMode) {
+                GradeSimulationEditCard(
+                    grade = grade,
+                    resetVersion = simulationResetVersion,
+                    onValueChange = { value ->
+                        simulatedValues = if (value == null) {
+                            simulatedValues - grade.id
+                        } else {
+                            simulatedValues + (grade.id to value)
+                        }
+                        saveGradeSimulations(simulationPrefs, simulatedValues)
+                    },
+                    onOpen = { selectedGrade = grade }
+                )
+            } else {
+                GradeCard(
+                    grade = grade,
+                    onOpen = { selectedGrade = grade }
+                )
+            }
         }
     }
 }
@@ -659,31 +763,40 @@ fun GradesScreen(viewModel: StudentViewModel) {
 @Composable
 fun AbsencesScreen(viewModel: StudentViewModel) {
     val state by viewModel.absences.collectAsStateWithLifecycle()
-    val coursesState by viewModel.courses.collectAsStateWithLifecycle()
-    val gradesState by viewModel.grades.collectAsStateWithLifecycle()
     
     val absencesList = state.data.orEmpty()
-    val coursesList = coursesState.data.orEmpty()
-    val gradesList = gradesState.data.orEmpty()
 
-    val periods = remember(absencesList, coursesList, gradesList) {
-        val all = (absencesList.mapNotNull { it.period } + 
-                   coursesList.mapNotNull { it.period } + 
-                   gradesList.mapNotNull { it.period })
+    val years = remember(absencesList) {
+        absencesList.map { it.academicYearLabel() }
             .filter { it.isNotBlank() }
             .distinct()
-        all.sortedWith { p1, p2 -> comparePeriods(p2, p1) }
+            .sortedDescending()
     }
-    var selectedPeriod by remember(periods) {
-        val defaultPeriod = periods.firstOrNull { period ->
-            absencesList.any { it.period == period }
-        } ?: periods.firstOrNull()
-        mutableStateOf(defaultPeriod)
+    var selectedYear by remember(years) {
+        mutableStateOf(years.firstOrNull())
+    }
+    val semesters = remember(absencesList, selectedYear) {
+        absencesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }
+            .mapNotNull { it.semesterLabel() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedWith { p1, p2 -> comparePeriods(p2, p1) }
+    }
+    var selectedSemester by remember(selectedYear, semesters) {
+        mutableStateOf<String?>(null)
+    }
+    var selectedJustified by remember { mutableStateOf<Boolean?>(null) }
+
+    val statusLabel = when (selectedJustified) {
+        true -> stringResource(R.string.absences_justified)
+        false -> stringResource(R.string.absences_unjustified)
+        null -> stringResource(R.string.common_all)
     }
 
     LaunchedEffect(viewModel) {
-        viewModel.absencesPeriodToNavigate.collect { targetPeriod ->
-            selectedPeriod = targetPeriod
+        viewModel.absencesPeriodToNavigate.collect { targetPeriodOrYear ->
+            selectedYear = targetPeriodOrYear.academicYearLabel()
+            selectedSemester = targetPeriodOrYear.semesterLabel()
         }
     }
 
@@ -694,49 +807,141 @@ fun AbsencesScreen(viewModel: StudentViewModel) {
         emptyBody = R.string.absences_empty_body,
         onRetry = viewModel::refresh
     ) { absences ->
-        val filteredAbsences = if (selectedPeriod != null) {
-            absences.filter { it.period == selectedPeriod }
-        } else {
-            absences
+        val filteredAbsences = absences.filter { absence ->
+            (selectedYear == null || absence.academicYearLabel() == selectedYear) &&
+                (selectedSemester == null || absence.semesterLabel() == selectedSemester) &&
+                (selectedJustified == null || absence.justified == selectedJustified)
         }
 
-        if (periods.isNotEmpty()) {
+        if (years.isNotEmpty()) {
             item {
-                var expanded by remember { mutableStateOf(false) }
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    CompactCard(
-                        modifier = Modifier.clickable { expanded = true }
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    var yearExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        CompactCard(
+                            modifier = Modifier.clickable { yearExpanded = true }
                         ) {
-                            Text(
-                                text = selectedPeriod ?: "",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Icon(
-                                imageVector = Icons.Rounded.ArrowDropDown,
-                                contentDescription = null
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = selectedYear ?: stringResource(R.string.common_all),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowDropDown,
+                                    contentDescription = null
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = yearExpanded,
+                            onDismissRequest = { yearExpanded = false }
+                        ) {
+                            (listOf(null) + years).forEach { year ->
+                                DropdownMenuItem(
+                                    text = { Text(year ?: stringResource(R.string.common_all)) },
+                                    onClick = {
+                                        selectedYear = year
+                                        selectedSemester = null
+                                        yearExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        periods.forEach { period ->
-                            DropdownMenuItem(
-                                text = { Text(period) },
-                                onClick = {
-                                    selectedPeriod = period
-                                    expanded = false
+
+                    var semesterExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        CompactCard(
+                            modifier = Modifier.clickable { semesterExpanded = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = selectedSemester ?: stringResource(R.string.common_all),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowDropDown,
+                                    contentDescription = null
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = semesterExpanded,
+                            onDismissRequest = { semesterExpanded = false }
+                        ) {
+                            (listOf(null) + semesters).forEach { semester ->
+                                DropdownMenuItem(
+                                    text = { Text(semester ?: stringResource(R.string.common_all)) },
+                                    onClick = {
+                                        selectedSemester = semester
+                                        semesterExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    var statusExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        CompactCard(
+                            modifier = Modifier.clickable { statusExpanded = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = statusLabel,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowDropDown,
+                                    contentDescription = null
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = statusExpanded,
+                            onDismissRequest = { statusExpanded = false }
+                        ) {
+                            listOf(null, true, false).forEach { justified ->
+                                val label = when (justified) {
+                                    true -> stringResource(R.string.absences_justified)
+                                    false -> stringResource(R.string.absences_unjustified)
+                                    null -> stringResource(R.string.common_all)
                                 }
-                            )
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        selectedJustified = justified
+                                        statusExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
+                }
                 }
             }
         }
@@ -769,8 +974,19 @@ fun CoursesScreen(viewModel: StudentViewModel) {
     val periods = remember(coursesList) {
         listOf(null) + coursesList.mapNotNull { it.period }.filter { it.isNotBlank() }.distinct().sortedWith { p1, p2 -> comparePeriods(p2, p1) }
     }
-    var selectedYear by remember { mutableStateOf<String?>(null) }
-    var selectedPeriod by remember { mutableStateOf<String?>(null) }
+    val defaultYear = remember(coursesList) {
+        coursesList.mapNotNull { it.year }.filter { it.isNotBlank() }.distinct().sortedDescending().firstOrNull()
+    }
+    var selectedYear by remember(defaultYear) { mutableStateOf<String?>(defaultYear) }
+    val defaultPeriod = remember(coursesList, selectedYear) {
+        coursesList.filter { selectedYear == null || it.year == selectedYear }
+            .mapNotNull { it.period }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedWith { p1, p2 -> comparePeriods(p2, p1) }
+            .firstOrNull()
+    }
+    var selectedPeriod by remember(defaultPeriod) { mutableStateOf<String?>(defaultPeriod) }
 
     val filteredCourses = remember(coursesList, selectedYear, selectedPeriod) {
         coursesList.filter { course ->
@@ -1264,7 +1480,7 @@ private fun GradeCard(
                     formatNumber(grade.scale)
                 ),
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.primary
+                color = gradeColor(grade.value, grade.scale)
             )
         } else {
             Text(
@@ -1297,7 +1513,7 @@ internal fun GradeSummaryCard(grades: List<Grade>) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            LabelValue(R.string.grades_weighted_average, formatNumber(summary.weightedAverage))
+            ColoredLabelValue(R.string.grades_weighted_average, formatNumber(summary.weightedAverage), gradeColor(summary.weightedAverage, 20.0))
             LabelValue(R.string.grades_gpa, formatNumber(summary.gpa))
         }
         LabelValue(R.string.grades_count, summary.gradedCount.toString())
@@ -1307,6 +1523,41 @@ internal fun GradeSummaryCard(grades: List<Grade>) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+private fun GradeSimulationEditCard(
+    grade: Grade,
+    resetVersion: Int,
+    onValueChange: (Double?) -> Unit,
+    onOpen: () -> Unit
+) {
+    val initialValueText = formatNumber(grade.value)
+    var valueText by remember(grade.id, resetVersion) { mutableStateOf(initialValueText) }
+    CompactCard {
+        Text(
+            text = grade.courseName.orUntitled(),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.clickable(onClick = onOpen)
+        )
+        Text(grade.subject.orUntitled())
+        OutlinedTextField(
+            value = valueText,
+            onValueChange = { value ->
+                valueText = value
+                onValueChange(value.toGradeNumber())
+            },
+            label = { Text(stringResource(R.string.grades_simulation_value)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
+        if (!grade.period.isNullOrBlank()) {
+            LabelValue(R.string.common_period, grade.period)
         }
     }
 }
@@ -1414,111 +1665,6 @@ private fun GradeDetailsDialog(
 }
 
 @Composable
-private fun GradeSimulationCard(grades: List<Grade>) {
-    var valueText by remember { mutableStateOf("") }
-    var coefficientText by remember { mutableStateOf("1") }
-    var labelText by remember { mutableStateOf("") }
-    var simulatedList by remember { mutableStateOf(emptyList<Grade>()) }
-    
-    val overallGrades = remember(grades, simulatedList) {
-        grades + simulatedList
-    }
-    val summary = remember(overallGrades) { overallGrades.toGradeSummary() }
-    
-    DataCard {
-        Text(
-            text = stringResource(R.string.grades_simulation_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        
-        if (simulatedList.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                simulatedList.forEachIndexed { index, sim ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                      ) {
-                          Text(
-                              text = "${sim.courseName} (coef ${formatNumber(sim.coefficient)}): ${formatNumber(sim.value)}/20",
-                              style = MaterialTheme.typography.bodyMedium
-                          )
-                          IconButton(
-                              onClick = { simulatedList = simulatedList.filterIndexed { i, _ -> i != index } },
-                              modifier = Modifier.size(24.dp)
-                          ) {
-                              Icon(
-                                  imageVector = Icons.Rounded.Delete,
-                                  contentDescription = stringResource(R.string.action_delete),
-                                  modifier = Modifier.size(16.dp)
-                              )
-                          }
-                      }
-                }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            }
-        }
-        
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = labelText,
-                onValueChange = { labelText = it },
-                label = { Text(stringResource(R.string.grades_simulation_label)) },
-                modifier = Modifier.weight(1.5f),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = valueText,
-                onValueChange = { valueText = it },
-                label = { Text(stringResource(R.string.grades_simulation_value)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = coefficientText,
-                onValueChange = { coefficientText = it },
-                label = { Text(stringResource(R.string.grades_simulation_coefficient)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f),
-                singleLine = true
-            )
-        }
-        
-        Button(
-            onClick = {
-                val value = valueText.toGradeNumber()
-                val coef = coefficientText.toGradeNumber() ?: 1.0
-                if (value != null) {
-                    val label = labelText.trim().ifBlank { "Simulated" }
-                    val newSim = Grade(
-                        id = "sim-${System.currentTimeMillis()}",
-                        courseName = label,
-                        subject = label,
-                        value = value,
-                        scale = 20.0,
-                        coefficient = coef,
-                        average = null,
-                        date = null,
-                        period = null
-                    )
-                    simulatedList = simulatedList + newSim
-                    valueText = ""
-                    labelText = ""
-                    coefficientText = "1"
-                }
-            },
-            modifier = Modifier.align(Alignment.End)
-        ) {
-            Text(stringResource(R.string.grades_simulation_add))
-        }
-        
-        LabelValue(R.string.grades_simulation_average, formatNumber(summary.weightedAverage))
-    }
-}
-
-@Composable
 internal fun AbsenceCard(
     absence: Absence,
     onOpen: (() -> Unit)? = null
@@ -1548,7 +1694,6 @@ internal fun CourseCard(
     course: Course,
     viewModel: StudentViewModel
 ) {
-    var syllabusExpanded by remember(course.id) { mutableStateOf(false) }
     var showFilesDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val documentsState by viewModel.documents.collectAsStateWithLifecycle()
@@ -1558,6 +1703,7 @@ internal fun CourseCard(
             it.downloadUrl?.contains("courseId=${course.id}") == true
         }
     }
+    val effectiveFileCount = maxOf(course.fileCount, courseFiles.size)
 
     if (showFilesDialog) {
         CourseFilesDialog(
@@ -1576,7 +1722,7 @@ internal fun CourseCard(
         LabelValue(R.string.courses_teacher, course.teacher.orEmpty())
         LabelValue(R.string.profile_year, course.year.orEmpty())
         LabelValue(R.string.common_period, course.period.orEmpty())
-        LabelValue(R.string.courses_files, course.fileCount.toString())
+        LabelValue(R.string.courses_files, effectiveFileCount.toString())
         course.location?.let { location ->
             if (location.isNotBlank()) {
                 val context = LocalContext.current
@@ -1605,7 +1751,7 @@ internal fun CourseCard(
                 }
             }
         }
-        if (!course.syllabus.isNullOrBlank() || course.fileCount > 0) {
+        if (!course.syllabus.isNullOrBlank() || effectiveFileCount > 0) {
             HorizontalDivider()
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1614,12 +1760,6 @@ internal fun CourseCard(
             ) {
                 if (!course.syllabus.isNullOrBlank()) {
                     TextButton(
-                        onClick = { syllabusExpanded = !syllabusExpanded },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(stringResource(if (syllabusExpanded) R.string.courses_hide_syllabus else R.string.courses_show_syllabus))
-                    }
-                    IconButton(
                         onClick = {
                             runCatching {
                                 val file = File(context.cacheDir, "${course.name}_syllabus.txt")
@@ -1632,26 +1772,21 @@ internal fun CourseCard(
                                 }
                                 context.startActivity(Intent.createChooser(intent, "Syllabus - ${course.name}"))
                             }
-                        }
+                        },
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Rounded.Download, contentDescription = stringResource(R.string.courses_download_syllabus))
+                        Text(stringResource(R.string.courses_download_syllabus))
                     }
                 }
                 
-                if (course.fileCount > 0) {
+                if (effectiveFileCount > 0) {
                     TextButton(
                         onClick = { showFilesDialog = true },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(stringResource(R.string.courses_files_button, course.fileCount))
+                        Text(pluralStringResource(R.plurals.courses_files_button, effectiveFileCount, effectiveFileCount))
                     }
                 }
-            }
-            if (syllabusExpanded && !course.syllabus.isNullOrBlank()) {
-                Text(
-                    text = course.syllabus,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
             }
         }
     }
@@ -2096,4 +2231,133 @@ private fun comparePeriods(p1: String, p2: String): Int {
     val num1 = numRegex.findAll(p1).mapNotNull { it.value.toIntOrNull() }.lastOrNull() ?: 0
     val num2 = numRegex.findAll(p2).mapNotNull { it.value.toIntOrNull() }.lastOrNull() ?: 0
     return num1.compareTo(num2)
+}
+
+@Composable
+private fun ColoredLabelValue(
+    @StringRes label: Int,
+    value: String,
+    color: Color
+) {
+    if (value.isBlank()) return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(label),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = color
+        )
+    }
+}
+
+@Composable
+private fun gradeColor(value: Double?, scale: Double?): Color {
+    val normalized = value?.let { gradeValue ->
+        val gradeScale = scale?.takeIf { it > 0.0 } ?: 20.0
+        gradeValue / gradeScale * 20.0
+    }
+    return when {
+        normalized == null -> MaterialTheme.colorScheme.onSurfaceVariant
+        normalized >= 10.0 -> Color(0xFF2E7D32)
+        else -> Color(0xFFC62828)
+    }
+}
+
+private fun List<Grade>.withSimulatedValues(values: Map<String, Double>): List<Grade> {
+    return map { it.withSimulatedValue(values[it.id]) }
+}
+
+private fun List<Grade>.withRecomputedMainGrades(mainOverrides: Set<String>): List<Grade> {
+    return map { grade ->
+        if (grade.id.contains("-cc-") || grade.id.contains("-exam") || grade.id in mainOverrides) {
+            grade
+        } else {
+            val components = filter { it.courseName == grade.courseName && it.period == grade.period }
+            val ccValues = components.filter { it.id.contains("-cc-") }.mapNotNull { it.value }
+            val examValue = components.firstOrNull { it.id.contains("-exam") }?.value
+            val ccAverage = ccValues.takeIf { it.isNotEmpty() }?.average()
+            val recomputedValue = when {
+                ccAverage != null && examValue != null -> 0.5 * ccAverage + 0.5 * examValue
+                ccAverage != null -> ccAverage
+                examValue != null -> examValue
+                else -> grade.value
+            }
+            grade.copy(value = recomputedValue)
+        }
+    }
+}
+
+private fun Grade.withSimulatedValue(value: Double?): Grade {
+    return if (value == null) this else copy(value = value)
+}
+
+private fun loadGradeSimulations(
+    preferences: SharedPreferences,
+    allowedIds: Set<String>
+): Map<String, Double> {
+    return preferences.getString("values", null)
+        .orEmpty()
+        .lineSequence()
+        .mapNotNull { line ->
+            val separator = line.indexOf('=')
+            if (separator <= 0) return@mapNotNull null
+            val id = line.substring(0, separator)
+            val value = line.substring(separator + 1).toDoubleOrNull()
+            if (id in allowedIds && value != null) id to value else null
+        }
+        .toMap()
+}
+
+private fun saveGradeSimulations(
+    preferences: SharedPreferences,
+    values: Map<String, Double>
+) {
+    preferences.edit()
+        .putString("values", values.entries.joinToString("\n") { "${it.key}=${it.value}" })
+        .apply()
+}
+
+private fun clearGradeSimulations(preferences: SharedPreferences) {
+    preferences.edit().remove("values").apply()
+}
+
+private fun Grade.academicYearLabel(): String {
+    Regex("\\d{4}\\s*-\\s*\\d{4}").find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
+    val gradeDate = date ?: return ""
+    val startYear = if (gradeDate.monthValue >= 9) gradeDate.year else gradeDate.year - 1
+    return "$startYear-${startYear + 1}"
+}
+
+private fun Absence.academicYearLabel(): String {
+    Regex("\\d{4}\\s*-\\s*\\d{4}").find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
+    val date = startsAt.atZone(ZoneId.systemDefault()).toLocalDate()
+    val startYear = if (date.monthValue >= 9) date.year else date.year - 1
+    return "$startYear-${startYear + 1}"
+}
+
+private fun String.academicYearLabel(): String {
+    Regex("\\d{4}\\s*-\\s*\\d{4}").find(this)?.value?.replace(" ", "")?.let { return it }
+    return this
+}
+
+private fun Grade.semesterLabel(): String? {
+    return period?.semesterLabel()
+}
+
+private fun Absence.semesterLabel(): String? {
+    return period?.semesterLabel()
+}
+
+private fun String.semesterLabel(): String? {
+    return Regex("Semestre\\s*\\d+", RegexOption.IGNORE_CASE).find(this)?.value
 }

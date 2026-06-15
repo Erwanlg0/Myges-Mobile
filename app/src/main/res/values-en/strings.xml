@@ -135,8 +135,6 @@
     <string name="courses_empty_title">No courses</string>
     <string name="courses_empty_body">Courses for the synced year will appear here.</string>
     <string name="courses_files">Files</string>
-    <string name="courses_hide_syllabus">Hide syllabus</string>
-    <string name="courses_show_syllabus">Show syllabus</string>
     <string name="courses_teacher">Teacher</string>
 
     <string name="projects_title">Projects</string>
@@ -211,7 +209,10 @@
     <string name="courses_filter_period_format">Semester: %1$s</string>
     <string name="courses_dialog_title">Course files</string>
     <string name="courses_no_files">No files available.</string>
-    <string name="courses_files_button">Files (%1$d)</string>
+    <plurals name="courses_files_button">
+        <item quantity="one">File (%1$d)</item>
+        <item quantity="other">Files (%1$d)</item>
+    </plurals>
     <string name="courses_download_syllabus">Download Syllabus</string>
     <string name="courses_download_file">Download</string>
 </resources>

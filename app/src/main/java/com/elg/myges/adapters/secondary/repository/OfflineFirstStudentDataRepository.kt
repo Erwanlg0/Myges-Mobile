@@ -74,7 +74,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             DashboardSummary(
                 profile = localData.profile?.toDomain(),
                 nextEvent = localData.agenda.firstOrNull { it.endsAt.isAfter(now) },
-                latestGrades = localData.grades.sortedWith(compareByDescending<Grade> { it.date }.thenByDescending { it.id }).take(3),
+                latestGrades = localData.grades.filter { it.value != null }.sortedWith(compareByDescending<Grade> { it.date }.thenByDescending { it.id }).take(3),
                 recentAbsences = localData.absences.sortedByDescending { it.startsAt }.take(1),
                 dueProjects = localData.projects.filter { it.deadline?.isAfter(now) == true }.take(3),
                 lastSyncAt = settings.lastSyncAt

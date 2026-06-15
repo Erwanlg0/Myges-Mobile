@@ -99,7 +99,7 @@ class StudentDaoTest {
     private fun agenda(id: String, title: String) = AgendaEventEntity(id, title, 1L, 2L, null, null, null, null, null)
     private fun grade(id: String, title: String) = GradeEntity(id, title, title, 10.0, 20.0, null, null, null, null)
     private fun absence(id: String, title: String) = AbsenceEntity(id, title, 1L, 2L, false, null, null)
-    private fun course(id: String, title: String) = CourseEntity(id, title, null, null, null, null, 0)
+    private fun course(id: String, title: String) = CourseEntity(id, title, null, null, null, null, 0, null)
     private fun project(id: String, title: String) = ProjectEntity(id, title, null, null, null, null, 0)
     private fun projectStep(projectId: String, id: String, title: String) = ProjectStepEntity(projectId, id, title, null, null)
     private fun practical(id: String, title: String) = PracticalEntity(id, title, null, null, null, null, null)

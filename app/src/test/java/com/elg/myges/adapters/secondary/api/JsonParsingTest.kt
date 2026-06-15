@@ -312,6 +312,30 @@ class JsonParsingTest {
     }
 
     @Test
+    fun syllabusParsesKordisArrayPayloadIntoReadableText() {
+        val syllabus = json.parseToJsonElement(
+            """
+            {
+              "result": [{
+                "syllabus_name": "Scripting Python",
+                "teaching_goals": "Learn Python",
+                "skills": [{"comp_label": "Optimize software"}],
+                "control_types": [{"evaluation_label": "Continuous assessment"}],
+                "seance_details": [{"content": "Functions and classes"}]
+              }]
+            }
+            """.trimIndent()
+        ).toCourseSyllabus()
+
+        checkNotNull(syllabus)
+        assertTrue(syllabus.contains("Scripting Python"))
+        assertTrue(syllabus.contains("Learn Python"))
+        assertTrue(syllabus.contains("Optimize software"))
+        assertTrue(syllabus.contains("Continuous assessment"))
+        assertTrue(syllabus.contains("Functions and classes"))
+    }
+
+    @Test
     fun documentsParseKordisCourseFilePayload() {
         val documents = json.parseToJsonElement(
             """

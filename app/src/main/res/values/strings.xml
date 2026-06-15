@@ -135,8 +135,6 @@
     <string name="courses_empty_title">Aucun cours</string>
     <string name="courses_empty_body">Les cours de l’année synchronisée apparaîtront ici.</string>
     <string name="courses_files">Fichiers</string>
-    <string name="courses_hide_syllabus">Masquer le syllabus</string>
-    <string name="courses_show_syllabus">Afficher le syllabus</string>
     <string name="courses_teacher">Intervenant</string>
 
     <string name="projects_title">Projets</string>
@@ -211,7 +209,10 @@
     <string name="courses_filter_period_format">Semestre : %1$s</string>
     <string name="courses_dialog_title">Fichiers de cours</string>
     <string name="courses_no_files">Aucun fichier disponible.</string>
-    <string name="courses_files_button">Fichiers (%1$d)</string>
+    <plurals name="courses_files_button">
+        <item quantity="one">Fichier (%1$d)</item>
+        <item quantity="other">Fichiers (%1$d)</item>
+    </plurals>
     <string name="courses_download_syllabus">Télécharger Syllabus</string>
     <string name="courses_download_file">Télécharger</string>
 </resources>
