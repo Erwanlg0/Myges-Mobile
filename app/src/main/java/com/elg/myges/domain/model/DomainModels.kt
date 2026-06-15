@@ -86,7 +86,8 @@ data class Project(
     val fileCount: Int,
     val year: String? = null,
     val courseId: String? = null,
-    val groups: List<ProjectGroup> = emptyList()
+    val groups: List<ProjectGroup> = emptyList(),
+    val startsAt: Instant? = null
 )
 
 data class Practical(
@@ -98,7 +99,8 @@ data class Practical(
     val room: String?,
     val status: String?,
     val year: String? = null,
-    val groups: List<ProjectGroup> = emptyList()
+    val groups: List<ProjectGroup> = emptyList(),
+    val steps: List<ProjectStep> = emptyList()
 )
 
 data class AcademicDocument(

@@ -141,7 +141,8 @@ fun Project.toEntity() = ProjectEntity(
     deadlineEpochMillis = deadline?.toEpochMilli(),
     fileCount = fileCount,
     year = year,
-    courseId = courseId
+    courseId = courseId,
+    startsAtEpochMillis = startsAt?.toEpochMilli()
 )
 
 fun Project.toGroupEntities() = groups.map { group ->
@@ -178,7 +179,8 @@ fun ProjectEntity.toDomain(
     fileCount = fileCount,
     year = year,
     courseId = courseId,
-    groups = groups.map { it.toDomain() }
+    groups = groups.map { it.toDomain() },
+    startsAt = startsAtEpochMillis?.let { Instant.ofEpochMilli(it) }
 )
 
 fun ProjectGroupEntity.toDomain() = ProjectGroup(
@@ -206,7 +208,10 @@ fun Practical.toEntity() = PracticalEntity(
     year = year
 )
 
-fun PracticalEntity.toDomain(groups: List<ProjectGroupEntity> = emptyList()) = Practical(
+fun PracticalEntity.toDomain(
+    steps: List<ProjectStepEntity> = emptyList(),
+    groups: List<ProjectGroupEntity> = emptyList()
+) = Practical(
     id = id,
     name = name,
     courseName = courseName,
@@ -215,6 +220,7 @@ fun PracticalEntity.toDomain(groups: List<ProjectGroupEntity> = emptyList()) = P
     room = room,
     status = status,
     year = year,
+    steps = steps.map { it.toDomain() },
     groups = groups.map { it.toDomain() }
 )
 
@@ -225,6 +231,16 @@ fun Practical.toGroupEntities() = groups.map { group ->
         name = group.name,
         students = group.students.joinToString("\n"),
         isMine = group.isMine
+    )
+}
+
+fun Practical.toStepEntities() = steps.map { step ->
+    ProjectStepEntity(
+        projectId = id,
+        id = step.id,
+        title = step.title,
+        deadlineEpochMillis = step.deadline?.toEpochMilli(),
+        status = step.status
     )
 }
 

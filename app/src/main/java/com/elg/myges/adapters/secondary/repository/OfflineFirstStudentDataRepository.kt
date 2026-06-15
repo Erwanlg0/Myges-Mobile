@@ -62,6 +62,9 @@ import java.nio.charset.StandardCharsets
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @Singleton
 class OfflineFirstStudentDataRepository @Inject constructor(
@@ -118,9 +121,10 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     }
 
     override fun observePracticals(): Flow<List<Practical>> {
-        return combine(dao.observePracticals(), dao.observeProjectGroups()) { practicals, groups ->
+        return combine(dao.observePracticals(), dao.observeProjectSteps(), dao.observeProjectGroups()) { practicals, steps, groups ->
+            val stepsByPractical = steps.groupBy { it.projectId }
             val groupsByPractical = groups.groupBy { it.projectId }
-            practicals.map { it.toDomain(groupsByPractical[it.id].orEmpty()) }
+            practicals.map { it.toDomain(stepsByPractical[it.id].orEmpty(), groupsByPractical[it.id].orEmpty()) }
         }
     }
 
@@ -191,7 +195,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     courses = yearData.courses.map { it.toEntity() },
                     projects = yearData.projects.map { it.toEntity() },
                     projectGroups = yearData.projects.flatMap { it.toGroupEntities() } + yearData.practicals.flatMap { it.toGroupEntities() },
-                    projectSteps = yearData.projects.flatMap { it.toStepEntities() },
+                    projectSteps = yearData.projects.flatMap { it.toStepEntities() } + yearData.practicals.flatMap { it.toStepEntities() },
                     practicals = yearData.practicals.map { it.toEntity() },
                     documents = yearData.documents.map { it.toEntity() },
                     directoryPeople = yearData.directory.map { it.toEntity() },
@@ -269,7 +273,19 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             is HttpException -> if (code() == 401 || code() == 403) {
                 AppException(AppError.Unauthorized)
             } else {
-                AppException(AppError.Remote(code(), message()))
+                val errorBody = runCatching { response()?.errorBody()?.string() }.getOrNull()
+                val parsedMessage = errorBody?.let { body ->
+                    runCatching {
+                        val json = Json.parseToJsonElement(body).jsonObject
+                        json["message"]?.jsonPrimitive?.content
+                            ?: json["error"]?.jsonPrimitive?.content
+                            ?: json["detail"]?.jsonPrimitive?.content
+                            ?: body.take(100)
+                    }.getOrElse {
+                        body.take(100)
+                    }
+                }?.takeIf { it.isNotBlank() } ?: message()
+                AppException(AppError.Remote(code(), parsedMessage))
             }
             is IOException -> AppException(AppError.Network)
             else -> AppException(AppError.Unexpected(message))
@@ -385,15 +401,16 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             grades.mapNotNull { it.academicYearStart() }.toSet() +
             absences.mapNotNull { it.academicYearStart() }.toSet() +
             documents.mapNotNull { it.year }.toSet()
-        val cachedStepsByProject = dao.projectSteps().groupBy { it.projectId }
+        val cachedSteps = dao.projectSteps().groupBy { it.projectId }
+        val cachedGroups = dao.projectGroups().groupBy { it.projectId }
         if (refreshedYears.isEmpty()) {
             return copy(
                 courses = (courses + dao.courses().map { it.toDomain() }).distinctBy { it.id },
                 grades = (grades + dao.grades().map { it.toDomain() }).distinctBy { it.id },
                 absences = (absences + dao.absences().map { it.toDomain() }).distinctBy { it.id },
                 documents = (documents + dao.documents().map { it.toDomain() }).distinctBy { it.id },
-                projects = (projects + dao.projects().map { it.toDomain(cachedStepsByProject[it.id].orEmpty()) }).distinctBy { it.id },
-                practicals = (practicals + dao.practicals().map { it.toDomain() }).distinctBy { it.id }
+                projects = (projects + dao.projects().map { it.toDomain(cachedSteps[it.id].orEmpty(), cachedGroups[it.id].orEmpty()) }).distinctBy { it.id },
+                practicals = (practicals + dao.practicals().map { it.toDomain(cachedSteps[it.id].orEmpty(), cachedGroups[it.id].orEmpty()) }).distinctBy { it.id }
             )
         }
         return copy(
@@ -401,8 +418,8 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             grades = (grades + dao.grades().map { it.toDomain() }.filter { it.academicYearStart() !in refreshedYears }).distinctBy { it.id },
             absences = (absences + dao.absences().map { it.toDomain() }.filter { it.academicYearStart() !in refreshedYears }).distinctBy { it.id },
             documents = (documents + dao.documents().map { it.toDomain() }.filter { it.year !in refreshedYears }).distinctBy { it.id },
-            projects = (projects + dao.projects().map { it.toDomain(cachedStepsByProject[it.id].orEmpty()) }).distinctBy { it.id },
-            practicals = (practicals + dao.practicals().map { it.toDomain() }).distinctBy { it.id }
+            projects = (projects + dao.projects().map { it.toDomain(cachedSteps[it.id].orEmpty(), cachedGroups[it.id].orEmpty()) }).distinctBy { it.id },
+            practicals = (practicals + dao.practicals().map { it.toDomain(cachedSteps[it.id].orEmpty(), cachedGroups[it.id].orEmpty()) }).distinctBy { it.id }
         )
     }
 

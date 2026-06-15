@@ -370,6 +370,7 @@ fun JsonElement.toProjects(currentUserId: String? = null, fallbackYear: String? 
             )
         }
         val stepFileCount = root.array("steps", "projectSteps").sumOf { it.objectOrData().array("files").size }
+        val startsAt = root.instant("startsAt", "start", "startDate", "dateStart", "project_create_date")
         Project(
             id = projectId,
             name = root.text("name", "title") ?: "",
@@ -383,7 +384,8 @@ fun JsonElement.toProjects(currentUserId: String? = null, fallbackYear: String? 
             fileCount = root.array("files", "project_files", "documents", "deliverables").size + stepFileCount,
             year = year,
             courseId = root.text("rc_id", "rcId", "courseId"),
-            groups = groups
+            groups = groups,
+            startsAt = startsAt
         )
     }
 }
@@ -418,11 +420,23 @@ fun JsonElement.toNextProjectStepProjects(): List<Project> {
 }
 
 fun JsonElement.toPracticals(currentUserId: String? = null, fallbackYear: String? = null): List<Practical> {
+    val projectDateKeys = arrayOf(
+        "deadline", "dueDate", "endDate", "psp_limit_date", "limit_date", 
+        "limitDate", "date_limit", "dateLimit", "date", "due_date", "due", 
+        "update_date", "date_limite", "dateLimite"
+    )
     return arrayOrNested("practicals", "items", "data").map { element ->
         val root = element.objectOrData()
-        val stepDates = root.array("steps", "projectSteps")
-            .mapNotNull { it.objectOrData().instant("deadline", "dueDate", "endDate", "psp_limit_date") }
-            .sorted()
+        val steps = root.array("steps", "projectSteps").map { step ->
+            val stepRoot = step.objectOrData()
+            ProjectStep(
+                id = stepRoot.text("id", "stepId", "psp_id", "uid") ?: stableId(stepRoot),
+                title = stepRoot.text("title", "name", "psp_desc", "psp_type") ?: "",
+                deadline = stepRoot.instant(*projectDateKeys),
+                status = stepRoot.text("status", "state")
+            )
+        }
+        val stepDates = steps.mapNotNull { it.deadline }.sorted()
         val userGroupIds = root.array("project_group_logs")
             .mapNotNull { it.objectOrData() }
             .filter { log -> currentUserId != null && log.text("user_id", "uid", "u_id") == currentUserId }
@@ -449,7 +463,8 @@ fun JsonElement.toPracticals(currentUserId: String? = null, fallbackYear: String
             room = root.text("room", "classroom", "salle"),
             status = root.text("status", "state"),
             year = root.text("year", "academicYear") ?: fallbackYear,
-            groups = groups
+            groups = groups,
+            steps = steps
         )
     }
 }

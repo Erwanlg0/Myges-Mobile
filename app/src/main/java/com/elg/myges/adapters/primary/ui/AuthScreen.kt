@@ -84,7 +84,7 @@ fun AuthRoute(
 
     AuthScreen(
         loading = state.loading,
-        errorMessage = state.error?.messageRes(),
+        error = state.error,
         hasBiometricSession = state.hasBiometricSession,
         authorizationUrl = state.authorizationUrl,
         onLogin = {
@@ -100,7 +100,7 @@ fun AuthRoute(
 @Composable
 internal fun AuthScreen(
     loading: Boolean,
-    errorMessage: Int?,
+    error: com.elg.myges.domain.model.AppError?,
     hasBiometricSession: Boolean,
     authorizationUrl: String,
     onLogin: () -> Unit,
@@ -126,7 +126,7 @@ internal fun AuthScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(28.dp))
-            errorMessage?.let {
+            error?.let {
                 StateBanner(it)
                 Spacer(Modifier.height(12.dp))
             }

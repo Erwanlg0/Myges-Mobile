@@ -92,7 +92,7 @@ class AndroidNotificationScheduler @Inject constructor(
                 grade.courseName.ifBlank { context.getString(R.string.common_untitled) },
                 formatGrade(grade)
             ),
-            route = ROUTE_GRADES,
+            route = "$ROUTE_GRADES?id=${grade.id}",
             subject = grade.courseName
         )
     }
@@ -106,7 +106,7 @@ class AndroidNotificationScheduler @Inject constructor(
                 absence.courseName.ifBlank { context.getString(R.string.common_untitled) },
                 formatInstant(absence.startsAt)
             ),
-            route = ROUTE_ABSENCES,
+            route = "$ROUTE_ABSENCES?id=${absence.id}",
             subject = absence.courseName
         )
     }
@@ -120,7 +120,7 @@ class AndroidNotificationScheduler @Inject constructor(
                 event.title.ifBlank { context.getString(R.string.common_untitled) },
                 formatInstant(event.startsAt)
             ),
-            route = ROUTE_AGENDA,
+            route = "$ROUTE_AGENDA?id=${event.id}",
             subject = event.title
         )
     }
@@ -136,7 +136,7 @@ class AndroidNotificationScheduler @Inject constructor(
                 project.name.ifBlank { context.getString(R.string.common_untitled) },
                 deadline
             ),
-            route = ROUTE_PROJECTS,
+            route = "$ROUTE_PROJECTS?id=${project.id}",
             subject = project.courseName ?: project.name
         )
     }
@@ -149,7 +149,7 @@ class AndroidNotificationScheduler @Inject constructor(
                 R.string.notifications_new_document_body,
                 document.title.ifBlank { context.getString(R.string.common_untitled) }
             ),
-            route = ROUTE_DOCUMENTS,
+            route = "$ROUTE_DOCUMENTS?id=${document.id}",
             subject = document.category ?: document.title
         )
     }

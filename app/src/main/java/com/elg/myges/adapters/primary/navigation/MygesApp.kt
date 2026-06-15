@@ -138,7 +138,7 @@ private fun StudentRoute(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val selectedDestination = destinations.firstOrNull { destination ->
-        currentDestination?.hierarchy?.any { it.route == destination.route } == true
+        currentDestination?.hierarchy?.any { it.route?.substringBefore('?') == destination.route } == true
     } ?: destinations.first()
 
     LaunchedEffect(studentViewModel) {
@@ -177,10 +177,12 @@ private fun StudentRoute(
     }
 
     LaunchedEffect(notificationRoute) {
-        val route = notificationRoute?.takeIf { requestedRoute ->
-            destinations.any { destination -> destination.route == requestedRoute }
-        } ?: return@LaunchedEffect
-        navController.navigateTo(route)
+        val fullRoute = notificationRoute ?: return@LaunchedEffect
+        val baseRoute = fullRoute.substringBefore('?')
+        val destination = destinations.firstOrNull { it.route == baseRoute }
+        if (destination != null) {
+            navController.navigateTo(fullRoute)
+        }
         onNotificationRouteConsumed()
     }
 
@@ -302,13 +304,23 @@ private fun StudentScaffold(
             modifier = Modifier.padding(padding)
         ) {
             composable("dashboard") { DashboardScreen(studentViewModel, onNavigateToTab = { route -> navController.navigateTo(route) }) }
-            composable("agenda") { AgendaScreen(studentViewModel) }
-            composable("grades") { GradesScreen(studentViewModel) }
-            composable("absences") { AbsencesScreen(studentViewModel) }
+            composable("agenda?id={id}") { backStackEntry ->
+                AgendaScreen(studentViewModel, highlightedEventId = backStackEntry.arguments?.getString("id"))
+            }
+            composable("grades?id={id}") { backStackEntry ->
+                GradesScreen(studentViewModel, highlightedGradeId = backStackEntry.arguments?.getString("id"))
+            }
+            composable("absences?id={id}") { backStackEntry ->
+                AbsencesScreen(studentViewModel, highlightedAbsenceId = backStackEntry.arguments?.getString("id"))
+            }
             composable("courses") { CoursesScreen(studentViewModel) }
-            composable("projects") { ProjectsScreen(studentViewModel) }
+            composable("projects?id={id}") { backStackEntry ->
+                ProjectsScreen(studentViewModel, highlightedProjectId = backStackEntry.arguments?.getString("id"))
+            }
             composable("practicals") { PracticalsScreen(studentViewModel) }
-            composable("documents") { DocumentsScreen(studentViewModel) }
+            composable("documents?id={id}") { backStackEntry ->
+                DocumentsScreen(studentViewModel, highlightedDocumentId = backStackEntry.arguments?.getString("id"))
+            }
             composable("directory") { DirectoryScreen(studentViewModel) }
             composable("notifications") { NotificationsScreen(studentViewModel, settingsViewModel) }
             composable("settings") { SettingsScreen(settingsViewModel, studentViewModel) }

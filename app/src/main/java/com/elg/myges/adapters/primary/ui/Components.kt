@@ -53,7 +53,7 @@ fun <T> FeatureStateContent(
     when {
         (state.loading || state.refreshing) && empty(state.data) -> LoadingState()
         !state.online && empty(state.data) -> OfflineState(onRetry)
-        state.error != null && empty(state.data) -> ErrorState(state.error.messageRes(), onRetry)
+        state.error != null && empty(state.data) -> ErrorState(state.error, onRetry)
         empty(state.data) -> EmptyState(emptyTitle, emptyBody, onRetry)
         else -> LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -64,7 +64,7 @@ fun <T> FeatureStateContent(
                 item { StateBanner(R.string.state_offline) }
             }
             if (state.error != null) {
-                item { StateBanner(state.error.messageRes()) }
+                item { StateBanner(state.error) }
             }
             if (state.refreshing) {
                 item { RefreshingRow() }
@@ -196,6 +196,58 @@ fun ErrorState(
 }
 
 @Composable
+fun ErrorState(
+    error: com.elg.myges.domain.model.AppError,
+    onRetry: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(error) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.state_error_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            val text = when (error) {
+                is com.elg.myges.domain.model.AppError.Remote -> {
+                    val base = stringResource(R.string.error_remote)
+                    val detail = listOfNotNull(
+                        error.code?.let { "HTTP $it" },
+                        error.message?.takeIf { it.isNotBlank() }
+                    ).joinToString(": ")
+                    if (detail.isNotEmpty()) "$base ($detail)" else base
+                }
+                is com.elg.myges.domain.model.AppError.Unexpected -> {
+                    val base = stringResource(R.string.error_unexpected)
+                    if (!error.message.isNullOrBlank()) "$base (${error.message})" else base
+                }
+                else -> stringResource(error.messageRes())
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Button(onClick = onRetry) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.action_retry))
+            }
+        }
+    }
+}
+
+@Composable
 fun StateBanner(@StringRes text: Int) {
     val haptic = LocalHapticFeedback.current
     LaunchedEffect(text) {
@@ -209,6 +261,41 @@ fun StateBanner(@StringRes text: Int) {
     ) {
         Text(
             text = stringResource(text),
+            modifier = Modifier.padding(12.dp),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+fun StateBanner(error: com.elg.myges.domain.model.AppError) {
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(error) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        val text = when (error) {
+            is com.elg.myges.domain.model.AppError.Remote -> {
+                val base = stringResource(R.string.error_remote)
+                val detail = listOfNotNull(
+                    error.code?.let { "HTTP $it" },
+                    error.message?.takeIf { it.isNotBlank() }
+                ).joinToString(": ")
+                if (detail.isNotEmpty()) "$base ($detail)" else base
+            }
+            is com.elg.myges.domain.model.AppError.Unexpected -> {
+                val base = stringResource(R.string.error_unexpected)
+                if (!error.message.isNullOrBlank()) "$base (${error.message})" else base
+            }
+            else -> stringResource(error.messageRes())
+        }
+        Text(
+            text = text,
             modifier = Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodyMedium
         )

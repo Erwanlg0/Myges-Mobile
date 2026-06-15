@@ -35,6 +35,9 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.ui.text.style.TextOverflow
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.text.style.TextDecoration
@@ -105,6 +108,7 @@ import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
 import com.elg.myges.domain.model.Project
 import com.elg.myges.domain.model.ProjectGroup
+import com.elg.myges.domain.model.ProjectStep
 import com.elg.myges.domain.model.UserSettings
 import com.elg.myges.domain.model.progress
 import com.elg.myges.domain.model.toGradeSummary
@@ -299,13 +303,27 @@ fun DashboardScreen(
 }
 
 @Composable
-fun AgendaScreen(viewModel: StudentViewModel) {
+fun AgendaScreen(
+    viewModel: StudentViewModel,
+    highlightedEventId: String? = null
+) {
     val state by viewModel.agenda.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var selectedMode by remember { mutableStateOf(AgendaMode.Week7) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
+
+    LaunchedEffect(state.data, highlightedEventId) {
+        if (!highlightedEventId.isNullOrBlank()) {
+            val event = state.data.firstOrNull { it.id == highlightedEventId }
+            if (event != null) {
+                selectedDate = event.startsAt.atZone(ZoneId.systemDefault()).toLocalDate()
+                selectedEvent = event
+                selectedMode = AgendaMode.Week7
+            }
+        }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.agendaDateToNavigate.collect { targetDate ->
@@ -555,7 +573,10 @@ fun AgendaScreen(viewModel: StudentViewModel) {
 }
 
 @Composable
-fun GradesScreen(viewModel: StudentViewModel) {
+fun GradesScreen(
+    viewModel: StudentViewModel,
+    highlightedGradeId: String? = null
+) {
     val state by viewModel.grades.collectAsStateWithLifecycle()
     var selectedGrade by remember { mutableStateOf<Grade?>(null) }
     val context = LocalContext.current
@@ -598,6 +619,17 @@ fun GradesScreen(viewModel: StudentViewModel) {
         viewModel.gradesPeriodToNavigate.collect { targetPeriod ->
             selectedYear = targetPeriod.academicYearLabel()
             selectedSemester = targetPeriod.semesterLabel()
+        }
+    }
+
+    LaunchedEffect(gradesList, highlightedGradeId) {
+        if (!highlightedGradeId.isNullOrBlank()) {
+            val grade = gradesList.firstOrNull { it.id == highlightedGradeId }
+            if (grade != null) {
+                selectedYear = grade.academicYearLabel()
+                selectedSemester = grade.semesterLabel()
+                selectedGrade = grade
+            }
         }
     }
 
@@ -784,12 +816,16 @@ fun GradesScreen(viewModel: StudentViewModel) {
 }
 
 @Composable
-fun AbsencesScreen(viewModel: StudentViewModel) {
+fun AbsencesScreen(
+    viewModel: StudentViewModel,
+    highlightedAbsenceId: String? = null
+) {
     val state by viewModel.absences.collectAsStateWithLifecycle()
     val coursesState by viewModel.courses.collectAsStateWithLifecycle()
     val gradesState by viewModel.grades.collectAsStateWithLifecycle()
     
     val absencesList = state.data.orEmpty()
+
     val coursesList = coursesState.data.orEmpty()
     val gradesList = gradesState.data.orEmpty()
 
@@ -827,6 +863,16 @@ fun AbsencesScreen(viewModel: StudentViewModel) {
         viewModel.absencesPeriodToNavigate.collect { targetPeriodOrYear ->
             selectedYear = targetPeriodOrYear.academicYearLabel()
             selectedSemester = targetPeriodOrYear.semesterLabel()
+        }
+    }
+
+    LaunchedEffect(absencesList, highlightedAbsenceId) {
+        if (!highlightedAbsenceId.isNullOrBlank()) {
+            val absence = absencesList.firstOrNull { it.id == highlightedAbsenceId }
+            if (absence != null) {
+                selectedYear = absence.academicYearLabel()
+                selectedSemester = absence.semesterLabel()
+            }
         }
     }
 
@@ -1114,19 +1160,32 @@ fun CoursesScreen(viewModel: StudentViewModel) {
 }
 
 @Composable
-fun ProjectsScreen(viewModel: StudentViewModel) {
+fun ProjectsScreen(
+    viewModel: StudentViewModel,
+    highlightedProjectId: String? = null
+) {
     val state by viewModel.projects.collectAsStateWithLifecycle()
     val documentsState by viewModel.documents.collectAsStateWithLifecycle()
     val downloadingDocumentIds by viewModel.downloadingDocumentIds.collectAsStateWithLifecycle()
     val documentDownloadProgress by viewModel.documentDownloadProgress.collectAsStateWithLifecycle()
     var selectedProject by remember { mutableStateOf<Project?>(null) }
     var selectedYear by remember(state.data) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(state.data, highlightedProjectId) {
+        if (!highlightedProjectId.isNullOrBlank()) {
+            val project = state.data.firstOrNull { it.id == highlightedProjectId }
+            if (project != null) {
+                selectedYear = project.year
+                selectedProject = project
+            }
+        }
+    }
     val years = remember(state.data) { state.data.mapNotNull { it.year }.distinct().sortedDescending() }
     val filteredProjects = remember(state.data, selectedYear) {
         state.data
             .filter { it.name.isNotBlank() }
             .filter { selectedYear == null || it.year == selectedYear }
-            .sortedWith(compareByDescending<Project> { it.year }.thenBy { it.deadline }.thenBy { it.name })
+            .sortedWith(compareByDescending<Project> { it.year }.thenByDescending { it.startsAt ?: it.deadline }.thenBy { it.name })
     }
     selectedProject?.let { project ->
         ProjectDetailsDialog(
@@ -1175,7 +1234,7 @@ fun PracticalsScreen(viewModel: StudentViewModel) {
     val filteredPracticals = remember(state.data, selectedYear) {
         state.data
             .filter { selectedYear == null || it.year == selectedYear }
-            .sortedWith(compareByDescending<Practical> { it.year }.thenBy { it.startsAt }.thenBy { it.name })
+            .sortedWith(compareByDescending<Practical> { it.year }.thenByDescending { it.startsAt }.thenBy { it.name })
     }
     selectedPractical?.let { practical ->
         PracticalDetailsDialog(
@@ -1347,10 +1406,22 @@ private fun DirectoryPersonCard(person: DirectoryPerson) {
 }
 
 @Composable
-fun DocumentsScreen(viewModel: StudentViewModel) {
+fun DocumentsScreen(
+    viewModel: StudentViewModel,
+    highlightedDocumentId: String? = null
+) {
     val state by viewModel.documents.collectAsStateWithLifecycle()
     val downloadingDocumentIds by viewModel.downloadingDocumentIds.collectAsStateWithLifecycle()
     val documentDownloadProgress by viewModel.documentDownloadProgress.collectAsStateWithLifecycle()
+
+    LaunchedEffect(state.data, highlightedDocumentId) {
+        if (!highlightedDocumentId.isNullOrBlank()) {
+            val document = state.data.firstOrNull { it.id == highlightedDocumentId }
+            if (document != null) {
+                viewModel.openDocument(document)
+            }
+        }
+    }
     FeatureStateContent(
         state = state,
         empty = List<AcademicDocument>::isEmpty,
@@ -1431,7 +1502,7 @@ fun SettingsScreen(
     ) {
         val currentError = state.error
         if (currentError != null) {
-            item { StateBanner(currentError.messageRes()) }
+            item { StateBanner(currentError) }
         }
         if (state.loading) {
             item { RefreshingRow() }
@@ -2190,6 +2261,43 @@ private fun CourseFilesDialog(
 }
 
 @Composable
+private fun StepItem(step: ProjectStep) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .padding(vertical = 4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = step.title.orUntitled(),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = if (expanded) Int.MAX_VALUE else 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        if (expanded) {
+            Spacer(modifier = Modifier.height(4.dp))
+            LabelValue(R.string.projects_deadline, formatInstant(step.deadline))
+            LabelValue(R.string.projects_status, step.status.orEmpty())
+        }
+    }
+}
+
+@Composable
 internal fun ProjectCard(
     project: Project,
     onOpen: () -> Unit = {}
@@ -2218,9 +2326,7 @@ internal fun ProjectCard(
         ProjectProgress(project)
         project.steps.forEach { step ->
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            Text(step.title.orUntitled(), fontWeight = FontWeight.Medium)
-            LabelValue(R.string.projects_deadline, formatInstant(step.deadline))
-            LabelValue(R.string.projects_status, step.status.orEmpty())
+            StepItem(step)
         }
     }
 }
@@ -2311,29 +2417,7 @@ private fun ProjectDetailsDialog(
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         project.steps.forEach { step ->
-                            Column {
-                                Text(
-                                    text = step.title.orUntitled(),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = formatInstant(step.deadline),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = step.status.orEmpty(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (step.status.isCompletedStatus()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            }
+                            StepItem(step)
                         }
                     }
                 }
@@ -2487,6 +2571,29 @@ private fun String?.isCompletedStatus(): Boolean {
 }
 
 @Composable
+private fun PracticalProgress(practical: Practical) {
+    val progress = remember(practical) { practical.progress() }
+    Text(
+        text = stringResource(R.string.projects_progress),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    LinearProgressIndicator(
+        progress = { progress.fraction.toFloat() },
+        modifier = Modifier.fillMaxWidth().clip(CircleShape)
+    )
+    Text(
+        text = if (progress.totalSteps == 0) {
+            stringResource(R.string.projects_no_steps)
+        } else {
+            stringResource(R.string.projects_steps_completed, progress.completedSteps, progress.totalSteps)
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
 internal fun PracticalCard(
     practical: Practical,
     onOpen: () -> Unit = {}
@@ -2502,6 +2609,14 @@ internal fun PracticalCard(
         LabelValue(R.string.practicals_end, formatInstant(practical.endsAt))
         LabelValue(R.string.agenda_room, practical.room.orEmpty())
         LabelValue(R.string.projects_status, practical.status.orEmpty())
+        if (practical.steps.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            PracticalProgress(practical)
+            practical.steps.forEach { step ->
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                StepItem(step)
+            }
+        }
     }
 }
 
@@ -2939,6 +3054,23 @@ private fun PracticalDetailsDialog(
                 LabelValue(R.string.practicals_end, formatInstant(practical.endsAt))
                 LabelValue(R.string.agenda_room, practical.room.orEmpty())
                 LabelValue(R.string.projects_status, practical.status.orEmpty())
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                PracticalProgress(practical)
+
+                if (practical.steps.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(
+                        text = stringResource(R.string.projects_steps_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        practical.steps.forEach { step ->
+                            StepItem(step)
+                        }
+                    }
+                }
 
                 if (practical.groups.isNotEmpty()) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
