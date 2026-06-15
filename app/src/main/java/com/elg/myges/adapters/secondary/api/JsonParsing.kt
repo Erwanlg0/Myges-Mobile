@@ -208,7 +208,8 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
             examValue != null -> examValue
             else -> null
         }
-        val finalAverage = root.number("average", "moyenne", "ccaverage") ?: calculatedAverage
+
+        val finalAverage = calculatedAverage ?: root.number("average", "moyenne")?.takeIf { it != 0.0 }
 
         val resultList = mutableListOf<Grade>()
 
@@ -300,26 +301,28 @@ fun JsonElement.toCourses(): List<Course> {
             year = root.text("year", "academicYear"),
             period = root.text("period", "trimester_name", "semester", "trimester"),
             syllabus = root.text("syllabus", "description", "summary"),
-            fileCount = files.size.takeIf { it > 0 } ?: if (root.bool("has_documents") == true) 1 else 0
+            fileCount = files.size.takeIf { it > 0 }
+                ?: root.number("fileCount", "file_count", "files_count", "document_count", "documents_count", "nb_documents")?.toInt()
+                ?: if (root.bool("has_documents") == true) 1 else 0
         )
     }
 }
 
 fun JsonElement.toCourseSyllabus(): String? {
-    val root = objectOrData()
+    val root = arrayOrNested("result", "data").firstOrNull()?.objectOrData() ?: objectOrData()
     return listOfNotNull(
         root.text("syllabus_name", "course_name"),
         root.text("teaching_goals"),
         root.text("detail_plan"),
-        root.text("skills"),
+        root.text("skills") ?: root.arrayText("skills", "comp_label", "label", "name"),
         root.text("prerequisite"),
         root.text("teaching_method"),
-        root.text("evaluation_type"),
+        root.text("evaluation_type") ?: root.arrayText("control_types", "evaluation_label", "label", "name"),
         root.text("evaluation_criteria"),
         root.text("books_reference"),
         root.text("other_reference"),
         root.text("computing_tools"),
-        root.arrayText("seance_details", "title", "name", "description", "detail")
+        root.arrayText("seance_details", "title", "name", "description", "detail", "content")
     )
         .map { it.trim() }
         .filter { it.isNotBlank() }

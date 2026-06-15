@@ -82,10 +82,12 @@
     <string name="grades_component">Composant</string>
     <string name="grades_coefficient">Coefficient</string>
     <string name="grades_count">Notes prises en compte</string>
-    <string name="grades_detail_title">Détail de la note</string>
+    <string name="grades_detail_title">Détails de la matière</string>
     <string name="grades_gpa">GPA estimé</string>
     <string name="grades_no_grade">Aucune note</string>
     <string name="grades_breakdown_title">Détail par composant</string>
+    <string name="grades_block">Bloc</string>
+    <string name="grades_block_average">Moyennes de bloc</string>
     <string name="grades_cc_average">Moyenne CC</string>
     <string name="grades_general_average">Moyenne Générale (G)</string>
     <string name="grades_cc_title">Contrôles Continus (CC)</string>
@@ -94,6 +96,9 @@
     <string name="grades_simulation_add">Ajouter</string>
     <string name="grades_simulation_average">Moyenne simulée</string>
     <string name="grades_simulation_coefficient">Coefficient simulé</string>
+    <string name="grades_simulation_mode">Mode simulation</string>
+    <string name="grades_real_mode">Mode réel</string>
+    <string name="grades_simulation_reset">Réinitialiser</string>
     <string name="grades_simulation_title">Simulation</string>
     <string name="grades_simulation_value">Note simulée</string>
     <string name="grades_summary_incomplete">Estimation calculée avec les données disponibles. Elle peut différer des règles officielles de l’école.</string>
@@ -131,8 +136,6 @@
     <string name="courses_empty_title">Aucun cours</string>
     <string name="courses_empty_body">Les cours de l’année synchronisée apparaîtront ici.</string>
     <string name="courses_files">Fichiers</string>
-    <string name="courses_hide_syllabus">Masquer le syllabus</string>
-    <string name="courses_show_syllabus">Afficher le syllabus</string>
     <string name="courses_teacher">Intervenant</string>
 
     <string name="projects_title">Projets</string>
@@ -197,6 +200,7 @@
 
     <string name="settings_title">Réglages</string>
     <string name="settings_calendar_sync">Synchronisation calendrier</string>
+    <string name="settings_calendar_select_title">Sélectionner un compte de calendrier</string>
     <string name="settings_clear_cache">Vider le cache</string>
     <string name="settings_language">Langue</string>
     <string name="settings_language_english">Anglais</string>
@@ -214,4 +218,15 @@
 
     <string name="calendar_event_marker_prefix" translatable="false">MyGES:</string>
     <string name="calendar_event_description">MyGES:%1$s</string>
+    <string name="common_all">Tous</string>
+    <string name="courses_filter_year_format">Année : %1$s</string>
+    <string name="courses_filter_period_format">Semestre : %1$s</string>
+    <string name="courses_dialog_title">Fichiers de cours</string>
+    <string name="courses_no_files">Aucun fichier disponible.</string>
+    <plurals name="courses_files_button">
+        <item quantity="one">Fichier (%1$d)</item>
+        <item quantity="other">Fichiers (%1$d)</item>
+    </plurals>
+    <string name="courses_download_syllabus">Télécharger Syllabus</string>
+    <string name="courses_download_file">Télécharger</string>
 </resources>

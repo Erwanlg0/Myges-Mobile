@@ -83,7 +83,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             DashboardSummary(
                 profile = localData.profile?.toDomain(),
                 nextEvent = localData.agenda.firstOrNull { it.endsAt.isAfter(now) },
-                latestGrades = localData.grades.sortedWith(compareByDescending<Grade> { it.date }.thenByDescending { it.id }).take(3),
+                latestGrades = localData.grades.filter { it.value != null }.sortedWith(compareByDescending<Grade> { it.date }.thenByDescending { it.id }).take(3),
                 recentAbsences = localData.absences.sortedByDescending { it.startsAt }.take(1),
                 dueProjects = localData.projects.filter { it.deadline?.isAfter(now) == true }.take(3),
                 lastSyncAt = settings.lastSyncAt
@@ -151,7 +151,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     academicYear = activeYears.sorted().joinToString(", ")
                 )
 
-                val isFirstSync = dao.agendaIds().isEmpty()
+                val isFirstSync = settingsRepository.settings.first().lastSyncAt == null || dao.agendaIds().isEmpty()
                 val agendaWindow = if (isFirstSync) {
                     AgendaWindow.firstSync()
                 } else {
@@ -334,7 +334,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 syllabusDocuments(courses)
                 
             val availablePeriods = (grades.mapNotNull { it.period } + courses.mapNotNull { it.period })
-                .filter { it.isNotBlank() }
+                .filter { it.isNotBlank() && it.contains(Regex("\\d{4}")) }
                 .distinct()
             val absences = runCatching { api.absences(year)?.toAbsences(year, availablePeriods).orEmpty() }.getOrDefault(emptyList())
             val practicals = (
@@ -365,6 +365,40 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         )
     }
 
+    private suspend fun fetchCurrentYearData(years: List<String>): YearData {
+        years.forEach { year ->
+            val yearData = fetchAllYearsData(listOf(year))
+            if (yearData.hasAcademicData()) return yearData
+        }
+        return fetchAllYearsData(listOf(years.firstOrNull() ?: Year.now().value.toString()))
+    }
+
+    private suspend fun YearData.withCachedOutsideFetchedYears(): YearData {
+        val refreshedYears = courses.mapNotNull { it.year }.toSet() +
+            grades.mapNotNull { it.academicYearStart() }.toSet() +
+            absences.mapNotNull { it.academicYearStart() }.toSet() +
+            documents.mapNotNull { it.year }.toSet()
+        val cachedStepsByProject = dao.projectSteps().groupBy { it.projectId }
+        if (refreshedYears.isEmpty()) {
+            return copy(
+                courses = (courses + dao.courses().map { it.toDomain() }).distinctBy { it.id },
+                grades = (grades + dao.grades().map { it.toDomain() }).distinctBy { it.id },
+                absences = (absences + dao.absences().map { it.toDomain() }).distinctBy { it.id },
+                documents = (documents + dao.documents().map { it.toDomain() }).distinctBy { it.id },
+                projects = (projects + dao.projects().map { it.toDomain(cachedStepsByProject[it.id].orEmpty()) }).distinctBy { it.id },
+                practicals = (practicals + dao.practicals().map { it.toDomain() }).distinctBy { it.id }
+            )
+        }
+        return copy(
+            courses = (courses + dao.courses().map { it.toDomain() }.filter { it.year !in refreshedYears }).distinctBy { it.id },
+            grades = (grades + dao.grades().map { it.toDomain() }.filter { it.academicYearStart() !in refreshedYears }).distinctBy { it.id },
+            absences = (absences + dao.absences().map { it.toDomain() }.filter { it.academicYearStart() !in refreshedYears }).distinctBy { it.id },
+            documents = (documents + dao.documents().map { it.toDomain() }.filter { it.year !in refreshedYears }).distinctBy { it.id },
+            projects = (projects + dao.projects().map { it.toDomain(cachedStepsByProject[it.id].orEmpty()) }).distinctBy { it.id },
+            practicals = (practicals + dao.practicals().map { it.toDomain() }).distinctBy { it.id }
+        )
+    }
+
     private suspend fun courseDocuments(courses: List<Course>): List<AcademicDocument> {
         return courses.filter { it.fileCount > 0 }
             .flatMap { course ->
@@ -373,7 +407,13 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                         ?.toDocuments()
                         .orEmpty()
                         .map { document ->
-                            document.copy(downloadUrl = document.downloadUrl ?: "me/${course.id}/files/${document.id}")
+                            if (document.downloadUrl != null) {
+                                val originalUrl = document.downloadUrl
+                                val separator = if (originalUrl.contains("?")) "&" else "?"
+                                document.copy(downloadUrl = "$originalUrl${separator}courseId=${course.id}")
+                            } else {
+                                document.copy(downloadUrl = "me/${course.id}/files/${document.id}")
+                            }
                         }
                 }.getOrDefault(emptyList())
             }
@@ -537,7 +577,7 @@ internal data class AgendaWindow(
         }
 
         fun subsequentSync(today: LocalDate = LocalDate.now(ZoneOffset.UTC)): AgendaWindow {
-            val start = today.minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+            val start = today.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
             val end = today.plusDays(365)
                 .atTime(23, 59, 59, 999_000_000)
                 .toInstant(ZoneOffset.UTC)
@@ -571,6 +611,17 @@ internal fun academicYearCandidates(
 
 private fun String.toAcademicYearInt(): Int? {
     return Regex("\\d{4}").find(this)?.value?.toIntOrNull()
+}
+
+private fun Grade.academicYearStart(): String? {
+    Regex("\\d{4}\\s*-\\s*\\d{4}").find(period.orEmpty())?.value?.take(4)?.let { return it }
+    return date?.let { if (it.monthValue >= 9) it.year else it.year - 1 }?.toString()
+}
+
+private fun Absence.academicYearStart(): String? {
+    Regex("\\d{4}\\s*-\\s*\\d{4}").find(period.orEmpty())?.value?.take(4)?.let { return it }
+    val date = startsAt.atZone(ZoneOffset.UTC).toLocalDate()
+    return (if (date.monthValue >= 9) date.year else date.year - 1).toString()
 }
 
 private const val YEAR_FALLBACK_DEPTH = 10
