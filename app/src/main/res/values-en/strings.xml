@@ -154,7 +154,11 @@
     <string name="projects_progress">Progress</string>
     <string name="projects_status">Status</string>
     <string name="projects_steps_completed">%1$d/%2$d steps completed</string>
+    <string name="projects_view_all_groups">View all groups</string>
+    <string name="projects_deliverables_label">Deliverables:</string>
 
+
+    <string name="practicals_detail_title">Practical Details</string>
     <string name="practicals_title">Practicals</string>
     <string name="practicals_empty_title">No practicals</string>
     <string name="practicals_empty_body">Synced practical work will appear here.</string>

@@ -417,12 +417,29 @@ fun JsonElement.toNextProjectStepProjects(): List<Project> {
     }
 }
 
-fun JsonElement.toPracticals(fallbackYear: String? = null): List<Practical> {
+fun JsonElement.toPracticals(currentUserId: String? = null, fallbackYear: String? = null): List<Practical> {
     return arrayOrNested("practicals", "items", "data").map { element ->
         val root = element.objectOrData()
         val stepDates = root.array("steps", "projectSteps")
             .mapNotNull { it.objectOrData().instant("deadline", "dueDate", "endDate", "psp_limit_date") }
             .sorted()
+        val userGroupIds = root.array("project_group_logs")
+            .mapNotNull { it.objectOrData() }
+            .filter { log -> currentUserId != null && log.text("user_id", "uid", "u_id") == currentUserId }
+            .mapNotNull { it.text("pgr_id", "project_group_id", "group_id") }
+            .toSet()
+        val groups = root.array("groups").map { group ->
+            val groupRoot = group.objectOrData()
+            val groupId = groupRoot.text("project_group_id", "pgr_id", "group_id", "id") ?: stableId(groupRoot)
+            ProjectGroup(
+                id = groupId,
+                name = groupRoot.text("group_name", "name", "label") ?: groupId,
+                students = groupRoot.array("project_group_students", "students").mapNotNull { student ->
+                    student.objectOrData().directoryDisplayName()
+                },
+                isMine = groupId in userGroupIds
+            )
+        }
         Practical(
             id = root.text("id", "practicalId", "project_id", "uid") ?: stableId(root),
             name = root.text("name", "title") ?: "",
@@ -431,8 +448,42 @@ fun JsonElement.toPracticals(fallbackYear: String? = null): List<Practical> {
             endsAt = root.instant("endsAt", "end", "endDate", "dateEnd") ?: stepDates.lastOrNull(),
             room = root.text("room", "classroom", "salle"),
             status = root.text("status", "state"),
-            year = root.text("year", "academicYear") ?: fallbackYear
+            year = root.text("year", "academicYear") ?: fallbackYear,
+            groups = groups
         )
+    }
+}
+
+fun JsonElement.toPracticalDocuments(fallbackYear: String? = null): List<AcademicDocument> {
+    val arrayResult = arrayOrNested("practicals", "items", "data")
+    if (arrayResult.isEmpty() && hasArrayPayload()) return emptyList()
+    return (arrayResult.ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }).flatMap { element ->
+        val root = element.objectOrData()
+        val practicalId = root.text("id", "practicalId", "project_id", "uid") ?: stableId(root)
+        val practicalYear = root.text("year", "academicYear") ?: fallbackYear
+        val files = root.array("project_files").map { file ->
+            val fileRoot = file.objectOrData()
+            val document = fileRoot.toDocument(
+                parentTitle = root.text("name", "title"),
+                parentYear = practicalYear,
+                ownerId = practicalId
+            )
+            document.copy(downloadUrl = document.downloadUrl ?: "me/projectFiles/${document.id}")
+        }
+        val stepFiles = root.array("steps", "projectSteps").flatMap { step ->
+            val stepRoot = step.objectOrData()
+            stepRoot.array("files").map { file ->
+                val fileRoot = file.objectOrData()
+                val document = fileRoot.toDocument(
+                    parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"),
+                    parentYear = practicalYear,
+                    ownerId = practicalId,
+                    groupId = fileRoot.text("pgr_id", "project_group_id", "group_id")
+                )
+                document.copy(downloadUrl = document.downloadUrl ?: "me/projectStepFiles/${document.id}")
+            }
+        }
+        files + stepFiles
     }
 }
 

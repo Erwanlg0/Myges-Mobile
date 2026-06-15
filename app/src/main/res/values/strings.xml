@@ -154,7 +154,11 @@
     <string name="projects_progress">Progression</string>
     <string name="projects_status">Statut</string>
     <string name="projects_steps_completed">%1$d/%2$d étapes terminées</string>
+    <string name="projects_view_all_groups">Voir tous les groupes</string>
+    <string name="projects_deliverables_label">Rendus :</string>
 
+
+    <string name="practicals_detail_title">Détail du travail pratique</string>
     <string name="practicals_title">Travaux pratiques</string>
     <string name="practicals_empty_title">Aucun travail pratique</string>
     <string name="practicals_empty_body">Les travaux pratiques synchronisés apparaîtront ici.</string>

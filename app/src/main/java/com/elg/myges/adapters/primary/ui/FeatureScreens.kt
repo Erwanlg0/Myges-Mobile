@@ -104,6 +104,7 @@ import com.elg.myges.domain.model.Grade
 import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
 import com.elg.myges.domain.model.Project
+import com.elg.myges.domain.model.ProjectGroup
 import com.elg.myges.domain.model.UserSettings
 import com.elg.myges.domain.model.progress
 import com.elg.myges.domain.model.toGradeSummary
@@ -272,22 +273,19 @@ fun DashboardScreen(
             }
         }
         item { SectionTitle(R.string.dashboard_due_projects) }
-        if (dashboard.dueProjects.isEmpty()) {
+        val dueProjects = dashboard.dueProjects.filter { it.name.isNotBlank() }
+        if (dueProjects.isEmpty()) {
             item { CompactCard { Text(stringResource(R.string.projects_empty_title)) } }
         } else {
-            items(dashboard.dueProjects, key = { it.id }) { project ->
-                var showDialog by remember { mutableStateOf(false) }
-                if (showDialog) {
-                    ProjectDetailsDialog(
-                        project = project,
-                        documents = emptyList(),
-                        downloadingDocumentIds = emptySet(),
-                        documentDownloadProgress = emptyMap(),
-                        onOpenDocument = {},
-                        onDismiss = { showDialog = false }
+            items(dueProjects, key = { it.id }) { project ->
+                CompactCard(modifier = Modifier.clickable { onNavigateToTab("projects") }) {
+                    Text(
+                        text = project.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
+                    LabelValue(R.string.projects_deadline, formatInstant(project.deadline))
                 }
-                ProjectCard(project, onOpen = { showDialog = true })
             }
         }
         dashboard.lastSyncAt?.let {
@@ -1126,6 +1124,7 @@ fun ProjectsScreen(viewModel: StudentViewModel) {
     val years = remember(state.data) { state.data.mapNotNull { it.year }.distinct().sortedDescending() }
     val filteredProjects = remember(state.data, selectedYear) {
         state.data
+            .filter { it.name.isNotBlank() }
             .filter { selectedYear == null || it.year == selectedYear }
             .sortedWith(compareByDescending<Project> { it.year }.thenBy { it.deadline }.thenBy { it.name })
     }
@@ -1167,12 +1166,26 @@ fun ProjectsScreen(viewModel: StudentViewModel) {
 @Composable
 fun PracticalsScreen(viewModel: StudentViewModel) {
     val state by viewModel.practicals.collectAsStateWithLifecycle()
+    val documentsState by viewModel.documents.collectAsStateWithLifecycle()
+    val downloadingDocumentIds by viewModel.downloadingDocumentIds.collectAsStateWithLifecycle()
+    val documentDownloadProgress by viewModel.documentDownloadProgress.collectAsStateWithLifecycle()
+    var selectedPractical by remember { mutableStateOf<Practical?>(null) }
     var selectedYear by remember(state.data) { mutableStateOf<String?>(null) }
     val years = remember(state.data) { state.data.mapNotNull { it.year }.distinct().sortedDescending() }
     val filteredPracticals = remember(state.data, selectedYear) {
         state.data
             .filter { selectedYear == null || it.year == selectedYear }
             .sortedWith(compareByDescending<Practical> { it.year }.thenBy { it.startsAt }.thenBy { it.name })
+    }
+    selectedPractical?.let { practical ->
+        PracticalDetailsDialog(
+            practical = practical,
+            documents = documentsState.data.filter { it.ownerId == practical.id },
+            downloadingDocumentIds = downloadingDocumentIds,
+            documentDownloadProgress = documentDownloadProgress,
+            onOpenDocument = viewModel::openDocument,
+            onDismiss = { selectedPractical = null }
+        )
     }
     FeatureStateContent(
         state = state,
@@ -1190,16 +1203,21 @@ fun PracticalsScreen(viewModel: StudentViewModel) {
                 )
             }
         }
-        items(filteredPracticals, key = { it.id }) { practical -> PracticalCard(practical) }
+        items(filteredPracticals, key = { it.id }) { practical ->
+            PracticalCard(
+                practical = practical,
+                onOpen = { selectedPractical = practical }
+            )
+        }
     }
 }
 
 @Composable
 fun DirectoryScreen(viewModel: StudentViewModel) {
     val state by viewModel.directory.collectAsStateWithLifecycle()
-    var selectedYear by remember(state.data) { mutableStateOf<String?>(null) }
-    var selectedRole by remember(state.data) { mutableStateOf<DirectoryRole?>(null) }
     val years = remember(state.data) { state.data.mapNotNull { it.year }.distinct().sortedDescending() }
+    var selectedYear by remember(state.data, years) { mutableStateOf(years.firstOrNull()) }
+    var selectedRole by remember(state.data) { mutableStateOf<DirectoryRole?>(null) }
     val filteredPeople = remember(state.data, selectedYear, selectedRole) {
         state.data.filter { person ->
             (selectedYear == null || person.year == selectedYear) &&
@@ -2319,6 +2337,7 @@ private fun ProjectDetailsDialog(
                         }
                     }
                 }
+                val myGroupId = project.groups.firstOrNull { it.isMine }?.id
                 if (project.groups.isNotEmpty()) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     Text(
@@ -2326,38 +2345,128 @@ private fun ProjectDetailsDialog(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    project.groups.sortedBy { !it.isMine }.forEach { group ->
+                    val myGroup = project.groups.firstOrNull { it.isMine }
+                    if (myGroup != null) {
                         CompactCard {
                             Text(
-                                text = if (group.isMine) {
-                                    stringResource(R.string.projects_my_group, group.name)
-                                } else {
-                                    group.name
-                                },
+                                text = stringResource(R.string.projects_my_group, myGroup.name),
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = group.students.joinToString(", ").ifBlank { stringResource(R.string.projects_group_empty) },
+                                text = myGroup.students.joinToString(", ").ifBlank { stringResource(R.string.projects_group_empty) },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
+                    var showAllGroupsDialog by remember { mutableStateOf(false) }
+                    if (showAllGroupsDialog) {
+                        AllGroupsDialog(
+                            groups = project.groups,
+                            documents = documents,
+                            downloadingDocumentIds = downloadingDocumentIds,
+                            documentDownloadProgress = documentDownloadProgress,
+                            onOpenDocument = onOpenDocument,
+                            onDismiss = { showAllGroupsDialog = false }
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { showAllGroupsDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.projects_view_all_groups))
+                    }
                 }
-                if (documents.isNotEmpty()) {
+                val visibleDocuments = remember(documents, myGroupId) {
+                    documents.filter { it.groupId == null || it.groupId == myGroupId }
+                }
+                if (visibleDocuments.isNotEmpty()) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     Text(
                         text = stringResource(R.string.projects_files_title),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    documents.forEach { document ->
+                    visibleDocuments.forEach { document ->
                         DocumentCard(
                             document = document,
                             downloading = document.id in downloadingDocumentIds,
                             progress = documentDownloadProgress[document.id],
+                            showDownloadButton = true,
                             onOpen = { onOpenDocument(document) }
                         )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        }
+    )
+}
+
+@Composable
+private fun AllGroupsDialog(
+    groups: List<ProjectGroup>,
+    documents: List<AcademicDocument>,
+    downloadingDocumentIds: Set<String>,
+    documentDownloadProgress: Map<String, Float?>,
+    onOpenDocument: (AcademicDocument) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sortedGroups = remember(groups) {
+        groups.sortedWith(
+            compareBy<ProjectGroup> { !it.isMine }
+                .thenBy { group -> Regex("\\d+").find(group.name)?.value?.toIntOrNull() ?: Int.MAX_VALUE }
+                .thenBy { group -> group.name }
+        )
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.projects_groups_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                sortedGroups.forEach { group ->
+                    CompactCard {
+                        Text(
+                            text = if (group.isMine) {
+                                stringResource(R.string.projects_my_group, group.name)
+                            } else {
+                                group.name
+                            },
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = group.students.joinToString(", ").ifBlank { stringResource(R.string.projects_group_empty) },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        val groupDocs = documents.filter { it.groupId == group.id }
+                        if (groupDocs.isNotEmpty()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.projects_deliverables_label),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            groupDocs.forEach { document ->
+                                DocumentCard(
+                                    document = document,
+                                    downloading = document.id in downloadingDocumentIds,
+                                    progress = documentDownloadProgress[document.id],
+                                    showDownloadButton = group.isMine,
+                                    onOpen = { onOpenDocument(document) }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -2378,8 +2487,11 @@ private fun String?.isCompletedStatus(): Boolean {
 }
 
 @Composable
-internal fun PracticalCard(practical: Practical) {
-    CompactCard {
+internal fun PracticalCard(
+    practical: Practical,
+    onOpen: () -> Unit = {}
+) {
+    CompactCard(modifier = Modifier.clickable(onClick = onOpen)) {
         Text(
             text = practical.name.orUntitled(),
             style = MaterialTheme.typography.titleMedium,
@@ -2398,6 +2510,7 @@ internal fun DocumentCard(
     document: AcademicDocument,
     downloading: Boolean,
     progress: Float?,
+    showDownloadButton: Boolean = true,
     onOpen: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -2410,32 +2523,34 @@ internal fun DocumentCard(
         LabelValue(R.string.documents_category, document.category.orEmpty())
         LabelValue(R.string.profile_year, document.year.orEmpty())
         LabelValue(R.string.documents_updated_at, formatInstant(document.updatedAt))
-        OutlinedButton(
-            onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onOpen()
-            },
-            enabled = !downloading
-        ) {
-            if (downloading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Icon(Icons.Rounded.Download, contentDescription = null)
+        if (showDownloadButton) {
+            OutlinedButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onOpen()
+                },
+                enabled = !downloading
+            ) {
+                if (downloading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(Icons.Rounded.Download, contentDescription = null)
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(if (downloading) R.string.documents_downloading else R.string.documents_open))
             }
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(if (downloading) R.string.documents_downloading else R.string.documents_open))
-        }
-        if (downloading) {
-            if (progress == null) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            } else {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            if (downloading) {
+                if (progress == null) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                } else {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
@@ -2791,4 +2906,104 @@ private fun Course.semesterLabel(): String? {
 
 private fun String.semesterLabel(): String? {
     return Regex("Semestre\\s*\\d+", RegexOption.IGNORE_CASE).find(this)?.value
+}
+
+@Composable
+private fun PracticalDetailsDialog(
+    practical: Practical,
+    documents: List<AcademicDocument>,
+    downloadingDocumentIds: Set<String>,
+    documentDownloadProgress: Map<String, Float?>,
+    onOpenDocument: (AcademicDocument) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val myGroupId = practical.groups.firstOrNull { it.isMine }?.id
+    val visibleDocuments = remember(documents, myGroupId) {
+        documents.filter { it.groupId == null || it.groupId == myGroupId }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.practicals_detail_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = practical.name.orUntitled(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                LabelValue(R.string.practicals_course, practical.courseName.orEmpty())
+                LabelValue(R.string.practicals_start, formatInstant(practical.startsAt))
+                LabelValue(R.string.practicals_end, formatInstant(practical.endsAt))
+                LabelValue(R.string.agenda_room, practical.room.orEmpty())
+                LabelValue(R.string.projects_status, practical.status.orEmpty())
+
+                if (practical.groups.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(
+                        text = stringResource(R.string.projects_groups_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    val myGroup = practical.groups.firstOrNull { it.isMine }
+                    if (myGroup != null) {
+                        CompactCard {
+                            Text(
+                                text = stringResource(R.string.projects_my_group, myGroup.name),
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = myGroup.students.joinToString(", ").ifBlank { stringResource(R.string.projects_group_empty) },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    var showAllGroupsDialog by remember { mutableStateOf(false) }
+                    if (showAllGroupsDialog) {
+                        AllGroupsDialog(
+                            groups = practical.groups,
+                            documents = documents,
+                            downloadingDocumentIds = downloadingDocumentIds,
+                            documentDownloadProgress = documentDownloadProgress,
+                            onOpenDocument = onOpenDocument,
+                            onDismiss = { showAllGroupsDialog = false }
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { showAllGroupsDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.projects_view_all_groups))
+                    }
+                }
+
+                if (visibleDocuments.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    Text(
+                        text = stringResource(R.string.projects_files_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    visibleDocuments.forEach { document ->
+                        DocumentCard(
+                            document = document,
+                            downloading = document.id in downloadingDocumentIds,
+                            progress = documentDownloadProgress[document.id],
+                            showDownloadButton = true,
+                            onOpen = { onOpenDocument(document) }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        }
+    )
 }

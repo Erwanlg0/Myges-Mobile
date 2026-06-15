@@ -17,6 +17,7 @@ import com.elg.myges.adapters.secondary.api.toNews
 import com.elg.myges.adapters.secondary.api.toNextProjectStepProjects
 import com.elg.myges.adapters.secondary.api.toPracticals
 import com.elg.myges.adapters.secondary.api.toProfile
+import com.elg.myges.adapters.secondary.api.toPracticalDocuments
 import com.elg.myges.adapters.secondary.api.toProjectDocuments
 import com.elg.myges.adapters.secondary.api.toProjects
 import com.elg.myges.adapters.secondary.api.toYears
@@ -117,7 +118,10 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     }
 
     override fun observePracticals(): Flow<List<Practical>> {
-        return dao.observePracticals().map { practicals -> practicals.map { it.toDomain() } }
+        return combine(dao.observePracticals(), dao.observeProjectGroups()) { practicals, groups ->
+            val groupsByPractical = groups.groupBy { it.projectId }
+            practicals.map { it.toDomain(groupsByPractical[it.id].orEmpty()) }
+        }
     }
 
     override fun observeDocuments(): Flow<List<AcademicDocument>> {
@@ -186,7 +190,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     absences = yearData.absences.map { it.toEntity() },
                     courses = yearData.courses.map { it.toEntity() },
                     projects = yearData.projects.map { it.toEntity() },
-                    projectGroups = yearData.projects.flatMap { it.toGroupEntities() },
+                    projectGroups = yearData.projects.flatMap { it.toGroupEntities() } + yearData.practicals.flatMap { it.toGroupEntities() },
                     projectSteps = yearData.projects.flatMap { it.toStepEntities() },
                     practicals = yearData.practicals.map { it.toEntity() },
                     documents = yearData.documents.map { it.toEntity() },
@@ -335,21 +339,23 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             val projectPayloads = listOfNotNull(projectsJson) + courseProjectPayloads
             val projects = projectPayloads.flatMap { it.toProjects(currentUserId, year) }.mergeProjects()
             
+            val practicalsJson = runCatching { api.practicals(year) }.getOrNull()
+            val coursePracticalPayloads = newCourses.mapNotNull { course ->
+                runCatching { api.coursePracticals(course.id) }.getOrNull()
+            }
+            val practicalPayloads = listOfNotNull(practicalsJson) + coursePracticalPayloads
+            val practicals = practicalPayloads.flatMap { it.toPracticals(currentUserId, year) }.distinctBy { it.id }
+
             val documents = runCatching { api.annualDocuments(year)?.toDocuments().orEmpty() }.getOrDefault(emptyList()) +
                 courseDocuments(newCourses) +
                 projectPayloads.flatMap { it.toProjectDocuments(year) } +
+                practicalPayloads.flatMap { it.toPracticalDocuments(year) } +
                 syllabusDocuments(courses)
                 
             val availablePeriods = (grades.mapNotNull { it.period } + courses.mapNotNull { it.period })
                 .filter { it.isNotBlank() && it.contains(Regex("\\d{4}")) }
                 .distinct()
             val absences = runCatching { api.absences(year)?.toAbsences(year, availablePeriods).orEmpty() }.getOrDefault(emptyList())
-            val practicals = (
-                runCatching { api.practicals(year)?.toPracticals(year).orEmpty() }.getOrDefault(emptyList()) +
-                    newCourses.flatMap { course ->
-                        runCatching { api.coursePracticals(course.id)?.toPracticals(year).orEmpty() }.getOrDefault(emptyList())
-                    }
-                ).distinctBy { it.id }
             val directory = directoryPeople(year)
 
             allCourses.addAll(courses)

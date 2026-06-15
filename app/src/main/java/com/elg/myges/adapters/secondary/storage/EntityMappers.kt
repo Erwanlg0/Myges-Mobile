@@ -206,7 +206,7 @@ fun Practical.toEntity() = PracticalEntity(
     year = year
 )
 
-fun PracticalEntity.toDomain() = Practical(
+fun PracticalEntity.toDomain(groups: List<ProjectGroupEntity> = emptyList()) = Practical(
     id = id,
     name = name,
     courseName = courseName,
@@ -214,8 +214,19 @@ fun PracticalEntity.toDomain() = Practical(
     endsAt = endsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
     room = room,
     status = status,
-    year = year
+    year = year,
+    groups = groups.map { it.toDomain() }
 )
+
+fun Practical.toGroupEntities() = groups.map { group ->
+    ProjectGroupEntity(
+        projectId = id,
+        id = group.id,
+        name = group.name,
+        students = group.students.joinToString("\n"),
+        isMine = group.isMine
+    )
+}
 
 fun AcademicDocument.toEntity() = AcademicDocumentEntity(
     id = id,

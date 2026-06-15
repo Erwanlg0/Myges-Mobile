@@ -97,7 +97,8 @@ data class Practical(
     val endsAt: Instant?,
     val room: String?,
     val status: String?,
-    val year: String? = null
+    val year: String? = null,
+    val groups: List<ProjectGroup> = emptyList()
 )
 
 data class AcademicDocument(

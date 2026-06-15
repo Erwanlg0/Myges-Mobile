@@ -149,13 +149,29 @@ private fun StudentRoute(
 
     LaunchedEffect(studentViewModel) {
         studentViewModel.documentOpenRequests.collect { request ->
-            val intent = Intent(Intent.ACTION_VIEW)
-                .setDataAndType(request.uri, request.mimeType ?: "application/octet-stream")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val openWithMime = { mime: String ->
+                val intent = Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(request.uri, mime)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                context.startActivity(Intent.createChooser(intent, null))
+            }
             try {
-                context.startActivity(intent)
+                openWithMime(request.mimeType ?: "application/octet-stream")
             } catch (exception: ActivityNotFoundException) {
-                studentViewModel.reportOpenDocumentFailure()
+                try {
+                    val fallbackMimeType = when {
+                        request.mimeType?.startsWith("text/") == true && request.mimeType != "text/plain" -> "text/plain"
+                        request.mimeType != "application/octet-stream" -> "application/octet-stream"
+                        else -> null
+                    }
+                    if (fallbackMimeType != null) {
+                        openWithMime(fallbackMimeType)
+                    } else {
+                        throw exception
+                    }
+                } catch (e: ActivityNotFoundException) {
+                    studentViewModel.reportOpenDocumentFailure()
+                }
             }
         }
     }
