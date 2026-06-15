@@ -25,7 +25,6 @@ data class AuthUiState(
     val loading: Boolean,
     val error: AppError?,
     val hasBiometricSession: Boolean,
-    val enableBiometric: Boolean,
     val authorizationUrl: String
 )
 
@@ -38,26 +37,20 @@ class AuthViewModel @Inject constructor(
 ) : ViewModel() {
     private val loading = MutableStateFlow(false)
     private val error = MutableStateFlow<AppError?>(null)
-    private val enableBiometric = MutableStateFlow(true)
     private val authorizationUrl = MutableStateFlow(appConfig.oauthAuthorizeUrl)
 
     val state: StateFlow<AuthUiState> = combine(
         loading,
         error,
         observeLockedBiometricSession(),
-        enableBiometric,
         authorizationUrl
-    ) { isLoading, currentError, hasBiometricSession, biometricEnabled, oauthUrl ->
-        AuthUiState(isLoading, currentError, hasBiometricSession, biometricEnabled, oauthUrl)
+    ) { isLoading, currentError, hasBiometricSession, oauthUrl ->
+        AuthUiState(isLoading, currentError, hasBiometricSession, oauthUrl)
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
-        AuthUiState(false, null, false, true, appConfig.oauthAuthorizeUrl)
+        AuthUiState(false, null, false, appConfig.oauthAuthorizeUrl)
     )
-
-    fun setBiometricEnabled(enabled: Boolean) {
-        enableBiometric.value = enabled
-    }
 
     fun completeOAuthCallback(uri: Uri) {
         val accessToken = uri.oauthParameter("access_token")
@@ -73,7 +66,7 @@ class AuthViewModel @Inject constructor(
             loading.value = true
             error.value = null
             runCatching {
-                completeOAuthLoginUseCase(authorizationToken, expiresAt, enableBiometric.value)
+                completeOAuthLoginUseCase(authorizationToken, expiresAt, false)
             }.onFailure {
                 error.value = it.toAppError()
             }

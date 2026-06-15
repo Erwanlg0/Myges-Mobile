@@ -33,6 +33,7 @@ class AppSettingsRepository @Inject constructor(
                 documents = preferences[NOTIFY_DOCUMENTS] ?: true
             ),
             calendarSyncEnabled = preferences[CALENDAR_SYNC] ?: false,
+            biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
             lastSyncAt = preferences[LAST_SYNC]?.let(Instant::ofEpochMilli)
         )
     }
@@ -45,6 +46,10 @@ class AppSettingsRepository @Inject constructor(
 
     override suspend fun setCalendarSyncEnabled(enabled: Boolean) {
         context.settingsDataStore.edit { preferences -> preferences[CALENDAR_SYNC] = enabled }
+    }
+
+    override suspend fun setBiometricEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { preferences -> preferences[BIOMETRIC_ENABLED] = enabled }
     }
 
     override suspend fun setGradeNotificationsEnabled(enabled: Boolean) {
@@ -76,6 +81,7 @@ class AppSettingsRepository @Inject constructor(
     }
 
     private companion object {
+        val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         val CALENDAR_SYNC = booleanPreferencesKey("calendar_sync")
         val LANGUAGE_TAG = stringPreferencesKey("language_tag")
         val LAST_SYNC = longPreferencesKey("last_sync")

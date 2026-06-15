@@ -86,9 +86,7 @@ fun AuthRoute(
         loading = state.loading,
         errorMessage = state.error?.messageRes(),
         hasBiometricSession = state.hasBiometricSession,
-        enableBiometric = state.enableBiometric,
         authorizationUrl = state.authorizationUrl,
-        onBiometricEnabledChange = viewModel::setBiometricEnabled,
         onLogin = {
             CustomTabsIntent.Builder()
                 .setShowTitle(true)
@@ -104,9 +102,7 @@ internal fun AuthScreen(
     loading: Boolean,
     errorMessage: Int?,
     hasBiometricSession: Boolean,
-    enableBiometric: Boolean,
     authorizationUrl: String,
-    onBiometricEnabledChange: (Boolean) -> Unit,
     onLogin: () -> Unit,
     onBiometricUnlock: () -> Unit
 ) {
@@ -130,22 +126,6 @@ internal fun AuthScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(28.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .toggleable(
-                        value = enableBiometric,
-                        role = Role.Checkbox,
-                        onValueChange = onBiometricEnabledChange
-                    ),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = enableBiometric,
-                    onCheckedChange = null
-                )
-                Text(stringResource(R.string.auth_enable_biometric))
-            }
             errorMessage?.let {
                 StateBanner(it)
                 Spacer(Modifier.height(12.dp))

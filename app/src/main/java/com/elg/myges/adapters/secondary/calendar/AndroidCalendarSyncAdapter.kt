@@ -14,6 +14,8 @@ import com.elg.myges.domain.model.AppError
 import com.elg.myges.domain.model.AppException
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,37 +24,56 @@ class AndroidCalendarSyncAdapter @Inject constructor(
     @ApplicationContext private val context: Context
 ) : CalendarSyncPort {
     override suspend fun sync(events: List<AgendaEvent>) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
-            throw AppException(AppError.PermissionDenied)
-        }
-        val calendarId = writableCalendarId() ?: throw AppException(AppError.Storage)
-        val resolver = context.contentResolver
-        val timeZone = ZoneId.systemDefault().id
-        val desiredEvents = events.map { event -> event.toCalendarEvent(calendarId, timeZone) }
-        val plan = calendarSyncPlan(currentEvents(), desiredEvents)
-        plan.deletes.forEach { event ->
-            resolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.rowId), null, null)
-        }
-        plan.updates.forEach { update ->
-            resolver.update(
-                ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, update.current.rowId),
-                update.desired.toContentValues(),
-                null,
-                null
-            )
-        }
-        plan.inserts.forEach { event ->
-            resolver.insert(CalendarContract.Events.CONTENT_URI, event.toContentValues())
+        withContext(Dispatchers.IO) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
+                throw AppException(AppError.PermissionDenied)
+            }
+            val calendarId = writableCalendarId() ?: throw AppException(AppError.Storage)
+            val resolver = context.contentResolver
+            val timeZone = ZoneId.systemDefault().id
+            val desiredEvents = events.map { event -> event.toCalendarEvent(calendarId, timeZone) }
+            val plan = calendarSyncPlan(currentEvents(), desiredEvents)
+            plan.deletes.forEach { event ->
+                resolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.rowId), null, null)
+            }
+            plan.updates.forEach { update ->
+                resolver.update(
+                    ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, update.current.rowId),
+                    update.desired.toContentValues(),
+                    null,
+                    null
+                )
+            }
+            plan.inserts.forEach { event ->
+                resolver.insert(CalendarContract.Events.CONTENT_URI, event.toContentValues())
+            }
         }
     }
 
     private fun writableCalendarId(): Long? {
+        val prefs = context.getSharedPreferences("calendar_settings", Context.MODE_PRIVATE)
+        val savedId = prefs.getLong("selected_calendar_id", -1L)
         val projection = arrayOf(
             CalendarContract.Calendars._ID,
             CalendarContract.Calendars.ACCOUNT_TYPE
         )
         val selection = "${CalendarContract.Calendars.VISIBLE} = 1 AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ?"
         val args = arrayOf(CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString())
+
+        if (savedId != -1L) {
+            context.contentResolver.query(
+                CalendarContract.Calendars.CONTENT_URI,
+                projection,
+                "${CalendarContract.Calendars._ID} = ? AND $selection",
+                arrayOf(savedId.toString()) + args,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    return savedId
+                }
+            }
+        }
+
         context.contentResolver.query(CalendarContract.Calendars.CONTENT_URI, projection, selection, args, null)?.use { cursor ->
             var fallbackId: Long? = null
             while (cursor.moveToNext()) {
@@ -80,19 +101,24 @@ class AndroidCalendarSyncAdapter @Inject constructor(
             CalendarContract.Events.DTSTART,
             CalendarContract.Events.DTEND,
             CalendarContract.Events.EVENT_TIMEZONE,
-            CalendarContract.Events.EVENT_LOCATION
+            CalendarContract.Events.EVENT_LOCATION,
+            CalendarContract.Events.CUSTOM_APP_URI
         )
         return context.contentResolver.query(
             CalendarContract.Events.CONTENT_URI,
             projection,
-            "${CalendarContract.Events.DESCRIPTION} LIKE ?",
-            arrayOf("$markerPrefix%"),
+            "${CalendarContract.Events.CUSTOM_APP_PACKAGE} = ? OR ${CalendarContract.Events.DESCRIPTION} LIKE ?",
+            arrayOf(context.packageName, "$markerPrefix%"),
             null
         )?.use { cursor ->
             buildList {
                 while (cursor.moveToNext()) {
-                    val description = cursor.getString(3) ?: continue
-                    val externalId = description.removePrefix(markerPrefix).takeIf { it.isNotBlank() } ?: continue
+                    val description = cursor.getString(3).orEmpty()
+                    val externalId = cursor.getString(8)
+                        ?.removePrefix("myges://agenda/")
+                        ?.takeIf { it.isNotBlank() }
+                        ?: description.removePrefix(markerPrefix).substringBefore('\n').trim()
+                    if (externalId.isBlank()) continue
                     add(
                         CalendarEventRow(
                             rowId = cursor.getLong(0),
@@ -118,11 +144,20 @@ class AndroidCalendarSyncAdapter @Inject constructor(
         } else {
             address ?: room
         }
+        val descBuilder = StringBuilder()
+        if (!teacher.isNullOrBlank()) {
+            descBuilder.append("Intervenant : ").append(teacher).append("\n")
+        }
+        if (!room.isNullOrBlank() || !address.isNullOrBlank()) {
+            descBuilder.append("Salle(s) :\n")
+            val roomDetail = listOfNotNull(address, room).joinToString(" - ")
+            descBuilder.append("- ").append(roomDetail).append("\n")
+        }
         return DesiredCalendarEvent(
             externalId = id,
             calendarId = calendarId,
             title = title,
-            description = context.getString(R.string.calendar_event_description, id),
+            description = descBuilder.toString().trim(),
             startsAtEpochMillis = startsAt.toEpochMilli(),
             endsAtEpochMillis = endsAt.toEpochMilli(),
             timeZone = timeZone,
@@ -190,6 +225,8 @@ internal data class DesiredCalendarEvent(
             put(CalendarContract.Events.DTEND, endsAtEpochMillis)
             put(CalendarContract.Events.EVENT_TIMEZONE, timeZone)
             put(CalendarContract.Events.EVENT_COLOR, colorIdToArgb(colorId))
+            put(CalendarContract.Events.CUSTOM_APP_PACKAGE, "com.elg.myges")
+            put(CalendarContract.Events.CUSTOM_APP_URI, "myges://agenda/$externalId")
             if (location == null) {
                 putNull(CalendarContract.Events.EVENT_LOCATION)
             } else {

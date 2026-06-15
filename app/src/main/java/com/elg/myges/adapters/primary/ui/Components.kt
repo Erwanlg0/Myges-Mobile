@@ -51,7 +51,7 @@ fun <T> FeatureStateContent(
     content: LazyListScope.(T) -> Unit
 ) {
     when {
-        state.loading && empty(state.data) -> LoadingState()
+        (state.loading || state.refreshing) && empty(state.data) -> LoadingState()
         !state.online && empty(state.data) -> OfflineState(onRetry)
         state.error != null && empty(state.data) -> ErrorState(state.error.messageRes(), onRetry)
         empty(state.data) -> EmptyState(emptyTitle, emptyBody, onRetry)
@@ -77,10 +77,20 @@ fun <T> FeatureStateContent(
 @Composable
 fun LoadingState() {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            CircularProgressIndicator()
+            Text(
+                text = stringResource(R.string.state_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

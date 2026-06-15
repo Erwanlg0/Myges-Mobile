@@ -50,6 +50,10 @@ class SettingsViewModel @Inject constructor(
         updateSettingsUseCase.calendarSync(enabled)
     }
 
+    fun setBiometricEnabled(enabled: Boolean) = launchSettingChange {
+        updateSettingsUseCase.biometric(enabled)
+    }
+
     fun setGradeNotifications(enabled: Boolean) = launchSettingChange {
         updateSettingsUseCase.gradeNotifications(enabled)
     }

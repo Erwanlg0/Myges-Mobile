@@ -196,7 +196,7 @@ class JsonParsingTest {
         assertEquals("456", main.id)
         assertEquals("Algorithmique", main.courseName)
         assertEquals("", main.subject)
-        assertEquals(14.5, main.value ?: 0.0, 0.0)
+        assertEquals(14.25, main.value ?: 0.0, 0.0)
         assertEquals(2.0, main.coefficient ?: 0.0, 0.0)
 
         // CC 1 Component
@@ -210,6 +210,31 @@ class JsonParsingTest {
         assertEquals("456-cc-1", cc2.id)
         assertEquals("CC 2", cc2.subject)
         assertEquals(12.0, cc2.value ?: 0.0, 0.0)
+    }
+
+    @Test
+    fun gradesAverageCombinesCcAverageAndExamWhenBothExist() {
+        val grades = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "rc_id": 456,
+                  "course": "Algorithmique",
+                  "grades": [15, 5],
+                  "exam": 15,
+                  "trimester_name": "Semestre 1",
+                  "year": 2025
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toGrades("2025")
+
+        assertEquals(4, grades.size)
+        assertEquals(12.5, grades[0].value ?: 0.0, 0.0)
+        assertEquals("456-exam", grades[3].id)
+        assertEquals(15.0, grades[3].value ?: 0.0, 0.0)
     }
 
     @Test
@@ -309,6 +334,30 @@ class JsonParsingTest {
         assertTrue(syllabus.contains("Comprendre les structures de données"))
         assertTrue(syllabus.contains("Listes chaînées"))
         assertTrue(syllabus.contains("Projet"))
+    }
+
+    @Test
+    fun syllabusParsesKordisArrayPayloadIntoReadableText() {
+        val syllabus = json.parseToJsonElement(
+            """
+            {
+              "result": [{
+                "syllabus_name": "Scripting Python",
+                "teaching_goals": "Learn Python",
+                "skills": [{"comp_label": "Optimize software"}],
+                "control_types": [{"evaluation_label": "Continuous assessment"}],
+                "seance_details": [{"content": "Functions and classes"}]
+              }]
+            }
+            """.trimIndent()
+        ).toCourseSyllabus()
+
+        checkNotNull(syllabus)
+        assertTrue(syllabus.contains("Scripting Python"))
+        assertTrue(syllabus.contains("Learn Python"))
+        assertTrue(syllabus.contains("Optimize software"))
+        assertTrue(syllabus.contains("Continuous assessment"))
+        assertTrue(syllabus.contains("Functions and classes"))
     }
 
     @Test
@@ -414,6 +463,38 @@ class JsonParsingTest {
         assertEquals("778", projects.first().steps.first().id)
         assertEquals("Rendu final", projects.first().steps.first().title)
         assertEquals(1, projects.first().fileCount)
+    }
+
+    @Test
+    fun projectsDeadlineIsMaximumOfStepDeadlines() {
+        val projects = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "project_id": 22843,
+                  "name": "Projet final ReactJS",
+                  "course_name": "React",
+                  "steps": [
+                    {
+                      "psp_id": 778,
+                      "psp_desc": "Etape 1",
+                      "psp_limit_date": 1774653214127
+                    },
+                    {
+                      "psp_id": 779,
+                      "psp_desc": "Etape 2",
+                      "psp_limit_date": 1774653214128
+                    }
+                  ]
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toProjects()
+
+        assertEquals(1, projects.size)
+        assertEquals(Instant.ofEpochMilli(1774653214128), projects.first().deadline)
     }
 
     @Test
