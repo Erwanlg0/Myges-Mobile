@@ -263,7 +263,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 projectsJson?.toProjectDocuments().orEmpty()
                 
             val availablePeriods = (grades.mapNotNull { it.period } + courses.mapNotNull { it.period })
-                .filter { it.isNotBlank() }
+                .filter { it.isNotBlank() && it.contains(Regex("\\d{4}")) }
                 .distinct()
             val absences = runCatching { api.absences(year)?.toAbsences(year, availablePeriods).orEmpty() }.getOrDefault(emptyList())
             val practicals = runCatching { api.practicals(year)?.toPracticals().orEmpty() }.getOrDefault(emptyList())
@@ -294,7 +294,13 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                         ?.toDocuments()
                         .orEmpty()
                         .map { document ->
-                            document.copy(downloadUrl = document.downloadUrl ?: "me/${course.id}/files/${document.id}")
+                            if (document.downloadUrl != null) {
+                                val originalUrl = document.downloadUrl
+                                val separator = if (originalUrl.contains("?")) "&" else "?"
+                                document.copy(downloadUrl = "$originalUrl${separator}courseId=${course.id}")
+                            } else {
+                                document.copy(downloadUrl = "me/${course.id}/files/${document.id}")
+                            }
                         }
                 }.getOrDefault(emptyList())
             }

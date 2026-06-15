@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -645,7 +647,7 @@ fun GradesScreen(viewModel: StudentViewModel) {
         item { GradeSummaryCard(mainGrades) }
         item { GradeSimulationCard(mainGrades) }
         
-        items(mainGrades, key = { it.id }) { grade ->
+        items(filteredGrades, key = { it.id }) { grade ->
             GradeCard(
                 grade = grade,
                 onOpen = { selectedGrade = grade }
@@ -760,14 +762,108 @@ fun AbsencesScreen(viewModel: StudentViewModel) {
 @Composable
 fun CoursesScreen(viewModel: StudentViewModel) {
     val state by viewModel.courses.collectAsStateWithLifecycle()
+    val coursesList = state.data.orEmpty()
+    val years = remember(coursesList) {
+        listOf(null) + coursesList.mapNotNull { it.year }.filter { it.isNotBlank() }.distinct().sortedDescending()
+    }
+    val periods = remember(coursesList) {
+        listOf(null) + coursesList.mapNotNull { it.period }.filter { it.isNotBlank() }.distinct().sortedWith { p1, p2 -> comparePeriods(p2, p1) }
+    }
+    var selectedYear by remember { mutableStateOf<String?>(null) }
+    var selectedPeriod by remember { mutableStateOf<String?>(null) }
+
+    val filteredCourses = remember(coursesList, selectedYear, selectedPeriod) {
+        coursesList.filter { course ->
+            (selectedYear == null || course.year == selectedYear) &&
+            (selectedPeriod == null || course.period == selectedPeriod)
+        }
+    }
+
     FeatureStateContent(
         state = state,
         empty = List<Course>::isEmpty,
         emptyTitle = R.string.courses_empty_title,
         emptyBody = R.string.courses_empty_body,
         onRetry = viewModel::refresh
-    ) { courses ->
-        items(courses, key = { it.id }) { course -> CourseCard(course) }
+    ) { _ ->
+        if (years.size > 1 || periods.size > 1) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Year Selector
+                    var yearExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        CompactCard(modifier = Modifier.clickable { yearExpanded = true }) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = selectedYear ?: stringResource(R.string.courses_filter_year_format, stringResource(R.string.common_all)),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = yearExpanded,
+                            onDismissRequest = { yearExpanded = false }
+                        ) {
+                            years.forEach { year ->
+                                DropdownMenuItem(
+                                    text = { Text(year ?: stringResource(R.string.common_all)) },
+                                    onClick = {
+                                        selectedYear = year
+                                        yearExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Period Selector
+                    var periodExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        CompactCard(modifier = Modifier.clickable { periodExpanded = true }) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = selectedPeriod ?: stringResource(R.string.courses_filter_period_format, stringResource(R.string.common_all)),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = periodExpanded,
+                            onDismissRequest = { periodExpanded = false }
+                        ) {
+                            periods.forEach { period ->
+                                DropdownMenuItem(
+                                    text = { Text(period ?: stringResource(R.string.common_all)) },
+                                    onClick = {
+                                        selectedPeriod = period
+                                        periodExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        items(filteredCourses, key = { it.id }) { course ->
+            CourseCard(course = course, viewModel = viewModel)
+        }
     }
 }
 
@@ -1221,8 +1317,9 @@ private fun GradeDetailsDialog(
     components: List<Grade>,
     onDismiss: () -> Unit
 ) {
-    val ccComponents = components.filter { it.id.contains("-cc-") }
-    val examComponent = components.firstOrNull { it.id.contains("-exam") }
+    val isComponent = grade.id.contains("-cc-") || grade.id.contains("-exam")
+    val ccComponents = if (isComponent) emptyList() else components.filter { it.id.contains("-cc-") }
+    val examComponent = if (isComponent) null else components.firstOrNull { it.id.contains("-exam") }
     
     val ccValues = ccComponents.mapNotNull { it.value }
     val ccAverage = if (ccValues.isNotEmpty()) ccValues.average() else null
@@ -1447,8 +1544,29 @@ internal fun AbsenceCard(
 }
 
 @Composable
-internal fun CourseCard(course: Course) {
+internal fun CourseCard(
+    course: Course,
+    viewModel: StudentViewModel
+) {
     var syllabusExpanded by remember(course.id) { mutableStateOf(false) }
+    var showFilesDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val documentsState by viewModel.documents.collectAsStateWithLifecycle()
+    val courseFiles = remember(documentsState.data, course.id) {
+        documentsState.data.orEmpty().filter {
+            it.downloadUrl?.contains("me/${course.id}/files/") == true ||
+            it.downloadUrl?.contains("courseId=${course.id}") == true
+        }
+    }
+
+    if (showFilesDialog) {
+        CourseFilesDialog(
+            files = courseFiles,
+            viewModel = viewModel,
+            onDismiss = { showFilesDialog = false }
+        )
+    }
+
     CompactCard {
         Text(
             text = course.name.orUntitled(),
@@ -1487,16 +1605,118 @@ internal fun CourseCard(course: Course) {
                 }
             }
         }
-        if (!course.syllabus.isNullOrBlank()) {
+        if (!course.syllabus.isNullOrBlank() || course.fileCount > 0) {
             HorizontalDivider()
-            TextButton(onClick = { syllabusExpanded = !syllabusExpanded }) {
-                Text(stringResource(if (syllabusExpanded) R.string.courses_hide_syllabus else R.string.courses_show_syllabus))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!course.syllabus.isNullOrBlank()) {
+                    TextButton(
+                        onClick = { syllabusExpanded = !syllabusExpanded },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(if (syllabusExpanded) R.string.courses_hide_syllabus else R.string.courses_show_syllabus))
+                    }
+                    IconButton(
+                        onClick = {
+                            runCatching {
+                                val file = File(context.cacheDir, "${course.name}_syllabus.txt")
+                                file.writeText(course.syllabus)
+                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Syllabus - ${course.name}"))
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Rounded.Download, contentDescription = stringResource(R.string.courses_download_syllabus))
+                    }
+                }
+                
+                if (course.fileCount > 0) {
+                    TextButton(
+                        onClick = { showFilesDialog = true },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(stringResource(R.string.courses_files_button, course.fileCount))
+                    }
+                }
             }
-            if (syllabusExpanded) {
-                Text(course.syllabus)
+            if (syllabusExpanded && !course.syllabus.isNullOrBlank()) {
+                Text(
+                    text = course.syllabus,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
         }
     }
+}
+
+@Composable
+private fun CourseFilesDialog(
+    files: List<AcademicDocument>,
+    viewModel: StudentViewModel,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.courses_dialog_title)) },
+        text = {
+            if (files.isEmpty()) {
+                Text(stringResource(R.string.courses_no_files))
+            } else {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(files, key = { it.id }) { file ->
+                        Card(
+                            onClick = {
+                                viewModel.openDocument(file)
+                                onDismiss()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = file.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = file.fileName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Rounded.Download,
+                                    contentDescription = stringResource(R.string.courses_download_file)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        }
+    )
 }
 
 @Composable
