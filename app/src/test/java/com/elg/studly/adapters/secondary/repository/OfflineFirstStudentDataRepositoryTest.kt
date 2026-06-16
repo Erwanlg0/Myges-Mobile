@@ -268,6 +268,14 @@ private class RepositoryApi : MyGesApiService {
     override suspend fun download(url: String): Response<ResponseBody> {
         error("unused")
     }
+
+    override suspend fun joinGroup(rcId: String, projectId: String, groupId: String): Response<ResponseBody> {
+        error("unused")
+    }
+
+    override suspend fun leaveGroup(rcId: String, projectId: String, groupId: String): Response<ResponseBody> {
+        error("unused")
+    }
 }
 
 private class RepositoryDao : StudentDao() {

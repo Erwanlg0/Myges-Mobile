@@ -42,8 +42,12 @@ import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.StudentProfile
+import com.elg.studly.domain.model.SyncFeature
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -55,6 +59,7 @@ import retrofit2.HttpException
 import java.io.File
 import java.io.IOException
 import java.net.URLDecoder
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Year
@@ -168,72 +173,169 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return dao.observeNews().map { news -> news.map { it.toDomain() } }
     }
 
-    override suspend fun syncAll() {
+    override suspend fun syncAll(force: Boolean) {
         withContext(Dispatchers.IO) {
             try {
                 purgeExpiredDocumentCache(File(context.cacheDir, DOCUMENT_CACHE))
-                val profile = api.profile().toProfile()
-                val activeYears = (api.years()?.toYears().orEmpty() + 
-                        runCatching { api.trimesterYears()?.toYears().orEmpty() }.getOrDefault(emptyList()) + 
-                        listOfNotNull(profile.academicYear)
-                    )
-                    .flatMap { yearStr ->
-                        Regex("\\d{4}").findAll(yearStr).map { it.value }
+
+                val due = dueFeatures(force)
+                if (due.isEmpty()) return@withContext
+
+                val needAgenda = SyncFeature.Agenda in due
+                val needGrades = SyncFeature.Grades in due
+                val needAbsences = SyncFeature.Absences in due
+                val needProjects = SyncFeature.Projects in due
+                val needDocuments = SyncFeature.Documents in due
+                val needDirectory = SyncFeature.Directory in due
+                val needNews = SyncFeature.News in due
+                // Projects and documents share the (expensive) course/project payload fetch.
+                val academicDue = needProjects || needDocuments
+                val needYears = needGrades || needAbsences || needDirectory || academicDue
+
+                val profileAndYears = if (needYears) fetchProfileAndYears() else null
+                val updatedProfile = profileAndYears?.profile
+                val years = profileAndYears?.years.orEmpty()
+
+                val nextProjectStepProjects = if (academicDue) {
+                    runCatching { api.nextProjectSteps()?.toNextProjectStepProjects().orEmpty() }.getOrDefault(emptyList())
+                } else {
+                    emptyList()
+                }
+
+                val fetched = coroutineScope {
+                    val agendaDeferred = if (needAgenda) async { fetchAgendaEvents() } else null
+                    val gradesDeferred = if (needGrades) async { fetchGrades(years) } else null
+                    val academicDeferred = if (academicDue) {
+                        async { fetchAcademicData(years, updatedProfile!!.id, nextProjectStepProjects) }
+                    } else {
+                        null
                     }
-                    .distinct()
-                    .sortedDescending()
-                    .ifEmpty { listOf(Year.now().value.toString()) }
-                
-                val updatedProfile = profile.copy(
-                    academicYear = activeYears.sorted().joinToString(", ")
+                    val directoryDeferred = if (needDirectory) async { fetchDirectory(years) } else null
+                    val newsDeferred = if (needNews) async { fetchNews() } else null
+
+                    val agenda = agendaDeferred?.await()
+                    val grades = gradesDeferred?.await()
+                    val academic = academicDeferred?.await()
+                    val directory = directoryDeferred?.await()
+                    val news = newsDeferred?.await()
+                    val absences = if (needAbsences) {
+                        fetchAbsences(years, absencePeriods(grades, academic?.courses))
+                    } else {
+                        null
+                    }
+
+                    FetchedData(agenda, grades, absences, academic, directory, news)
+                }
+
+                val previousIds = SyncedIds(
+                    agenda = if (needAgenda) dao.agendaIds().toSet() else emptySet(),
+                    grades = if (needGrades) dao.gradeIds().toSet() else emptySet(),
+                    absences = if (needAbsences) dao.absenceIds().toSet() else emptySet(),
+                    projects = if (needProjects) dao.projectIds().toSet() else emptySet(),
+                    documents = if (needDocuments) dao.documentIds().toSet() else emptySet()
                 )
 
-                val isFirstSync = settingsRepository.settings.first().lastSyncAt == null || dao.agendaIds().isEmpty()
-                val agendaWindow = if (isFirstSync) {
-                    AgendaWindow.firstSync()
-                } else {
-                    AgendaWindow.subsequentSync()
+                updatedProfile?.let { dao.syncProfile(it.toEntity()) }
+                fetched.agenda?.let { events -> dao.syncAgenda(events.map { it.toEntity() }) }
+                fetched.grades?.let { grades -> dao.syncGrades(grades.map { it.toEntity() }) }
+                fetched.absences?.let { absences -> dao.syncAbsences(absences.map { it.toEntity() }) }
+                fetched.academic?.let { academic ->
+                    dao.syncCourses(academic.courses.map { it.toEntity() })
+                    if (needProjects) {
+                        dao.syncProjectsAndPracticals(
+                            projects = academic.projects.map { it.toEntity() },
+                            projectGroups = academic.projects.flatMap { it.toGroupEntities() } +
+                                academic.practicals.flatMap { it.toGroupEntities() },
+                            projectSteps = academic.projects.flatMap { it.toStepEntities() } +
+                                academic.practicals.flatMap { it.toStepEntities() },
+                            practicals = academic.practicals.map { it.toEntity() }
+                        )
+                    }
+                    if (needDocuments) {
+                        dao.syncDocuments(academic.documents.map { it.toEntity() })
+                    }
                 }
-                val agenda = api.agenda(
-                    start = agendaWindow.start,
-                    end = agendaWindow.end
-                )?.toAgendaEvents().orEmpty()
-                val nextProjectStepProjects = runCatching {
-                    api.nextProjectSteps()?.toNextProjectStepProjects().orEmpty()
-                }.getOrDefault(emptyList())
-                val yearData = fetchAllYearsData(activeYears, updatedProfile.id)
-                    .withNextProjectSteps(nextProjectStepProjects)
-                val news = runCatching { api.minimumVersion()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
-                    api.news()?.toNews().orEmpty() +
-                    runCatching { api.newsBanners()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
-                    runCatching { api.partners()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
-                    runCatching { api.speedMeetingAppointments()?.toNews().orEmpty() }.getOrDefault(emptyList())
-                val previousIds = SyncedIds(
-                    agenda = dao.agendaIds().toSet(),
-                    grades = dao.gradeIds().toSet(),
-                    absences = dao.absenceIds().toSet(),
-                    projects = dao.projectIds().toSet(),
-                    documents = dao.documentIds().toSet()
+                fetched.directory?.let { people -> dao.syncDirectory(people.map { it.toEntity() }) }
+                fetched.news?.let { news -> dao.syncNews(news.distinctBy { it.id }.map { it.toEntity() }) }
+
+                notifyAboutChanges(
+                    previousIds = previousIds,
+                    agenda = fetched.agenda.orEmpty(),
+                    grades = fetched.grades.orEmpty(),
+                    absences = fetched.absences.orEmpty(),
+                    projects = if (needProjects) fetched.academic?.projects.orEmpty() else emptyList(),
+                    documents = if (needDocuments) fetched.academic?.documents.orEmpty() else emptyList()
                 )
-                dao.replaceSyncedData(
-                    profile = updatedProfile.toEntity(),
-                    agenda = agenda.map { it.toEntity() },
-                    grades = yearData.grades.map { it.toEntity() },
-                    absences = yearData.absences.map { it.toEntity() },
-                    courses = yearData.courses.map { it.toEntity() },
-                    projects = yearData.projects.map { it.toEntity() },
-                    projectGroups = yearData.projects.flatMap { it.toGroupEntities() } + yearData.practicals.flatMap { it.toGroupEntities() },
-                    projectSteps = yearData.projects.flatMap { it.toStepEntities() } + yearData.practicals.flatMap { it.toStepEntities() },
-                    practicals = yearData.practicals.map { it.toEntity() },
-                    documents = yearData.documents.map { it.toEntity() },
-                    directoryPeople = yearData.directory.map { it.toEntity() },
-                    news = news.distinctBy { it.id }.map { it.toEntity() }
-                )
-                notifyAboutChanges(previousIds, agenda, yearData.grades, yearData.absences, yearData.projects, yearData.documents)
+
+                due.forEach { settingsRepository.markFeatureFetched(it) }
             } catch (throwable: Throwable) {
                 throw throwable.toRepositoryException()
             }
         }
+    }
+
+    private suspend fun dueFeatures(force: Boolean): Set<SyncFeature> {
+        if (force) return SyncFeature.entries.toSet()
+        val intervals = settingsRepository.settings.first().refreshIntervals
+        val now = Instant.now()
+        return SyncFeature.entries.filterTo(mutableSetOf()) { feature ->
+            val last = settingsRepository.lastFetchedAt(feature)
+            last == null || Duration.between(last, now).toMinutes() >= intervals.minutesFor(feature)
+        }
+    }
+
+    private suspend fun fetchProfileAndYears(): ProfileAndYears {
+        val profile = api.profile().toProfile()
+        val activeYears = (
+            api.years()?.toYears().orEmpty() +
+                runCatching { api.trimesterYears()?.toYears().orEmpty() }.getOrDefault(emptyList()) +
+                listOfNotNull(profile.academicYear)
+            )
+            .flatMap { yearStr -> Regex("\\d{4}").findAll(yearStr).map { it.value } }
+            .distinct()
+            .sortedDescending()
+            .ifEmpty { listOf(Year.now().value.toString()) }
+        val updatedProfile = profile.copy(academicYear = activeYears.sorted().joinToString(", "))
+        return ProfileAndYears(updatedProfile, activeYears)
+    }
+
+    private suspend fun fetchAgendaEvents(): List<AgendaEvent> {
+        val isFirstSync = settingsRepository.settings.first().lastSyncAt == null || dao.agendaIds().isEmpty()
+        val window = if (isFirstSync) AgendaWindow.firstSync() else AgendaWindow.subsequentSync()
+        return api.agenda(start = window.start, end = window.end)?.toAgendaEvents().orEmpty()
+    }
+
+    private suspend fun fetchGrades(years: List<String>): List<Grade> {
+        return years.flatMap { year ->
+            runCatching { api.grades(year)?.toGrades(year).orEmpty() }.getOrDefault(emptyList())
+        }.distinctBy { it.id }
+    }
+
+    private suspend fun fetchAbsences(years: List<String>, periods: List<String>): List<Absence> {
+        return years.flatMap { year ->
+            runCatching { api.absences(year)?.toAbsences(year, periods).orEmpty() }.getOrDefault(emptyList())
+        }.distinctBy { it.id }
+    }
+
+    private suspend fun fetchDirectory(years: List<String>): List<DirectoryPerson> {
+        return years.flatMap { directoryPeople(it) }.distinctBy { it.id }
+    }
+
+    private suspend fun fetchNews(): List<NewsItem> {
+        return runCatching { api.minimumVersion()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
+            api.news()?.toNews().orEmpty() +
+            runCatching { api.newsBanners()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
+            runCatching { api.partners()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
+            runCatching { api.speedMeetingAppointments()?.toNews().orEmpty() }.getOrDefault(emptyList())
+    }
+
+    /** Periods used to attribute absences — derived from freshly fetched data or the local cache. */
+    private suspend fun absencePeriods(grades: List<Grade>?, courses: List<Course>?): List<String> {
+        val resolvedGrades = grades ?: dao.grades().map { it.toDomain() }
+        val resolvedCourses = courses ?: dao.courses().map { it.toDomain() }
+        return (resolvedGrades.mapNotNull { it.period } + resolvedCourses.mapNotNull { it.period })
+            .filter { it.isNotBlank() && it.contains(Regex("\\d{4}")) }
+            .distinct()
     }
 
     override suspend fun clearCache() {
@@ -300,6 +402,28 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 }
                 target.setLastModified(Instant.now().toEpochMilli())
                 FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
+            } catch (throwable: Throwable) {
+                throw throwable.toRepositoryException()
+            }
+        }
+    }
+
+    override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {
+        withContext(Dispatchers.IO) {
+            try {
+                val response = api.joinGroup(courseId, projectId, groupId)
+                if (!response.isSuccessful) throw HttpException(response)
+            } catch (throwable: Throwable) {
+                throw throwable.toRepositoryException()
+            }
+        }
+    }
+
+    override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {
+        withContext(Dispatchers.IO) {
+            try {
+                val response = api.leaveGroup(courseId, projectId, groupId)
+                if (!response.isSuccessful) throw HttpException(response)
             } catch (throwable: Throwable) {
                 throw throwable.toRepositoryException()
             }
@@ -392,22 +516,22 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             }
     }
 
-    private suspend fun fetchAllYearsData(years: List<String>, currentUserId: String): YearData {
+    private suspend fun fetchAcademicData(
+        years: List<String>,
+        currentUserId: String,
+        nextProjectStepProjects: List<Project>
+    ): AcademicData {
         val allCourses = mutableListOf<Course>()
-        val allGrades = mutableListOf<Grade>()
-        val allAbsences = mutableListOf<Absence>()
         val allDocuments = mutableListOf<AcademicDocument>()
         val allProjects = mutableListOf<Project>()
         val allPracticals = mutableListOf<Practical>()
-        val allDirectory = mutableListOf<DirectoryPerson>()
         val fetchedCourseDocIds = mutableSetOf<String>()
 
         years.forEach { year ->
             val courses = runCatching { api.courses(year)?.toCourses().orEmpty() }.getOrDefault(emptyList())
                 .withRemoteSyllabus()
-            val grades = runCatching { api.grades(year)?.toGrades(year).orEmpty() }.getOrDefault(emptyList())
             val projectsJson = runCatching { api.projects(year) }.getOrNull()
-            
+
             val newCourses = courses.filter { it.id !in fetchedCourseDocIds }
             fetchedCourseDocIds.addAll(newCourses.map { it.id })
             val courseProjectPayloads = newCourses.mapNotNull { course ->
@@ -415,7 +539,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             }
             val projectPayloads = listOfNotNull(projectsJson) + courseProjectPayloads
             val projects = projectPayloads.flatMap { it.toProjects(currentUserId, year) }.mergeProjects()
-            
+
             val practicalsJson = runCatching { api.practicals(year) }.getOrNull()
             val coursePracticalPayloads = newCourses.mapNotNull { course ->
                 runCatching { api.coursePracticals(course.id) }.getOrNull()
@@ -431,60 +555,40 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 projectPayloads.flatMap { it.toProjectDocuments(year) }.filter { it.ownerId in myProjectIds } +
                 practicalPayloads.flatMap { it.toPracticalDocuments(year) }.filter { it.ownerId in myPracticalIds } +
                 syllabusDocuments(courses)
-                
-            val availablePeriods = (grades.mapNotNull { it.period } + courses.mapNotNull { it.period })
-                .filter { it.isNotBlank() && it.contains(Regex("\\d{4}")) }
-                .distinct()
-            val absences = runCatching { api.absences(year)?.toAbsences(year, availablePeriods).orEmpty() }.getOrDefault(emptyList())
-            val directory = directoryPeople(year)
 
             allCourses.addAll(courses)
-            allGrades.addAll(grades)
-            allAbsences.addAll(absences)
             allDocuments.addAll(documents)
             allProjects.addAll(projects)
             allPracticals.addAll(practicals)
-            allDirectory.addAll(directory)
         }
 
-        return YearData(
+        return AcademicData(
             courses = allCourses.distinctBy { it.id },
-            grades = allGrades.distinctBy { it.id },
-            absences = allAbsences.distinctBy { it.id },
-            documents = allDocuments.distinctBy { it.id },
-            projects = allProjects.mergeProjects(),
+            projects = allProjects.mergeProjects().withNextProjectSteps(nextProjectStepProjects),
             practicals = allPracticals.distinctBy { it.id },
-            directory = allDirectory.distinctBy { it.id }
+            documents = allDocuments.distinctBy { it.id }
         )
     }
 
-
-
-    private suspend fun YearData.withCachedOutsideFetchedYears(): YearData {
-        val refreshedYears = courses.mapNotNull { it.year }.toSet() +
-            grades.mapNotNull { it.academicYearStart() }.toSet() +
-            absences.mapNotNull { it.academicYearStart() }.toSet() +
-            documents.mapNotNull { it.year }.toSet()
-        val cachedSteps = dao.projectSteps().groupBy { it.projectId }
-        val cachedGroups = dao.projectGroups().groupBy { it.projectId }
-        if (refreshedYears.isEmpty()) {
-            return copy(
-                courses = (courses + dao.courses().map { it.toDomain() }).distinctBy { it.id },
-                grades = (grades + dao.grades().map { it.toDomain() }).distinctBy { it.id },
-                absences = (absences + dao.absences().map { it.toDomain() }).distinctBy { it.id },
-                documents = (documents + dao.documents().map { it.toDomain() }).distinctBy { it.id },
-                projects = (projects + dao.projects().map { it.toDomain(cachedSteps[it.id].orEmpty(), cachedGroups[it.id].orEmpty()) }).distinctBy { it.id },
-                practicals = (practicals + dao.practicals().map { it.toDomain(cachedSteps[it.id].orEmpty(), cachedGroups[it.id].orEmpty()) }).distinctBy { it.id }
+    private fun List<Project>.withNextProjectSteps(nextProjectStepProjects: List<Project>): List<Project> {
+        if (nextProjectStepProjects.isEmpty()) return this
+        val upcomingByProjectId = nextProjectStepProjects.associateBy { it.id }
+        val mergedProjects = map { project ->
+            val upcoming = upcomingByProjectId[project.id] ?: return@map project
+            project.copy(
+                name = project.name.ifBlank { upcoming.name },
+                courseName = project.courseName ?: upcoming.courseName,
+                groupName = project.groupName ?: upcoming.groupName,
+                status = project.status ?: upcoming.status,
+                deadline = listOfNotNull(project.deadline, upcoming.deadline).minOrNull(),
+                steps = (project.steps + upcoming.steps).distinctBy { it.id },
+                year = project.year ?: upcoming.year,
+                courseId = project.courseId ?: upcoming.courseId,
+                groups = (project.groups + upcoming.groups).distinctBy { it.id }
             )
         }
-        return copy(
-            courses = (courses + dao.courses().map { it.toDomain() }.filter { it.year !in refreshedYears }).distinctBy { it.id },
-            grades = (grades + dao.grades().map { it.toDomain() }.filter { it.academicYearStart() !in refreshedYears }).distinctBy { it.id },
-            absences = (absences + dao.absences().map { it.toDomain() }.filter { it.academicYearStart() !in refreshedYears }).distinctBy { it.id },
-            documents = (documents + dao.documents().map { it.toDomain() }.filter { it.year !in refreshedYears }).distinctBy { it.id },
-            projects = (projects + dao.projects().map { it.toDomain(cachedSteps[it.id].orEmpty(), cachedGroups[it.id].orEmpty()) }).distinctBy { it.id },
-            practicals = (practicals + dao.practicals().map { it.toDomain(cachedSteps[it.id].orEmpty(), cachedGroups[it.id].orEmpty()) }).distinctBy { it.id }
-        )
+        val existingProjectIds = map { it.id }.toSet()
+        return mergedProjects + nextProjectStepProjects.filter { it.id !in existingProjectIds }
     }
 
     private suspend fun courseDocuments(courses: List<Course>): List<AcademicDocument> {
@@ -614,46 +718,26 @@ private data class SyncedIds(
     val documents: Set<String>
 )
 
-private data class YearData(
+private data class ProfileAndYears(
+    val profile: StudentProfile,
+    val years: List<String>
+)
+
+private data class AcademicData(
     val courses: List<Course>,
-    val grades: List<Grade>,
-    val absences: List<Absence>,
-    val documents: List<AcademicDocument>,
     val projects: List<Project>,
     val practicals: List<Practical>,
-    val directory: List<DirectoryPerson>
-) {
-    fun hasAcademicData(): Boolean {
-        return courses.isNotEmpty() ||
-            grades.isNotEmpty() ||
-            absences.isNotEmpty() ||
-            documents.isNotEmpty() ||
-            projects.isNotEmpty() ||
-            practicals.isNotEmpty() ||
-            directory.isNotEmpty()
-    }
+    val documents: List<AcademicDocument>
+)
 
-    fun withNextProjectSteps(nextProjectStepProjects: List<Project>): YearData {
-        if (nextProjectStepProjects.isEmpty()) return this
-        val upcomingByProjectId = nextProjectStepProjects.associateBy { it.id }
-        val mergedProjects = projects.map { project ->
-            val upcoming = upcomingByProjectId[project.id] ?: return@map project
-            project.copy(
-                name = project.name.ifBlank { upcoming.name },
-                courseName = project.courseName ?: upcoming.courseName,
-                groupName = project.groupName ?: upcoming.groupName,
-                status = project.status ?: upcoming.status,
-                deadline = listOfNotNull(project.deadline, upcoming.deadline).minOrNull(),
-                steps = (project.steps + upcoming.steps).distinctBy { it.id },
-                year = project.year ?: upcoming.year,
-                courseId = project.courseId ?: upcoming.courseId,
-                groups = (project.groups + upcoming.groups).distinctBy { it.id }
-            )
-        }
-        val existingProjectIds = projects.map { it.id }.toSet()
-        return copy(projects = mergedProjects + nextProjectStepProjects.filter { it.id !in existingProjectIds })
-    }
-}
+private data class FetchedData(
+    val agenda: List<AgendaEvent>?,
+    val grades: List<Grade>?,
+    val absences: List<Absence>?,
+    val academic: AcademicData?,
+    val directory: List<DirectoryPerson>?,
+    val news: List<NewsItem>?
+)
 
 internal data class AgendaWindow(
     val start: Long,

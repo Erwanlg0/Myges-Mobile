@@ -91,6 +91,8 @@ private class RecordingStudentDataRepository(
         events += "clearCache"
     }
     override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri = Uri.EMPTY
+    override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {}
+    override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
 }
 
 private class RecordingSettingsRepository(

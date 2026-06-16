@@ -205,7 +205,8 @@ fun Practical.toEntity() = PracticalEntity(
     endsAtEpochMillis = endsAt?.toEpochMilli(),
     room = room,
     status = status,
-    year = year
+    year = year,
+    courseId = courseId
 )
 
 fun PracticalEntity.toDomain(
@@ -220,6 +221,7 @@ fun PracticalEntity.toDomain(
     room = room,
     status = status,
     year = year,
+    courseId = courseId,
     steps = steps.map { it.toDomain() },
     groups = groups.map { it.toDomain() }
 )

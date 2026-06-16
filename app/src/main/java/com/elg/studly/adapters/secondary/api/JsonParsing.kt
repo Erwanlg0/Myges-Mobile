@@ -470,6 +470,7 @@ fun JsonElement.toPracticals(currentUserId: String? = null, fallbackYear: String
             room = root.text("room", "classroom", "salle"),
             status = root.text("status", "state"),
             year = root.text("year", "academicYear") ?: fallbackYear,
+            courseId = root.text("rc_id", "rcId", "courseId", "discipline_id"),
             groups = groups,
             steps = steps
         )

@@ -8,6 +8,8 @@ import com.elg.studly.adapters.primary.state.FeatureUiState
 import java.time.LocalDate
 import com.elg.studly.application.ports.NetworkMonitor
 import com.elg.studly.application.usecase.DownloadDocumentUseCase
+import com.elg.studly.application.usecase.JoinGroupUseCase
+import com.elg.studly.application.usecase.LeaveGroupUseCase
 import com.elg.studly.application.usecase.LogoutUseCase
 import com.elg.studly.application.usecase.ObserveAbsencesUseCase
 import com.elg.studly.application.usecase.ObserveAgendaUseCase
@@ -67,6 +69,8 @@ class StudentViewModel @Inject constructor(
     private val refreshStudentDataUseCase: RefreshStudentDataUseCase,
     private val syncAgendaToCalendarUseCase: SyncAgendaToCalendarUseCase,
     private val downloadDocumentUseCase: DownloadDocumentUseCase,
+    private val joinGroupUseCase: JoinGroupUseCase,
+    private val leaveGroupUseCase: LeaveGroupUseCase,
     private val logoutUseCase: LogoutUseCase,
     networkMonitor: NetworkMonitor
 ) : ViewModel() {
@@ -84,7 +88,15 @@ class StudentViewModel @Inject constructor(
     private val _calendarSyncCompleted = MutableSharedFlow<Unit>()
     val calendarSyncCompleted: SharedFlow<Unit> = _calendarSyncCompleted
 
+    private val _depositRequests = MutableSharedFlow<String>()
+    val depositRequests: SharedFlow<String> = _depositRequests
+
     val agendaDateToNavigate = MutableSharedFlow<LocalDate>()
+
+    fun requestDeposit(groupId: String) {
+        viewModelScope.launch { _depositRequests.emit(groupId) }
+    }
+
     val gradesPeriodToNavigate = MutableSharedFlow<String>()
     val absencesPeriodToNavigate = MutableSharedFlow<String>()
 
@@ -137,17 +149,23 @@ class StudentViewModel @Inject constructor(
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
     init {
-        refresh()
+        autoRefresh()
         observeNetworkRecovery(networkMonitor.isOnline)
     }
 
-    fun refresh() {
+    /** Manual refresh (button / pull-to-refresh / retry) bypasses the per-feature intervals. */
+    fun refresh() = launchRefresh(force = true)
+
+    /** Automatic refresh (startup, network recovery) honours the per-feature intervals. */
+    private fun autoRefresh() = launchRefresh(force = false)
+
+    private fun launchRefresh(force: Boolean) {
         viewModelScope.launch {
             if (refreshing.value) return@launch
             refreshing.value = true
             error.value = null
             _documentError.value = null
-            runCatching { refreshStudentDataUseCase() }
+            runCatching { refreshStudentDataUseCase(force) }
                 .onSuccess { _refreshSucceeded.emit(Unit) }
                 .onFailure { handleFailure(it) }
             refreshing.value = false
@@ -188,6 +206,27 @@ class StudentViewModel @Inject constructor(
         }
     }
 
+    fun joinGroup(courseId: String, projectId: String, groupId: String) {
+        changeGroupMembership { joinGroupUseCase(courseId, projectId, groupId) }
+    }
+
+    fun leaveGroup(courseId: String, projectId: String, groupId: String) {
+        changeGroupMembership { leaveGroupUseCase(courseId, projectId, groupId) }
+    }
+
+    private fun changeGroupMembership(action: suspend () -> Unit) {
+        viewModelScope.launch {
+            if (refreshing.value) return@launch
+            refreshing.value = true
+            error.value = null
+            val result = runCatching { action() }
+            refreshing.value = false
+            result
+                .onSuccess { refresh() }
+                .onFailure { handleFailure(it) }
+        }
+    }
+
     fun reportOpenDocumentFailure() {
         error.value = AppError.Storage
     }
@@ -207,7 +246,7 @@ class StudentViewModel @Inject constructor(
                 val wasOnline = previousOnline
                 previousOnline = isOnline
                 if (wasOnline == false && isOnline) {
-                    refresh()
+                    autoRefresh()
                 }
             }
         }

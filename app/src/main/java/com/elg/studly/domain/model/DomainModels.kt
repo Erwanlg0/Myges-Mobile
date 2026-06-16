@@ -99,6 +99,7 @@ data class Practical(
     val room: String?,
     val status: String?,
     val year: String? = null,
+    val courseId: String? = null,
     val groups: List<ProjectGroup> = emptyList(),
     val steps: List<ProjectStep> = emptyList()
 )
@@ -184,8 +185,68 @@ data class UserSettings(
     val calendarSyncEnabled: Boolean,
     val biometricEnabled: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.System,
+    val refreshIntervals: RefreshIntervals = RefreshIntervals(),
     val lastSyncAt: Instant?
 )
+
+/** Bounds for per-feature background refresh intervals, in minutes. */
+const val MIN_REFRESH_MINUTES = 15
+const val MAX_REFRESH_MINUTES = 24 * 60
+const val DEFAULT_REFRESH_MINUTES = 6 * 60
+
+fun clampRefreshMinutes(minutes: Int): Int = minutes.coerceIn(MIN_REFRESH_MINUTES, MAX_REFRESH_MINUTES)
+
+/** A data category that can be refreshed from the network on its own schedule. */
+enum class SyncFeature {
+    Agenda,
+    Grades,
+    Absences,
+    Projects,
+    Documents,
+    Directory,
+    News
+}
+
+/**
+ * Minimum delay (minutes) between two automatic fetches of each feature. Manual refresh always
+ * bypasses these. Values are clamped to [MIN_REFRESH_MINUTES]..[MAX_REFRESH_MINUTES].
+ */
+data class RefreshIntervals(
+    val agenda: Int = DEFAULT_REFRESH_MINUTES,
+    val grades: Int = DEFAULT_REFRESH_MINUTES,
+    val absences: Int = DEFAULT_REFRESH_MINUTES,
+    val projects: Int = DEFAULT_REFRESH_MINUTES,
+    val documents: Int = DEFAULT_REFRESH_MINUTES,
+    val directory: Int = DEFAULT_REFRESH_MINUTES,
+    val news: Int = DEFAULT_REFRESH_MINUTES
+) {
+    fun minutesFor(feature: SyncFeature): Int = when (feature) {
+        SyncFeature.Agenda -> agenda
+        SyncFeature.Grades -> grades
+        SyncFeature.Absences -> absences
+        SyncFeature.Projects -> projects
+        SyncFeature.Documents -> documents
+        SyncFeature.Directory -> directory
+        SyncFeature.News -> news
+    }
+
+    fun with(feature: SyncFeature, minutes: Int): RefreshIntervals {
+        val value = clampRefreshMinutes(minutes)
+        return when (feature) {
+            SyncFeature.Agenda -> copy(agenda = value)
+            SyncFeature.Grades -> copy(grades = value)
+            SyncFeature.Absences -> copy(absences = value)
+            SyncFeature.Projects -> copy(projects = value)
+            SyncFeature.Documents -> copy(documents = value)
+            SyncFeature.Directory -> copy(directory = value)
+            SyncFeature.News -> copy(news = value)
+        }
+    }
+
+    /** Smallest configured interval — used as the background worker cadence. */
+    fun smallestIntervalMinutes(): Int =
+        clampRefreshMinutes(SyncFeature.entries.minOf { minutesFor(it) })
+}
 
 data class CalendarAccount(
     val id: Long,

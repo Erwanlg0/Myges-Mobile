@@ -107,7 +107,8 @@ data class PracticalEntity(
     val endsAtEpochMillis: Long?,
     val room: String?,
     val status: String?,
-    val year: String?
+    val year: String?,
+    val courseId: String? = null
 )
 
 @Entity(tableName = "documents")

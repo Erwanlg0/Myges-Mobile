@@ -13,6 +13,7 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.Session
+import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
@@ -39,9 +40,11 @@ interface StudentDataRepository {
     fun observeDocuments(): Flow<List<AcademicDocument>>
     fun observeDirectory(): Flow<List<DirectoryPerson>>
     fun observeNews(): Flow<List<NewsItem>>
-    suspend fun syncAll()
+    suspend fun syncAll(force: Boolean = false)
     suspend fun clearCache()
     suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit = {}): Uri
+    suspend fun joinGroup(courseId: String, projectId: String, groupId: String)
+    suspend fun leaveGroup(courseId: String, projectId: String, groupId: String)
 }
 
 interface SettingsRepository {
@@ -55,6 +58,9 @@ interface SettingsRepository {
     suspend fun setProjectNotificationsEnabled(enabled: Boolean)
     suspend fun setDocumentNotificationsEnabled(enabled: Boolean)
     suspend fun setThemeMode(themeMode: ThemeMode)
+    suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int)
+    suspend fun lastFetchedAt(feature: SyncFeature): Instant?
+    suspend fun markFeatureFetched(feature: SyncFeature)
     suspend fun markSynced()
     suspend fun clearSyncMetadata()
 }
@@ -72,7 +78,7 @@ interface CalendarSyncPort {
 
 interface NotificationScheduler {
     fun ensureChannels()
-    suspend fun scheduleStudentSync()
+    suspend fun scheduleStudentSync(intervalMinutes: Long)
     suspend fun runStudentSyncNow()
     suspend fun cancelStudentSync()
     suspend fun showSyncFailure()

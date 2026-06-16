@@ -33,6 +33,8 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.UploadFile
+import androidx.compose.material.icons.rounded.GroupAdd
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Refresh
@@ -1305,6 +1307,13 @@ fun ProjectsScreen(
             downloadingDocumentIds = downloadingDocumentIds,
             documentDownloadProgress = documentDownloadProgress,
             onOpenDocument = viewModel::openDocument,
+            onDeposit = viewModel::requestDeposit,
+            onJoinGroup = project.courseId?.let { rcId ->
+                { groupId: String -> viewModel.joinGroup(rcId, project.id, groupId) }
+            },
+            onLeaveGroup = project.courseId?.let { rcId ->
+                { groupId: String -> viewModel.leaveGroup(rcId, project.id, groupId) }
+            },
             onDismiss = { selectedProject = null }
         )
     }
@@ -1354,6 +1363,13 @@ fun PracticalsScreen(viewModel: StudentViewModel) {
             downloadingDocumentIds = downloadingDocumentIds,
             documentDownloadProgress = documentDownloadProgress,
             onOpenDocument = viewModel::openDocument,
+            onDeposit = viewModel::requestDeposit,
+            onJoinGroup = practical.courseId?.let { rcId ->
+                { groupId: String -> viewModel.joinGroup(rcId, practical.id, groupId) }
+            },
+            onLeaveGroup = practical.courseId?.let { rcId ->
+                { groupId: String -> viewModel.leaveGroup(rcId, practical.id, groupId) }
+            },
             onDismiss = { selectedPractical = null }
         )
     }
@@ -2784,6 +2800,9 @@ private fun ProjectDetailsDialog(
     downloadingDocumentIds: Set<String>,
     documentDownloadProgress: Map<String, Float?>,
     onOpenDocument: (AcademicDocument) -> Unit,
+    onDeposit: (String) -> Unit,
+    onJoinGroup: ((String) -> Unit)? = null,
+    onLeaveGroup: ((String) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var selectedStepId by remember(project.id) { mutableStateOf(project.steps.firstOrNull()?.id) }
@@ -2864,6 +2883,15 @@ private fun ProjectDetailsDialog(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = { onDeposit(myGroup.id) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Rounded.UploadFile, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.deposit_document))
+                            }
                         }
                     }
                     var showAllGroupsDialog by remember { mutableStateOf(false) }
@@ -2874,6 +2902,8 @@ private fun ProjectDetailsDialog(
                             downloadingDocumentIds = downloadingDocumentIds,
                             documentDownloadProgress = documentDownloadProgress,
                             onOpenDocument = onOpenDocument,
+                            onJoinGroup = onJoinGroup,
+                            onLeaveGroup = onLeaveGroup,
                             onDismiss = { showAllGroupsDialog = false }
                         )
                     }
@@ -2922,6 +2952,8 @@ private fun AllGroupsDialog(
     downloadingDocumentIds: Set<String>,
     documentDownloadProgress: Map<String, Float?>,
     onOpenDocument: (AcademicDocument) -> Unit,
+    onJoinGroup: ((String) -> Unit)? = null,
+    onLeaveGroup: ((String) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val sortedGroups = remember(groups) {
@@ -2931,6 +2963,7 @@ private fun AllGroupsDialog(
                 .thenBy { group -> group.name }
         )
     }
+    val alreadyInAGroup = groups.any { it.isMine }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.projects_groups_title)) },
@@ -2972,6 +3005,28 @@ private fun AllGroupsDialog(
                                     showDownloadButton = group.isMine,
                                     onOpen = { onOpenDocument(document) }
                                 )
+                            }
+                        }
+
+                        if (group.isMine && onLeaveGroup != null) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { onLeaveGroup(group.id) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Rounded.Logout, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.group_leave))
+                            }
+                        } else if (!group.isMine && !alreadyInAGroup && onJoinGroup != null) {
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = { onJoinGroup(group.id) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Rounded.GroupAdd, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.group_join))
                             }
                         }
                     }
@@ -3454,6 +3509,9 @@ private fun PracticalDetailsDialog(
     downloadingDocumentIds: Set<String>,
     documentDownloadProgress: Map<String, Float?>,
     onOpenDocument: (AcademicDocument) -> Unit,
+    onDeposit: (String) -> Unit,
+    onJoinGroup: ((String) -> Unit)? = null,
+    onLeaveGroup: ((String) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val myGroupId = practical.groups.firstOrNull { it.isMine }?.id
@@ -3515,6 +3573,15 @@ private fun PracticalDetailsDialog(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = { onDeposit(myGroup.id) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Rounded.UploadFile, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.deposit_document))
+                            }
                         }
                     }
                     var showAllGroupsDialog by remember { mutableStateOf(false) }
@@ -3525,6 +3592,8 @@ private fun PracticalDetailsDialog(
                             downloadingDocumentIds = downloadingDocumentIds,
                             documentDownloadProgress = documentDownloadProgress,
                             onOpenDocument = onOpenDocument,
+                            onJoinGroup = onJoinGroup,
+                            onLeaveGroup = onLeaveGroup,
                             onDismiss = { showAllGroupsDialog = false }
                         )
                     }

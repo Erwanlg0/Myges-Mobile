@@ -202,33 +202,41 @@ abstract class StudentDao {
     abstract suspend fun clearNews()
 
     @Transaction
-    open suspend fun replaceSyncedData(
-        profile: StudentProfileEntity,
-        agenda: List<AgendaEventEntity>,
-        grades: List<GradeEntity>,
-        absences: List<AbsenceEntity>,
-        courses: List<CourseEntity>,
+    open suspend fun syncProfile(profile: StudentProfileEntity) = replaceProfile(profile)
+
+    @Transaction
+    open suspend fun syncAgenda(agenda: List<AgendaEventEntity>) = replaceAgenda(agenda)
+
+    @Transaction
+    open suspend fun syncGrades(grades: List<GradeEntity>) = replaceGrades(grades)
+
+    @Transaction
+    open suspend fun syncAbsences(absences: List<AbsenceEntity>) = replaceAbsences(absences)
+
+    @Transaction
+    open suspend fun syncCourses(courses: List<CourseEntity>) = replaceCourses(courses)
+
+    @Transaction
+    open suspend fun syncProjectsAndPracticals(
         projects: List<ProjectEntity>,
         projectGroups: List<ProjectGroupEntity>,
         projectSteps: List<ProjectStepEntity>,
-        practicals: List<PracticalEntity>,
-        documents: List<AcademicDocumentEntity>,
-        directoryPeople: List<DirectoryPersonEntity>,
-        news: List<NewsEntity>
+        practicals: List<PracticalEntity>
     ) {
-        replaceProfile(profile)
-        replaceAgenda(agenda)
-        replaceGrades(grades)
-        replaceAbsences(absences)
-        replaceCourses(courses)
         replaceProjects(projects)
         replaceProjectGroups(projectGroups)
         replaceProjectSteps(projectSteps)
         replacePracticals(practicals)
-        replaceDocuments(documents)
-        replaceDirectoryPeople(directoryPeople)
-        replaceNews(news)
     }
+
+    @Transaction
+    open suspend fun syncDocuments(documents: List<AcademicDocumentEntity>) = replaceDocuments(documents)
+
+    @Transaction
+    open suspend fun syncDirectory(directoryPeople: List<DirectoryPersonEntity>) = replaceDirectoryPeople(directoryPeople)
+
+    @Transaction
+    open suspend fun syncNews(news: List<NewsEntity>) = replaceNews(news)
 
     @Transaction
     open suspend fun clearAll() {

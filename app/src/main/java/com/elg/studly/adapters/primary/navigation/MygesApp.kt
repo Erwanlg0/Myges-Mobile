@@ -61,6 +61,7 @@ import com.elg.studly.adapters.primary.ui.AgendaScreen
 import com.elg.studly.adapters.primary.ui.AuthRoute
 import com.elg.studly.adapters.primary.ui.CoursesScreen
 import com.elg.studly.adapters.primary.ui.DashboardScreen
+import com.elg.studly.adapters.primary.ui.DepositWebViewScreen
 import com.elg.studly.adapters.primary.ui.DirectoryScreen
 import com.elg.studly.adapters.primary.ui.DocumentsScreen
 import com.elg.studly.adapters.primary.ui.GradesScreen
@@ -173,6 +174,12 @@ private fun StudentRoute(
                     studentViewModel.reportOpenDocumentFailure()
                 }
             }
+        }
+    }
+
+    LaunchedEffect(studentViewModel) {
+        studentViewModel.depositRequests.collect { groupId ->
+            navController.navigate("deposit/$groupId") { launchSingleTop = true }
         }
     }
 
@@ -322,6 +329,12 @@ private fun StudentScaffold(
             composable("practicals") { PracticalsScreen(studentViewModel) }
             composable("documents?id={id}") { backStackEntry ->
                 DocumentsScreen(studentViewModel, highlightedDocumentId = backStackEntry.arguments?.getString("id"))
+            }
+            composable("deposit/{groupId}") { backStackEntry ->
+                DepositWebViewScreen(
+                    groupId = backStackEntry.arguments?.getString("groupId").orEmpty(),
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable("directory") { DirectoryScreen(studentViewModel) }
             composable("notifications") { NotificationsScreen(studentViewModel, settingsViewModel) }

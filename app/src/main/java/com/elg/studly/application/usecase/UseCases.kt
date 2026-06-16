@@ -16,6 +16,7 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.Session
+import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
@@ -25,12 +26,14 @@ import javax.inject.Inject
 
 class CompleteOAuthLoginUseCase @Inject constructor(
     private val sessionRepository: SessionRepository,
+    private val settingsRepository: SettingsRepository,
     private val notificationScheduler: NotificationScheduler
 ) {
     suspend operator fun invoke(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) {
         sessionRepository.authenticateWithToken(accessToken, expiresAt, enableBiometric)
         notificationScheduler.ensureChannels()
-        notificationScheduler.scheduleStudentSync()
+        val intervalMinutes = settingsRepository.settings.first().refreshIntervals.smallestIntervalMinutes().toLong()
+        notificationScheduler.scheduleStudentSync(intervalMinutes)
         notificationScheduler.runStudentSyncNow()
     }
 }
@@ -128,8 +131,9 @@ class RefreshStudentDataUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val calendarSyncPort: CalendarSyncPort
 ) {
-    suspend operator fun invoke() {
-        repository.syncAll()
+    /** [force] = true bypasses the per-feature refresh intervals (manual refresh). */
+    suspend operator fun invoke(force: Boolean = false) {
+        repository.syncAll(force)
         syncCalendarIfEnabled()
         settingsRepository.markSynced()
     }
@@ -158,6 +162,20 @@ class DownloadDocumentUseCase @Inject constructor(
     suspend operator fun invoke(document: AcademicDocument, onProgress: (Float?) -> Unit = {}) = repository.downloadDocument(document, onProgress)
 }
 
+class JoinGroupUseCase @Inject constructor(
+    private val repository: StudentDataRepository
+) {
+    suspend operator fun invoke(courseId: String, projectId: String, groupId: String) =
+        repository.joinGroup(courseId, projectId, groupId)
+}
+
+class LeaveGroupUseCase @Inject constructor(
+    private val repository: StudentDataRepository
+) {
+    suspend operator fun invoke(courseId: String, projectId: String, groupId: String) =
+        repository.leaveGroup(courseId, projectId, groupId)
+}
+
 class ObserveSettingsUseCase @Inject constructor(
     private val repository: SettingsRepository
 ) {
@@ -176,6 +194,18 @@ class UpdateSettingsUseCase @Inject constructor(
     suspend fun projectNotifications(enabled: Boolean) = repository.setProjectNotificationsEnabled(enabled)
     suspend fun documentNotifications(enabled: Boolean) = repository.setDocumentNotificationsEnabled(enabled)
     suspend fun themeMode(themeMode: ThemeMode) = repository.setThemeMode(themeMode)
+    suspend fun refreshInterval(feature: SyncFeature, minutes: Int) = repository.setRefreshInterval(feature, minutes)
+}
+
+/** Re-aligns the background sync worker cadence with the smallest configured refresh interval. */
+class RescheduleSyncUseCase @Inject constructor(
+    private val settingsRepository: SettingsRepository,
+    private val notificationScheduler: NotificationScheduler
+) {
+    suspend operator fun invoke() {
+        val intervalMinutes = settingsRepository.settings.first().refreshIntervals.smallestIntervalMinutes().toLong()
+        notificationScheduler.scheduleStudentSync(intervalMinutes)
+    }
 }
 
 class SyncAgendaToCalendarUseCase @Inject constructor(

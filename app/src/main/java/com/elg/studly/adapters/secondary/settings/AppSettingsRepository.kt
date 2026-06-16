@@ -1,17 +1,23 @@
 package com.elg.studly.adapters.secondary.settings
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.domain.model.NotificationPreferences
+import com.elg.studly.domain.model.RefreshIntervals
+import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
+import com.elg.studly.domain.model.clampRefreshMinutes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.Instant
 import javax.inject.Inject
@@ -36,12 +42,38 @@ class AppSettingsRepository @Inject constructor(
             calendarSyncEnabled = preferences[CALENDAR_SYNC] ?: false,
             biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
             themeMode = preferences[THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
+            refreshIntervals = preferences.toRefreshIntervals(),
             lastSyncAt = preferences[LAST_SYNC]?.let(Instant::ofEpochMilli)
         )
     }
 
+    private fun Preferences.toRefreshIntervals(): RefreshIntervals {
+        val defaults = RefreshIntervals()
+        return SyncFeature.entries.fold(defaults) { acc, feature ->
+            val stored = this[INTERVAL_KEYS.getValue(feature)] ?: return@fold acc
+            acc.with(feature, stored)
+        }
+    }
+
     override suspend fun setThemeMode(themeMode: ThemeMode) {
         context.settingsDataStore.edit { preferences -> preferences[THEME_MODE] = themeMode.name }
+    }
+
+    override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[INTERVAL_KEYS.getValue(feature)] = clampRefreshMinutes(minutes)
+        }
+    }
+
+    override suspend fun lastFetchedAt(feature: SyncFeature): Instant? {
+        return context.settingsDataStore.data.first()[LAST_FETCH_KEYS.getValue(feature)]
+            ?.let(Instant::ofEpochMilli)
+    }
+
+    override suspend fun markFeatureFetched(feature: SyncFeature) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[LAST_FETCH_KEYS.getValue(feature)] = Instant.now().toEpochMilli()
+        }
     }
 
     override suspend fun setLanguageTag(languageTag: String?) {
@@ -83,7 +115,10 @@ class AppSettingsRepository @Inject constructor(
     }
 
     override suspend fun clearSyncMetadata() {
-        context.settingsDataStore.edit { preferences -> preferences.remove(LAST_SYNC) }
+        context.settingsDataStore.edit { preferences ->
+            preferences.remove(LAST_SYNC)
+            LAST_FETCH_KEYS.values.forEach(preferences::remove)
+        }
     }
 
     private companion object {
@@ -97,5 +132,12 @@ class AppSettingsRepository @Inject constructor(
         val NOTIFY_GRADES = booleanPreferencesKey("notify_grades")
         val NOTIFY_PROJECTS = booleanPreferencesKey("notify_projects")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+
+        val INTERVAL_KEYS = SyncFeature.entries.associateWith {
+            intPreferencesKey("refresh_interval_${it.name.lowercase()}")
+        }
+        val LAST_FETCH_KEYS = SyncFeature.entries.associateWith {
+            longPreferencesKey("last_fetch_${it.name.lowercase()}")
+        }
     }
 }

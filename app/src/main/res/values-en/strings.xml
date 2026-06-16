@@ -161,6 +161,9 @@
     <string name="projects_status">Status</string>
     <string name="projects_steps_completed">%1$d/%2$d steps completed</string>
     <string name="projects_view_all_groups">View all groups</string>
+    <string name="deposit_document">Upload a document</string>
+    <string name="group_join">Join this group</string>
+    <string name="group_leave">Leave group</string>
     <string name="projects_deliverables_label">Deliverables:</string>
 
 

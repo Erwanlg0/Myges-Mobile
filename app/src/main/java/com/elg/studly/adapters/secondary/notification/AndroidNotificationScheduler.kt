@@ -56,8 +56,11 @@ class AndroidNotificationScheduler @Inject constructor(
         manager.createNotificationChannel(channel)
     }
 
-    override suspend fun scheduleStudentSync() {
-        val request = PeriodicWorkRequestBuilder<StudentSyncWorker>(6, TimeUnit.HOURS)
+    override suspend fun scheduleStudentSync(intervalMinutes: Long) {
+        val request = PeriodicWorkRequestBuilder<StudentSyncWorker>(
+            intervalMinutes.coerceAtLeast(MIN_PERIODIC_MINUTES),
+            TimeUnit.MINUTES
+        )
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -242,6 +245,7 @@ class AndroidNotificationScheduler @Inject constructor(
     }
 
     private companion object {
+        const val MIN_PERIODIC_MINUTES = 15L
         const val CHANNEL_STUDENT = "student"
         const val NOTIFICATION_SYNC_FAILURE = 1001
         const val WORK_STUDENT_SYNC = "student_sync"

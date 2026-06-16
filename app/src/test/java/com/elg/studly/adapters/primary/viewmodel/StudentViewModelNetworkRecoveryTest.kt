@@ -9,6 +9,8 @@ import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.application.ports.StudentDataRepository
 import com.elg.studly.application.ports.SessionRepository
 import com.elg.studly.application.usecase.DownloadDocumentUseCase
+import com.elg.studly.application.usecase.JoinGroupUseCase
+import com.elg.studly.application.usecase.LeaveGroupUseCase
 import com.elg.studly.application.usecase.LogoutUseCase
 import com.elg.studly.application.usecase.ObserveAbsencesUseCase
 import com.elg.studly.application.usecase.ObserveAgendaUseCase
@@ -217,6 +219,8 @@ class StudentViewModelNetworkRecoveryTest {
             RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort),
             SyncAgendaToCalendarUseCase(calendarSyncPort),
             DownloadDocumentUseCase(repository),
+            JoinGroupUseCase(repository),
+            LeaveGroupUseCase(repository),
             LogoutUseCase(sessionRepository, notificationScheduler),
             networkMonitor
         )
@@ -262,6 +266,8 @@ private class FakeStudentDataRepository : StudentDataRepository {
         downloadFinished?.await()
         return Uri.EMPTY
     }
+    override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {}
+    override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
 }
 
 private class FakeSettingsRepository : SettingsRepository {

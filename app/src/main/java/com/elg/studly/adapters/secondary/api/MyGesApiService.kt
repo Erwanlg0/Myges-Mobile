@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonElement
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.POST
@@ -118,6 +119,21 @@ interface MyGesApiService {
 
     @GET("me/courses/{rcId}/practicals")
     suspend fun coursePracticals(@Path("rcId") rcId: String): JsonElement?
+
+    // Project/practical groups share the same route: POST = join, DELETE = leave.
+    @POST("me/courses/{rcId}/projects/{projectId}/groups/{groupId}")
+    suspend fun joinGroup(
+        @Path("rcId") rcId: String,
+        @Path("projectId") projectId: String,
+        @Path("groupId") groupId: String
+    ): Response<ResponseBody>
+
+    @DELETE("me/courses/{rcId}/projects/{projectId}/groups/{groupId}")
+    suspend fun leaveGroup(
+        @Path("rcId") rcId: String,
+        @Path("projectId") projectId: String,
+        @Path("groupId") groupId: String
+    ): Response<ResponseBody>
 
     @GET("me/news")
     suspend fun news(): JsonElement?
