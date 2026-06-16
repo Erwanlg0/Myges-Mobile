@@ -503,9 +503,16 @@ fun JsonElement.toPracticalDocuments(fallbackYear: String? = null): List<Academi
 }
 
 fun JsonElement.toDocuments(): List<AcademicDocument> {
-    return arrayOrNested("annualDocuments", "documents", "items", "data").map { element ->
-        val root = element.objectOrData()
-        root.toDocument()
+    val root = objectOrData()
+    val annualArray = root["annualDocuments"] as? JsonArray
+    val docsArray = root["documents"] as? JsonArray
+    if (annualArray != null || docsArray != null) {
+        val annual = annualArray?.map { it.objectOrData().toDocument() }.orEmpty()
+        val dossier = docsArray?.map { it.objectOrData().toDocument() }.orEmpty()
+        return annual + dossier
+    }
+    return arrayOrNested("items", "data").map { element ->
+        element.objectOrData().toDocument()
     }
 }
 

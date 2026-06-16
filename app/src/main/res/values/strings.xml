@@ -53,6 +53,7 @@
     <string name="dashboard_go_to_agenda">Accéder à la semaine du prochain cours</string>
     <string name="dashboard_go_to_grades">Accéder aux notes de cette période</string>
     <string name="dashboard_go_to_absences">Accéder aux absences de cette période</string>
+    <string name="dashboard_go_to_projects">Accéder aux projets</string>
 
     <string name="profile_email">E-mail</string>
     <string name="profile_avatar_cd">Photo de profil de %1$s</string>
@@ -173,6 +174,8 @@
     <string name="documents_downloading">Téléchargement</string>
     <string name="documents_open">Télécharger et ouvrir</string>
     <string name="documents_updated_at">Mis à jour</string>
+    <string name="documents_annual">Documents annuels</string>
+    <string name="documents_folder">Documents dossier</string>
 
     <string name="directory_title">Trombinoscope</string>
     <string name="directory_empty_title">Aucun contact</string>

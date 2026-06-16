@@ -88,9 +88,36 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             DashboardSummary(
                 profile = localData.profile?.toDomain(),
                 nextEvent = localData.agenda.firstOrNull { it.endsAt.isAfter(now) },
-                latestGrades = localData.grades.filter { it.value != null }.sortedWith(compareByDescending<Grade> { it.date }.thenByDescending { it.id }).take(3),
+                latestGrades = run {
+                    val allGrades = localData.grades.filter { it.value != null }
+                    val structuredMainKeys = allGrades
+                        .filter { it.subject.isBlank() && !it.id.contains("-cc-") && !it.id.contains("-exam") }
+                        .map { it.courseName to it.period }
+                        .toSet()
+                    val ccRegex = Regex("^(cc|contrôle continu)\\s*\\d*$", RegexOption.IGNORE_CASE)
+                    allGrades.filter { grade ->
+                        !grade.id.contains("-cc-") &&
+                        !grade.id.contains("-exam") &&
+                        !((grade.courseName to grade.period) in structuredMainKeys &&
+                            (grade.subject.matches(ccRegex) ||
+                             grade.subject.trim().equals("examen", ignoreCase = true)))
+                    }.sortedWith(compareByDescending<Grade> { it.date }.thenByDescending { it.id }).take(3)
+                },
                 recentAbsences = localData.absences.sortedByDescending { it.startsAt }.take(1),
-                dueProjects = localData.projects.filter { it.deadline?.isAfter(now) == true }.take(3),
+                dueProjects = localData.projects
+                    .filter { project ->
+                        project.name.isNotBlank() && (
+                            project.deadline?.isAfter(now) == true ||
+                            project.steps.any { it.deadline?.isAfter(now) == true }
+                        )
+                    }
+                    .sortedBy { project ->
+                        listOfNotNull(
+                            project.deadline?.takeIf { it.isAfter(now) },
+                            project.steps.mapNotNull { it.deadline }.filter { it.isAfter(now) }.minOrNull()
+                        ).minOrNull()
+                    }
+                    .take(3),
                 lastSyncAt = settings.lastSyncAt
             )
         }

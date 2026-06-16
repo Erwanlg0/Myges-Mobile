@@ -10,14 +10,8 @@ fun Project.progress(): ProjectProgress {
     val total = steps.size
     if (total == 0) return ProjectProgress(0, 0, 0.0)
     val now = java.time.Instant.now()
-    val sixMonthsAgo = now.minus(180, java.time.temporal.ChronoUnit.DAYS)
-    val progressed = steps.count { 
-        it.status.isCompletedStatus() || (it.deadline != null && it.deadline.isBefore(now) && it.deadline.isAfter(sixMonthsAgo)) 
-    }
-    val completed = if (progressed == total && steps.any { !it.status.isCompletedStatus() }) {
-        (total - 1).coerceAtLeast(0)
-    } else {
-        progressed
+    val completed = steps.count {
+        it.status.isCompletedStatus() || (it.deadline != null && it.deadline.isBefore(now))
     }
     return ProjectProgress(
         completedSteps = completed,
@@ -30,14 +24,8 @@ fun Practical.progress(): ProjectProgress {
     val total = steps.size
     if (total == 0) return ProjectProgress(0, 0, 0.0)
     val now = java.time.Instant.now()
-    val sixMonthsAgo = now.minus(180, java.time.temporal.ChronoUnit.DAYS)
-    val progressed = steps.count { 
-        it.status.isCompletedStatus() || (it.deadline != null && it.deadline.isBefore(now) && it.deadline.isAfter(sixMonthsAgo)) 
-    }
-    val completed = if (progressed == total && steps.any { !it.status.isCompletedStatus() }) {
-        (total - 1).coerceAtLeast(0)
-    } else {
-        progressed
+    val completed = steps.count {
+        it.status.isCompletedStatus() || (it.deadline != null && it.deadline.isBefore(now))
     }
     return ProjectProgress(
         completedSteps = completed,

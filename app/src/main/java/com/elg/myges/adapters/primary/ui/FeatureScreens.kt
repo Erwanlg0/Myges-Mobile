@@ -276,19 +276,43 @@ fun DashboardScreen(
                 )
             }
         }
-        item { SectionTitle(R.string.dashboard_due_projects) }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.dashboard_due_projects),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                IconButton(onClick = { onNavigateToTab("projects") }) {
+                    Icon(
+                        imageVector = Icons.Rounded.ArrowForward,
+                        contentDescription = stringResource(R.string.dashboard_go_to_projects),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
         val dueProjects = dashboard.dueProjects.filter { it.name.isNotBlank() }
         if (dueProjects.isEmpty()) {
             item { CompactCard { Text(stringResource(R.string.projects_empty_title)) } }
         } else {
             items(dueProjects, key = { it.id }) { project ->
+                val now = remember { Instant.now() }
+                val nextDeadline = remember(project) {
+                    project.deadline?.takeIf { it.isAfter(now) }
+                        ?: project.steps.mapNotNull { it.deadline }.filter { it.isAfter(now) }.minOrNull()
+                }
                 CompactCard(modifier = Modifier.clickable { onNavigateToTab("projects") }) {
                     Text(
                         text = project.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    LabelValue(R.string.projects_deadline, formatInstant(project.deadline))
+                    LabelValue(R.string.projects_deadline, formatInstant(nextDeadline))
                 }
             }
         }
@@ -762,7 +786,18 @@ fun GradesScreen(
             }
         }
 
-        val mainGrades = displayedGrades.filter { !it.id.contains("-cc-") && !it.id.contains("-exam") }
+        val structuredMainKeys = displayedGrades
+            .filter { it.subject.isBlank() && !it.id.contains("-cc-") && !it.id.contains("-exam") }
+            .map { it.courseName to it.period }
+            .toSet()
+        val ccSubjectRegex = Regex("^(cc|contrôle continu)\\s*\\d*$", RegexOption.IGNORE_CASE)
+        val mainGrades = displayedGrades.filter { grade ->
+            !grade.id.contains("-cc-") &&
+            !grade.id.contains("-exam") &&
+            !((grade.courseName to grade.period) in structuredMainKeys &&
+                (grade.subject.matches(ccSubjectRegex) ||
+                 grade.subject.trim().equals("examen", ignoreCase = true)))
+        }
 
         item { GradeSummaryCard(mainGrades, displayedGrades) }
         if (blockAssignments.isNotEmpty()) {
@@ -1413,29 +1448,83 @@ fun DocumentsScreen(
     val state by viewModel.documents.collectAsStateWithLifecycle()
     val downloadingDocumentIds by viewModel.downloadingDocumentIds.collectAsStateWithLifecycle()
     val documentDownloadProgress by viewModel.documentDownloadProgress.collectAsStateWithLifecycle()
+    var documentOpenTriggered by remember(highlightedDocumentId) { mutableStateOf(false) }
+
+    val annualDocuments = remember(state.data) {
+        state.data.filter { it.ownerId == null && it.category != null }
+    }
+    val folderDocuments = remember(state.data) {
+        state.data.filter { it.ownerId == null && it.category == null }
+    }
+    val years = remember(annualDocuments) {
+        annualDocuments.mapNotNull { it.year }.distinct().sortedDescending()
+    }
+    var selectedYear by remember(years) { mutableStateOf(years.firstOrNull()) }
+    val filteredAnnual = remember(annualDocuments, selectedYear) {
+        if (selectedYear == null) annualDocuments else annualDocuments.filter { it.year == selectedYear }
+    }
+    val annualByCategory = remember(filteredAnnual) {
+        filteredAnnual
+            .groupBy { it.category?.trim()?.uppercase() ?: "" }
+            .entries
+            .sortedBy { it.key }
+    }
 
     LaunchedEffect(state.data, highlightedDocumentId) {
-        if (!highlightedDocumentId.isNullOrBlank()) {
+        if (!documentOpenTriggered && !highlightedDocumentId.isNullOrBlank()) {
             val document = state.data.firstOrNull { it.id == highlightedDocumentId }
             if (document != null) {
+                documentOpenTriggered = true
                 viewModel.openDocument(document)
             }
         }
     }
     FeatureStateContent(
         state = state,
-        empty = List<AcademicDocument>::isEmpty,
+        empty = { allDocs -> allDocs.none { it.ownerId == null } },
         emptyTitle = R.string.documents_empty_title,
         emptyBody = R.string.documents_empty_body,
         onRetry = viewModel::refresh
-    ) { documents ->
-        items(documents, key = { it.id }) { document ->
-            DocumentCard(
-                document = document,
-                downloading = document.id in downloadingDocumentIds,
-                progress = documentDownloadProgress[document.id],
-                onOpen = { viewModel.openDocument(document) }
-            )
+    ) { _ ->
+        if (years.isNotEmpty()) {
+            item {
+                YearFilterRow(
+                    years = years,
+                    selectedYear = selectedYear,
+                    onYearSelected = { selectedYear = it }
+                )
+            }
+        }
+        item { SectionTitleText(stringResource(R.string.documents_annual)) }
+        annualByCategory.forEach { (category, docs) ->
+            item(key = "cat_$category") {
+                Text(
+                    text = category.ifBlank { stringResource(R.string.common_untitled) },
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                )
+            }
+            items(docs, key = { it.id }) { document ->
+                DocumentCard(
+                    document = document,
+                    downloading = document.id in downloadingDocumentIds,
+                    progress = documentDownloadProgress[document.id],
+                    showCategory = false,
+                    onOpen = { viewModel.openDocument(document) }
+                )
+            }
+        }
+        if (folderDocuments.isNotEmpty()) {
+            item { SectionTitleText(stringResource(R.string.documents_folder)) }
+            items(folderDocuments, key = { it.id }) { document ->
+                DocumentCard(
+                    document = document,
+                    downloading = document.id in downloadingDocumentIds,
+                    progress = documentDownloadProgress[document.id],
+                    onOpen = { viewModel.openDocument(document) }
+                )
+            }
         }
     }
 }
@@ -2314,7 +2403,6 @@ internal fun ProjectCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 LabelValue(R.string.projects_course, project.courseName.orEmpty())
-                LabelValue(R.string.projects_group, project.groupName.orEmpty())
             }
             Column(modifier = Modifier.weight(1f)) {
                 LabelValue(R.string.projects_status, project.status.orEmpty())
@@ -2626,6 +2714,7 @@ internal fun DocumentCard(
     downloading: Boolean,
     progress: Float?,
     showDownloadButton: Boolean = true,
+    showCategory: Boolean = true,
     onOpen: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -2635,7 +2724,7 @@ internal fun DocumentCard(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
-        LabelValue(R.string.documents_category, document.category.orEmpty())
+        if (showCategory) LabelValue(R.string.documents_category, document.category.orEmpty())
         LabelValue(R.string.profile_year, document.year.orEmpty())
         LabelValue(R.string.documents_updated_at, formatInstant(document.updatedAt))
         if (showDownloadButton) {

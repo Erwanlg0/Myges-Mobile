@@ -181,7 +181,9 @@ private fun StudentRoute(
         val baseRoute = fullRoute.substringBefore('?')
         val destination = destinations.firstOrNull { it.route == baseRoute }
         if (destination != null) {
-            navController.navigateTo(fullRoute)
+            navController.navigate(fullRoute) {
+                popUpTo(destinations.first().route) { saveState = true }
+            }
         }
         onNotificationRouteConsumed()
     }

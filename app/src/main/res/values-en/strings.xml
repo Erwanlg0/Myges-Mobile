@@ -53,6 +53,7 @@
     <string name="dashboard_go_to_agenda">Go to next course week</string>
     <string name="dashboard_go_to_grades">Go to grades period</string>
     <string name="dashboard_go_to_absences">Go to absences period</string>
+    <string name="dashboard_go_to_projects">Go to projects</string>
 
     <string name="profile_email">Email</string>
     <string name="profile_avatar_cd">%1$s profile picture</string>
@@ -173,6 +174,8 @@
     <string name="documents_downloading">Downloading</string>
     <string name="documents_open">Download and open</string>
     <string name="documents_updated_at">Updated</string>
+    <string name="documents_annual">Annual documents</string>
+    <string name="documents_folder">Project documents</string>
 
     <string name="directory_title">Directory</string>
     <string name="directory_empty_title">No contacts</string>
