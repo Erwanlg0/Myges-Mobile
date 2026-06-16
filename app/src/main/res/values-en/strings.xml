@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">MyGES</string>
+    <string name="app_name">Studly</string>
 
     <string name="action_cancel">Cancel</string>
     <string name="action_close">Close</string>
@@ -19,7 +19,7 @@
     <string name="state_error_title">Action unavailable</string>
     <string name="state_offline">Offline mode: displayed data comes from the local cache.</string>
     <string name="state_offline_empty_title">Offline</string>
-    <string name="state_offline_empty_body">No local data is available yet. Reconnect to the network to sync MyGES.</string>
+    <string name="state_offline_empty_body">No local data is available yet. Reconnect to the network to sync Studly.</string>
     <string name="state_refreshing">Syncing</string>
     <string name="state_loading">Loading…</string>
     <string name="state_loading_first_sync">First sync: fetching all your data can take up to 10 minutes. You can close the app, the download continues in the background.</string>
@@ -28,12 +28,12 @@
     <string name="error_network">Unable to connect. Check your network.</string>
     <string name="error_offline">No connection available.</string>
     <string name="error_permission_denied">The required permission was denied.</string>
-    <string name="error_remote">The MyGES service rejected the request.</string>
+    <string name="error_remote">The Studly service rejected the request.</string>
     <string name="error_storage">Local storage is unavailable.</string>
     <string name="error_unauthorized">The session expired. Sign in again.</string>
     <string name="error_unexpected">An unexpected error occurred.</string>
 
-    <string name="auth_title">MyGES sign in</string>
+    <string name="auth_title">Studly sign in</string>
     <string name="auth_subtitle">Sign in with Kordis to retrieve a secure access token.</string>
     <string name="auth_username">Username</string>
     <string name="auth_password">Password</string>
@@ -41,7 +41,7 @@
     <string name="auth_login">Sign in</string>
     <string name="auth_login_kordis">Sign in with Kordis</string>
     <string name="auth_biometric_unlock">Unlock with biometrics</string>
-    <string name="auth_biometric_title">MyGES unlock</string>
+    <string name="auth_biometric_title">Studly unlock</string>
     <string name="auth_biometric_subtitle">Confirm your identity to open your session.</string>
 
     <string name="dashboard_title">Dashboard</string>
@@ -83,7 +83,7 @@
 
     <string name="grades_title">Grades</string>
     <string name="grades_empty_title">No grades</string>
-    <string name="grades_empty_body">Synced grades will appear here as soon as MyGES returns them.</string>
+    <string name="grades_empty_body">Synced grades will appear here as soon as Studly returns them.</string>
     <string name="grades_average">Average</string>
     <string name="grades_component">Component</string>
     <string name="grades_coefficient">Coefficient</string>
@@ -198,7 +198,7 @@
     <string name="notifications_channel_student">Student tracking</string>
     <string name="notifications_channel_student_description">Grades, absences, agenda, documents, and projects.</string>
     <string name="notifications_sync_failed_title">Unable to sync</string>
-    <string name="notifications_sync_failed_body">MyGES will sync again automatically as soon as possible.</string>
+    <string name="notifications_sync_failed_body">Studly will sync again automatically as soon as possible.</string>
     <string name="notifications_new_grade_title">New grade</string>
     <string name="notifications_new_grade_body">%1$s: %2$s</string>
     <string name="notifications_new_absence_title">New absence</string>
@@ -228,6 +228,8 @@
     <string name="settings_language_system">System</string>
     <string name="settings_last_sync">Last sync</string>
     <string name="settings_logout">Sign out</string>
+    <string name="settings_about">About</string>
+    <string name="settings_rate_play_store">Rate on Google Play</string>
     <string name="settings_notifications">Notification preferences</string>
     <string name="settings_notify_absences">Absences</string>
     <string name="settings_notify_agenda">Agenda</string>
@@ -236,8 +238,8 @@
     <string name="settings_notify_projects">Projects</string>
     <string name="settings_session">Session and cache</string>
 
-    <string name="calendar_event_marker_prefix" translatable="false">MyGES:</string>
-    <string name="calendar_event_description">MyGES:%1$s</string>
+    <string name="calendar_event_marker_prefix" translatable="false">Studly:</string>
+    <string name="calendar_event_description">Studly:%1$s</string>
     <string name="common_all">All</string>
     <string name="courses_filter_year_format">Year: %1$s</string>
     <string name="courses_filter_period_format">Semester: %1$s</string>

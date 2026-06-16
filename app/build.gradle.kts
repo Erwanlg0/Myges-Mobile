@@ -20,13 +20,13 @@ fun buildConfigString(value: String): String {
 }
 
 android {
-    namespace = "com.elg.myges"
+    namespace = "com.elg.studly"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.elg.myges"
+        applicationId = "com.elg.studly"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

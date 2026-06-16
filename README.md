@@ -1,4 +1,4 @@
-# MyGES Android Application
+# Studly Android Application
 
 This repository describes the functional and technical foundations of a native Android application for MyGES. The application consumes existing MyGES endpoints, provides a student-focused mobile experience, and maintains a clear architecture to simplify maintenance, testing, and future development.
 

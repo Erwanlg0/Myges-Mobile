@@ -13,10 +13,10 @@
 -keep class * extends androidx.work.Worker
 -keep class * extends androidx.work.CoroutineWorker
 
--keep class com.elg.myges.adapters.secondary.storage.** { *; }
--keep class com.elg.myges.domain.model.** { *; }
--keep class com.elg.myges.adapters.secondary.notification.StudentSyncWorker { *; }
--keep interface com.elg.myges.adapters.secondary.api.MyGesApiService { *; }
+-keep class com.elg.studly.adapters.secondary.storage.** { *; }
+-keep class com.elg.studly.domain.model.** { *; }
+-keep class com.elg.studly.adapters.secondary.notification.StudentSyncWorker { *; }
+-keep interface com.elg.studly.adapters.secondary.api.MyGesApiService { *; }
 
 -keep class net.zetetic.database.sqlcipher.** { *; }
 -dontwarn javax.annotation.**

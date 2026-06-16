@@ -15,7 +15,7 @@ Use the cheapest command that validates the change. Validation order:
 
 Run a single test class:
 ```bash
-./gradlew :app:testDebugUnitTest --quiet --tests "com.elg.myges.adapters.secondary.api.JsonParsingTest"
+./gradlew :app:testDebugUnitTest --quiet --tests "studly.adapters.secondary.api.JsonParsingTest"
 ```
 
 Run instrumented tests (device/emulator required):

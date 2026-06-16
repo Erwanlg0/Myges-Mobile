@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Myges"
+rootProject.name = "Studly"
 include(":app")
  

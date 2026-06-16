@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">MyGES</string>
+    <string name="app_name">Studly</string>
 
     <string name="action_cancel">Annuler</string>
     <string name="action_close">Fermer</string>
@@ -19,7 +19,7 @@
     <string name="state_error_title">Action impossible</string>
     <string name="state_offline">Mode hors ligne : les données affichées proviennent du cache local.</string>
     <string name="state_offline_empty_title">Hors ligne</string>
-    <string name="state_offline_empty_body">Aucune donnée locale n’est encore disponible. Reconnectez-vous au réseau pour synchroniser MyGES.</string>
+    <string name="state_offline_empty_body">Aucune donnée locale n’est encore disponible. Reconnectez-vous au réseau pour synchroniser Studly.</string>
     <string name="state_refreshing">Synchronisation en cours</string>
     <string name="state_loading">Chargement en cours…</string>
     <string name="state_loading_first_sync">Première synchronisation : la récupération de toutes vos données peut prendre jusqu\'à 10 minutes. Vous pouvez fermer l\'application, le téléchargement continue en arrière-plan.</string>
@@ -28,12 +28,12 @@
     <string name="error_network">Connexion impossible. Vérifiez votre réseau.</string>
     <string name="error_offline">Aucune connexion disponible.</string>
     <string name="error_permission_denied">L’autorisation nécessaire a été refusée.</string>
-    <string name="error_remote">Le service MyGES a refusé la requête.</string>
+    <string name="error_remote">Le service Studly a refusé la requête.</string>
     <string name="error_storage">Le stockage local est indisponible.</string>
     <string name="error_unauthorized">La session a expiré. Reconnectez-vous.</string>
     <string name="error_unexpected">Une erreur inattendue est survenue.</string>
 
-    <string name="auth_title">Connexion MyGES</string>
+    <string name="auth_title">Connexion Studly</string>
     <string name="auth_subtitle">Connectez-vous via Kordis pour récupérer un jeton d’accès sécurisé.</string>
     <string name="auth_username">Identifiant</string>
     <string name="auth_password">Mot de passe</string>
@@ -41,7 +41,7 @@
     <string name="auth_login">Se connecter</string>
     <string name="auth_login_kordis">Se connecter avec Kordis</string>
     <string name="auth_biometric_unlock">Déverrouiller avec la biométrie</string>
-    <string name="auth_biometric_title">Déverrouillage MyGES</string>
+    <string name="auth_biometric_title">Déverrouillage Studly</string>
     <string name="auth_biometric_subtitle">Confirmez votre identité pour ouvrir votre session.</string>
 
     <string name="dashboard_title">Tableau de bord</string>
@@ -83,7 +83,7 @@
 
     <string name="grades_title">Notes</string>
     <string name="grades_empty_title">Aucune note</string>
-    <string name="grades_empty_body">Les notes synchronisées apparaîtront ici dès que MyGES les renverra.</string>
+    <string name="grades_empty_body">Les notes synchronisées apparaîtront ici dès que Studly les renverra.</string>
     <string name="grades_average">Moyenne</string>
     <string name="grades_component">Composant</string>
     <string name="grades_coefficient">Coefficient</string>
@@ -198,7 +198,7 @@
     <string name="notifications_channel_student">Suivi étudiant</string>
     <string name="notifications_channel_student_description">Notes, absences, agenda, documents et projets.</string>
     <string name="notifications_sync_failed_title">Synchronisation impossible</string>
-    <string name="notifications_sync_failed_body">MyGES sera resynchronisé automatiquement dès que possible.</string>
+    <string name="notifications_sync_failed_body">Studly sera resynchronisé automatiquement dès que possible.</string>
     <string name="notifications_new_grade_title">Nouvelle note</string>
     <string name="notifications_new_grade_body">%1$s : %2$s</string>
     <string name="notifications_new_absence_title">Nouvelle absence</string>
@@ -228,6 +228,8 @@
     <string name="settings_language_system">Système</string>
     <string name="settings_last_sync">Dernière synchronisation</string>
     <string name="settings_logout">Se déconnecter</string>
+    <string name="settings_about">À propos</string>
+    <string name="settings_rate_play_store">Donner un avis sur Google Play</string>
     <string name="settings_notifications">Préférences de notifications</string>
     <string name="settings_notify_absences">Absences</string>
     <string name="settings_notify_agenda">Agenda</string>
@@ -236,8 +238,8 @@
     <string name="settings_notify_projects">Projets</string>
     <string name="settings_session">Session et cache</string>
 
-    <string name="calendar_event_marker_prefix" translatable="false">MyGES:</string>
-    <string name="calendar_event_description">MyGES:%1$s</string>
+    <string name="calendar_event_marker_prefix" translatable="false">Studly:</string>
+    <string name="calendar_event_description">Studly:%1$s</string>
     <string name="common_all">Tous</string>
     <string name="courses_filter_year_format">Année : %1$s</string>
     <string name="courses_filter_period_format">Semestre : %1$s</string>
