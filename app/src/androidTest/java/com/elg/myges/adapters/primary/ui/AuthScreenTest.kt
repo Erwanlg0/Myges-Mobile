@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.elg.myges.R
+import com.elg.myges.domain.model.AppError
 import com.elg.myges.ui.theme.MygesTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -20,9 +21,8 @@ class AuthScreenTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun authScreenShowsBiometricSessionActionAndTogglesPreference() {
+    fun authScreenShowsBiometricSessionActionAndTriggersCallbacks() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        var biometricPreference: Boolean? = null
         var loginCount = 0
         var unlockCount = 0
 
@@ -30,22 +30,18 @@ class AuthScreenTest {
             MygesTheme {
                 AuthScreen(
                     loading = false,
-                    errorMessage = null,
+                    error = null,
                     hasBiometricSession = true,
-                    enableBiometric = true,
                     authorizationUrl = "https://authentication.example/oauth",
-                    onBiometricEnabledChange = { biometricPreference = it },
                     onLogin = { loginCount += 1 },
                     onBiometricUnlock = { unlockCount += 1 }
                 )
             }
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.auth_enable_biometric)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.auth_login_kordis)).assertIsEnabled().performClick()
         composeRule.onNodeWithText(context.getString(R.string.auth_biometric_unlock)).assertIsEnabled().performClick()
 
-        assertEquals(false, biometricPreference)
         assertEquals(1, loginCount)
         assertEquals(1, unlockCount)
     }
@@ -58,11 +54,9 @@ class AuthScreenTest {
             MygesTheme {
                 AuthScreen(
                     loading = true,
-                    errorMessage = R.string.error_unauthorized,
+                    error = AppError.Unauthorized,
                     hasBiometricSession = true,
-                    enableBiometric = true,
                     authorizationUrl = "https://authentication.example/oauth",
-                    onBiometricEnabledChange = {},
                     onLogin = {},
                     onBiometricUnlock = {}
                 )
