@@ -7,6 +7,8 @@ import com.elg.studly.application.usecase.ClearCacheUseCase
 import com.elg.studly.application.usecase.LogoutUseCase
 import com.elg.studly.application.usecase.ObserveSettingsUseCase
 import com.elg.studly.application.usecase.UpdateSettingsUseCase
+import com.elg.studly.application.usecase.RescheduleSyncUseCase
+import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.AppError
 import com.elg.studly.domain.model.CalendarAccount
 import com.elg.studly.domain.model.ThemeMode
@@ -33,7 +35,8 @@ class SettingsViewModel @Inject constructor(
     private val updateSettingsUseCase: UpdateSettingsUseCase,
     private val clearCacheUseCase: ClearCacheUseCase,
     private val logoutUseCase: LogoutUseCase,
-    private val calendarAccountsUseCase: CalendarAccountsUseCase
+    private val calendarAccountsUseCase: CalendarAccountsUseCase,
+    private val rescheduleSyncUseCase: RescheduleSyncUseCase
 ) : ViewModel() {
     private val loading = MutableStateFlow(false)
     private val error = MutableStateFlow<AppError?>(null)
@@ -104,6 +107,11 @@ class SettingsViewModel @Inject constructor(
 
     fun setDocumentNotifications(enabled: Boolean) = launchSettingChange {
         updateSettingsUseCase.documentNotifications(enabled)
+    }
+
+    fun setRefreshInterval(feature: SyncFeature, minutes: Int) = launchSettingChange {
+        updateSettingsUseCase.refreshInterval(feature, minutes)
+        rescheduleSyncUseCase()
     }
 
     fun clearCache() = launchSettingChange {

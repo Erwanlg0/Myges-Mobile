@@ -122,6 +122,9 @@ import com.elg.studly.domain.model.ProjectGroup
 import com.elg.studly.domain.model.ProjectStep
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
+import com.elg.studly.domain.model.SyncFeature
+import androidx.compose.material3.Slider
+import kotlin.math.roundToInt
 import com.elg.studly.domain.model.progress
 import com.elg.studly.domain.model.toGradeSummary
 import coil.compose.AsyncImage
@@ -1816,6 +1819,16 @@ fun SettingsScreen(
         item {
             DataCard {
                 Text(
+                    text = stringResource(R.string.settings_sync_intervals),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                SyncIntervalPreferences(settings, settingsViewModel)
+            }
+        }
+        item {
+            DataCard {
+                Text(
                     text = stringResource(R.string.settings_session),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
@@ -1961,6 +1974,133 @@ private fun NotificationPreferences(
         SwitchRow(R.string.settings_notify_projects, settings.notifications.projects, settingsViewModel::setProjectNotifications)
         SwitchRow(R.string.settings_notify_documents, settings.notifications.documents, settingsViewModel::setDocumentNotifications)
     }
+}
+
+@Composable
+private fun SyncFeature.displayName(): String {
+    return stringResource(
+        when (this) {
+            SyncFeature.Agenda -> R.string.settings_sync_interval_feature_agenda
+            SyncFeature.Grades -> R.string.settings_sync_interval_feature_grades
+            SyncFeature.Absences -> R.string.settings_sync_interval_feature_absences
+            SyncFeature.Projects -> R.string.settings_sync_interval_feature_projects
+            SyncFeature.Documents -> R.string.settings_sync_interval_feature_documents
+            SyncFeature.Directory -> R.string.settings_sync_interval_feature_directory
+            SyncFeature.News -> R.string.settings_sync_interval_feature_news
+        }
+    )
+}
+
+@Composable
+private fun formatDuration(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return when {
+        h == 0 -> stringResource(R.string.duration_minutes, m)
+        m == 0 -> stringResource(R.string.duration_hours, h)
+        else -> stringResource(R.string.duration_hours_minutes, h, m)
+    }
+}
+
+@Composable
+private fun SyncIntervalPreferences(
+    settings: UserSettings,
+    settingsViewModel: SettingsViewModel
+) {
+    val haptic = LocalHapticFeedback.current
+    var activeFeatureForDialog by remember { mutableStateOf<SyncFeature?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        SyncFeature.entries.forEach { feature ->
+            val currentMinutes = settings.refreshIntervals.minutesFor(feature)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        activeFeatureForDialog = feature
+                    }
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = feature.displayName(),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = formatDuration(currentMinutes),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+
+    activeFeatureForDialog?.let { feature ->
+        SyncIntervalPickerDialog(
+            feature = feature,
+            currentMinutes = settings.refreshIntervals.minutesFor(feature),
+            onConfirm = { minutes ->
+                settingsViewModel.setRefreshInterval(feature, minutes)
+                activeFeatureForDialog = null
+            },
+            onDismiss = { activeFeatureForDialog = null }
+        )
+    }
+}
+
+@Composable
+internal fun SyncIntervalPickerDialog(
+    feature: SyncFeature,
+    currentMinutes: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var sliderValue by remember { mutableStateOf(currentMinutes.toFloat()) }
+    val snappedMinutes = (sliderValue.roundToInt() / 15) * 15
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.settings_sync_interval_title, feature.displayName()))
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = formatDuration(snappedMinutes),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { sliderValue = it },
+                    valueRange = 15f..1440f,
+                    steps = 95,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(snappedMinutes) }
+            ) {
+                Text(stringResource(R.string.action_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss
+            ) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
 }
 
 @Composable

@@ -257,4 +257,18 @@
     <string name="courses_download_file">Télécharger</string>
     <string name="courses_syllabus_saved">Syllabus enregistré dans Téléchargements</string>
     <string name="courses_syllabus_save_failed">Échec de l\'enregistrement du syllabus</string>
+
+    <string name="action_confirm">Confirmer</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="duration_hours">%1$d h</string>
+    <string name="duration_hours_minutes">%1$d h %2$d min</string>
+    <string name="settings_sync_intervals">Intervalles de rafraîchissement</string>
+    <string name="settings_sync_interval_feature_agenda">Agenda</string>
+    <string name="settings_sync_interval_feature_grades">Notes</string>
+    <string name="settings_sync_interval_feature_absences">Absences</string>
+    <string name="settings_sync_interval_feature_projects">Projets</string>
+    <string name="settings_sync_interval_feature_documents">Documents</string>
+    <string name="settings_sync_interval_feature_directory">Trombinoscope</string>
+    <string name="settings_sync_interval_feature_news">Actualités</string>
+    <string name="settings_sync_interval_title">Intervalle pour %1$s</string>
 </resources>

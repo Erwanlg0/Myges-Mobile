@@ -192,9 +192,21 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 val academicDue = needProjects || needDocuments
                 val needYears = needGrades || needAbsences || needDirectory || academicDue
 
-                val profileAndYears = if (needYears) fetchProfileAndYears() else null
+                val profileAndYears = if (needYears) {
+                    val cachedProfile = dao.profile()
+                    if (!force && cachedProfile != null && !cachedProfile.academicYear.isNullOrBlank()) {
+                        val activeYears = cachedProfile.academicYear.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                        ProfileAndYears(cachedProfile.toDomain(), activeYears)
+                    } else {
+                        fetchProfileAndYears()
+                    }
+                } else null
                 val updatedProfile = profileAndYears?.profile
                 val years = profileAndYears?.years.orEmpty()
+
+                val today = LocalDate.now(ZoneOffset.UTC)
+                val currentAcademicYearStart = (if (today.monthValue >= 9) today.year else today.year - 1).toString()
+                val finalSyncYears = if (force) years else years.filter { it >= currentAcademicYearStart }.ifEmpty { years }
 
                 val nextProjectStepProjects = if (academicDue) {
                     runCatching { api.nextProjectSteps()?.toNextProjectStepProjects().orEmpty() }.getOrDefault(emptyList())
@@ -204,13 +216,13 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
                 val fetched = coroutineScope {
                     val agendaDeferred = if (needAgenda) async { fetchAgendaEvents() } else null
-                    val gradesDeferred = if (needGrades) async { fetchGrades(years) } else null
+                    val gradesDeferred = if (needGrades) async { fetchGrades(finalSyncYears) } else null
                     val academicDeferred = if (academicDue) {
-                        async { fetchAcademicData(years, updatedProfile!!.id, nextProjectStepProjects) }
+                        async { fetchAcademicData(finalSyncYears, updatedProfile!!.id, nextProjectStepProjects) }
                     } else {
                         null
                     }
-                    val directoryDeferred = if (needDirectory) async { fetchDirectory(years) } else null
+                    val directoryDeferred = if (needDirectory) async { fetchDirectory(finalSyncYears) } else null
                     val newsDeferred = if (needNews) async { fetchNews() } else null
 
                     val agenda = agendaDeferred?.await()
@@ -219,7 +231,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     val directory = directoryDeferred?.await()
                     val news = newsDeferred?.await()
                     val absences = if (needAbsences) {
-                        fetchAbsences(years, absencePeriods(grades, academic?.courses))
+                        fetchAbsences(finalSyncYears, absencePeriods(grades, academic?.courses))
                     } else {
                         null
                     }
