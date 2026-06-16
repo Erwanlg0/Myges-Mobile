@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.elg.myges.application.ports.SettingsRepository
 import com.elg.myges.domain.model.NotificationPreferences
+import com.elg.myges.domain.model.ThemeMode
 import com.elg.myges.domain.model.UserSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -34,8 +35,13 @@ class AppSettingsRepository @Inject constructor(
             ),
             calendarSyncEnabled = preferences[CALENDAR_SYNC] ?: false,
             biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
+            themeMode = preferences[THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
             lastSyncAt = preferences[LAST_SYNC]?.let(Instant::ofEpochMilli)
         )
+    }
+
+    override suspend fun setThemeMode(themeMode: ThemeMode) {
+        context.settingsDataStore.edit { preferences -> preferences[THEME_MODE] = themeMode.name }
     }
 
     override suspend fun setLanguageTag(languageTag: String?) {
@@ -90,5 +96,6 @@ class AppSettingsRepository @Inject constructor(
         val NOTIFY_DOCUMENTS = booleanPreferencesKey("notify_documents")
         val NOTIFY_GRADES = booleanPreferencesKey("notify_grades")
         val NOTIFY_PROJECTS = booleanPreferencesKey("notify_projects")
+        val THEME_MODE = stringPreferencesKey("theme_mode")
     }
 }

@@ -1,10 +1,12 @@
 package com.elg.myges.adapters.primary.viewmodel
 
 import android.net.Uri
+import com.elg.myges.application.ports.CalendarSyncPort
 import com.elg.myges.application.ports.NotificationScheduler
 import com.elg.myges.application.ports.SessionRepository
 import com.elg.myges.application.ports.SettingsRepository
 import com.elg.myges.application.ports.StudentDataRepository
+import com.elg.myges.application.usecase.CalendarAccountsUseCase
 import com.elg.myges.application.usecase.ClearCacheUseCase
 import com.elg.myges.application.usecase.LogoutUseCase
 import com.elg.myges.application.usecase.ObserveSettingsUseCase
@@ -12,6 +14,7 @@ import com.elg.myges.application.usecase.UpdateSettingsUseCase
 import com.elg.myges.domain.model.Absence
 import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
+import com.elg.myges.domain.model.CalendarAccount
 import com.elg.myges.domain.model.AppError
 import com.elg.myges.domain.model.AppException
 import com.elg.myges.domain.model.Course
@@ -144,9 +147,17 @@ class SettingsViewModelTest {
             ObserveSettingsUseCase(settingsRepository),
             UpdateSettingsUseCase(settingsRepository),
             ClearCacheUseCase(studentDataRepository, settingsRepository),
-            LogoutUseCase(sessionRepository, notificationScheduler)
+            LogoutUseCase(sessionRepository, notificationScheduler),
+            CalendarAccountsUseCase(StubCalendarSyncPort())
         )
     }
+}
+
+private class StubCalendarSyncPort : CalendarSyncPort {
+    override suspend fun sync(events: List<AgendaEvent>) = Unit
+    override suspend fun availableCalendars(): List<CalendarAccount> = emptyList()
+    override suspend fun selectedCalendarId(): Long? = null
+    override suspend fun selectCalendar(id: Long) = Unit
 }
 
 private class RecordingSettingsRepository(
@@ -198,6 +209,8 @@ private class RecordingSettingsRepository(
         documentNotifications = enabled
     }
 
+    override suspend fun setThemeMode(themeMode: com.elg.myges.domain.model.ThemeMode) = Unit
+
     override suspend fun markSynced() = Unit
 
     override suspend fun clearSyncMetadata() {
@@ -244,6 +257,7 @@ private class RecordingNotificationScheduler(
 ) : NotificationScheduler {
     override fun ensureChannels() = Unit
     override suspend fun scheduleStudentSync() = Unit
+    override suspend fun runStudentSyncNow() = Unit
     override suspend fun cancelStudentSync() {
         events += "cancelSync"
     }

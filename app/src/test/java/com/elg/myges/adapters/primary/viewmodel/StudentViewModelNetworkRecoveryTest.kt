@@ -288,12 +288,16 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setAgendaNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setProjectNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setThemeMode(themeMode: com.elg.myges.domain.model.ThemeMode) = Unit
     override suspend fun markSynced() = Unit
     override suspend fun clearSyncMetadata() = Unit
 }
 
 private class FakeCalendarSyncPort : CalendarSyncPort {
     override suspend fun sync(events: List<AgendaEvent>) = Unit
+    override suspend fun availableCalendars(): List<com.elg.myges.domain.model.CalendarAccount> = emptyList()
+    override suspend fun selectedCalendarId(): Long? = null
+    override suspend fun selectCalendar(id: Long) = Unit
 }
 
 private class FakeSessionRepository : SessionRepository {
@@ -315,6 +319,7 @@ private class FakeNotificationScheduler : NotificationScheduler {
 
     override fun ensureChannels() = Unit
     override suspend fun scheduleStudentSync() = Unit
+    override suspend fun runStudentSyncNow() = Unit
     override suspend fun cancelStudentSync() {
         syncCancelled = true
     }

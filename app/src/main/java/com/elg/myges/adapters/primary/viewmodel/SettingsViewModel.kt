@@ -2,11 +2,14 @@ package com.elg.myges.adapters.primary.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elg.myges.application.usecase.CalendarAccountsUseCase
 import com.elg.myges.application.usecase.ClearCacheUseCase
 import com.elg.myges.application.usecase.LogoutUseCase
 import com.elg.myges.application.usecase.ObserveSettingsUseCase
 import com.elg.myges.application.usecase.UpdateSettingsUseCase
 import com.elg.myges.domain.model.AppError
+import com.elg.myges.domain.model.CalendarAccount
+import com.elg.myges.domain.model.ThemeMode
 import com.elg.myges.domain.model.UserSettings
 import com.elg.myges.domain.model.toAppError
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,10 +32,35 @@ class SettingsViewModel @Inject constructor(
     observeSettings: ObserveSettingsUseCase,
     private val updateSettingsUseCase: UpdateSettingsUseCase,
     private val clearCacheUseCase: ClearCacheUseCase,
-    private val logoutUseCase: LogoutUseCase
+    private val logoutUseCase: LogoutUseCase,
+    private val calendarAccountsUseCase: CalendarAccountsUseCase
 ) : ViewModel() {
     private val loading = MutableStateFlow(false)
     private val error = MutableStateFlow<AppError?>(null)
+
+    private val _calendars = MutableStateFlow<List<CalendarAccount>>(emptyList())
+    val calendars: StateFlow<List<CalendarAccount>> = _calendars
+
+    private val _selectedCalendarId = MutableStateFlow<Long?>(null)
+    val selectedCalendarId: StateFlow<Long?> = _selectedCalendarId
+
+    fun loadCalendars() {
+        viewModelScope.launch {
+            runCatching {
+                _calendars.value = calendarAccountsUseCase.available()
+                _selectedCalendarId.value = calendarAccountsUseCase.selected()
+            }.onFailure { error.value = it.toAppError() }
+        }
+    }
+
+    fun selectCalendar(id: Long) {
+        viewModelScope.launch {
+            runCatching {
+                calendarAccountsUseCase.select(id)
+                _selectedCalendarId.value = id
+            }.onFailure { error.value = it.toAppError() }
+        }
+    }
 
     val state: StateFlow<SettingsUiState> = combine(
         observeSettings(),
@@ -44,6 +72,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setLanguage(languageTag: String?) = launchSettingChange {
         updateSettingsUseCase.language(languageTag)
+    }
+
+    fun setThemeMode(themeMode: ThemeMode) = launchSettingChange {
+        updateSettingsUseCase.themeMode(themeMode)
     }
 
     fun setCalendarSync(enabled: Boolean) = launchSettingChange {

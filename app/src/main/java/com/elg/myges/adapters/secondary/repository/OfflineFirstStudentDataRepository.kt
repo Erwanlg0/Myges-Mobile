@@ -389,7 +389,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             val practicalPayloads = listOfNotNull(practicalsJson) + coursePracticalPayloads
             val practicals = practicalPayloads.flatMap { it.toPracticals(currentUserId, year) }.distinctBy { it.id }
 
-            val documents = runCatching { api.annualDocuments(year)?.toDocuments().orEmpty() }.getOrDefault(emptyList()) +
+            val documents = runCatching { api.annualDocuments(year)?.toDocuments(year).orEmpty() }.getOrDefault(emptyList()) +
                 courseDocuments(newCourses) +
                 projectPayloads.flatMap { it.toProjectDocuments(year) } +
                 practicalPayloads.flatMap { it.toPracticalDocuments(year) } +

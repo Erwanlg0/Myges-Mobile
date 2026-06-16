@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,6 +28,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Logout
@@ -57,6 +59,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,12 +71,17 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,6 +107,7 @@ import com.elg.myges.adapters.primary.viewmodel.StudentViewModel
 import com.elg.myges.domain.model.Absence
 import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
+import com.elg.myges.domain.model.CalendarAccount
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
 import com.elg.myges.domain.model.DirectoryPerson
@@ -109,6 +118,7 @@ import com.elg.myges.domain.model.Practical
 import com.elg.myges.domain.model.Project
 import com.elg.myges.domain.model.ProjectGroup
 import com.elg.myges.domain.model.ProjectStep
+import com.elg.myges.domain.model.ThemeMode
 import com.elg.myges.domain.model.UserSettings
 import com.elg.myges.domain.model.progress
 import com.elg.myges.domain.model.toGradeSummary
@@ -329,14 +339,55 @@ fun DashboardScreen(
 @Composable
 fun AgendaScreen(
     viewModel: StudentViewModel,
+    settingsViewModel: SettingsViewModel,
     highlightedEventId: String? = null
 ) {
     val state by viewModel.agenda.collectAsStateWithLifecycle()
+    val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
+    val calendars by settingsViewModel.calendars.collectAsStateWithLifecycle()
+    val selectedCalendarId by settingsViewModel.selectedCalendarId.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var selectedMode by remember { mutableStateOf(AgendaMode.Week7) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
+    var showCalendarPicker by remember { mutableStateOf(false) }
+    var pendingCalendarPick by remember { mutableStateOf(false) }
+
+    val calendarConnected = settingsState.settings?.calendarSyncEnabled == true && selectedCalendarId != null
+
+    val connectCalendar = {
+        settingsViewModel.setCalendarSync(true)
+        pendingCalendarPick = true
+        settingsViewModel.loadCalendars()
+    }
+    val connectLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        if (grants.values.all { it }) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            connectCalendar()
+        }
+    }
+    LaunchedEffect(settingsViewModel) {
+        if (context.hasCalendarPermissions()) settingsViewModel.loadCalendars()
+    }
+    LaunchedEffect(calendars, pendingCalendarPick) {
+        if (pendingCalendarPick && calendars.isNotEmpty()) {
+            showCalendarPicker = true
+            pendingCalendarPick = false
+        }
+    }
+    if (showCalendarPicker) {
+        CalendarAccountPickerDialog(
+            calendars = calendars,
+            selectedCalendarId = selectedCalendarId,
+            onSelect = { id ->
+                settingsViewModel.selectCalendar(id)
+                showCalendarPicker = false
+                viewModel.syncAgendaToCalendar(state.data)
+            },
+            onDismiss = { showCalendarPicker = false }
+        )
+    }
 
     LaunchedEffect(state.data, highlightedEventId) {
         if (!highlightedEventId.isNullOrBlank()) {
@@ -353,6 +404,12 @@ fun AgendaScreen(
         viewModel.agendaDateToNavigate.collect { targetDate ->
             selectedDate = targetDate
             selectedMode = AgendaMode.Week7
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.calendarSyncCompleted.collect {
+            android.widget.Toast.makeText(context, context.getString(R.string.agenda_sync_done), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     val daysWithEvents = remember(state.data) {
@@ -381,7 +438,27 @@ fun AgendaScreen(
         item {
             AgendaModeSelector(selectedMode) { selectedMode = it }
         }
-        
+
+        if (!calendarConnected) {
+            item {
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (context.hasCalendarPermissions()) {
+                            connectCalendar()
+                        } else {
+                            connectLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.agenda_connect_google))
+                }
+            }
+        }
+
         item {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -1450,25 +1527,30 @@ fun DocumentsScreen(
     val documentDownloadProgress by viewModel.documentDownloadProgress.collectAsStateWithLifecycle()
     var documentOpenTriggered by remember(highlightedDocumentId) { mutableStateOf(false) }
 
-    val annualDocuments = remember(state.data) {
-        state.data.filter { it.ownerId == null && it.category != null }
+    val generalDocuments = remember(state.data) {
+        state.data.filter { it.ownerId == null }
     }
-    val folderDocuments = remember(state.data) {
-        state.data.filter { it.ownerId == null && it.category == null }
-    }
-    val years = remember(annualDocuments) {
-        annualDocuments.mapNotNull { it.year }.distinct().sortedDescending()
+    val years = remember(generalDocuments) {
+        generalDocuments.mapNotNull { it.filterYear() }.distinct().sortedDescending()
     }
     var selectedYear by remember(years) { mutableStateOf(years.firstOrNull()) }
-    val filteredAnnual = remember(annualDocuments, selectedYear) {
-        if (selectedYear == null) annualDocuments else annualDocuments.filter { it.year == selectedYear }
+    val filteredGeneral = remember(generalDocuments, selectedYear) {
+        if (selectedYear == null) generalDocuments else generalDocuments.filter { it.filterYear() == selectedYear }
     }
-    val annualByCategory = remember(filteredAnnual) {
-        filteredAnnual
+    val annualByCategory = remember(filteredGeneral) {
+        filteredGeneral
+            .filter { it.category != null }
             .groupBy { it.category?.trim()?.uppercase() ?: "" }
             .entries
             .sortedBy { it.key }
     }
+    val folderDocuments = remember(filteredGeneral) {
+        filteredGeneral.filter { it.category == null }
+    }
+
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val showScrollTop by remember { derivedStateOf { listState.firstVisibleItemIndex > 5 } }
 
     LaunchedEffect(state.data, highlightedDocumentId) {
         if (!documentOpenTriggered && !highlightedDocumentId.isNullOrBlank()) {
@@ -1479,23 +1561,53 @@ fun DocumentsScreen(
             }
         }
     }
+    Box(modifier = Modifier.fillMaxSize()) {
     FeatureStateContent(
         state = state,
         empty = { allDocs -> allDocs.none { it.ownerId == null } },
         emptyTitle = R.string.documents_empty_title,
         emptyBody = R.string.documents_empty_body,
-        onRetry = viewModel::refresh
+        onRetry = viewModel::refresh,
+        listState = listState
     ) { _ ->
         if (years.isNotEmpty()) {
             item {
-                YearFilterRow(
-                    years = years,
-                    selectedYear = selectedYear,
-                    onYearSelected = { selectedYear = it }
-                )
+                var yearExpanded by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    CompactCard(modifier = Modifier.clickable { yearExpanded = true }) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = selectedYear ?: stringResource(R.string.common_all),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = yearExpanded,
+                        onDismissRequest = { yearExpanded = false }
+                    ) {
+                        (listOf(null) + years).forEach { year ->
+                            DropdownMenuItem(
+                                text = { Text(year ?: stringResource(R.string.common_all)) },
+                                onClick = {
+                                    selectedYear = year
+                                    yearExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
-        item { SectionTitleText(stringResource(R.string.documents_annual)) }
+        if (annualByCategory.isNotEmpty()) {
+            item { SectionTitleText(stringResource(R.string.documents_annual)) }
+        }
         annualByCategory.forEach { (category, docs) ->
             item(key = "cat_$category") {
                 Text(
@@ -1527,6 +1639,28 @@ fun DocumentsScreen(
             }
         }
     }
+        if (showScrollTop) {
+            FloatingActionButton(
+                onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.action_scroll_top)
+                )
+            }
+        }
+    }
+}
+
+private fun AcademicDocument.filterYear(): String? {
+    year?.takeIf { it.isNotBlank() }?.let { return it }
+    val instant = updatedAt ?: return null
+    val date = instant.atZone(ZoneId.systemDefault()).toLocalDate()
+    val start = if (date.monthValue >= 8) date.year else date.year - 1
+    return "$start-${start + 1}"
 }
 
 @Composable
@@ -1570,20 +1704,51 @@ fun SettingsScreen(
 ) {
     val state by settingsViewModel.state.collectAsStateWithLifecycle()
     val agendaState by studentViewModel.agenda.collectAsStateWithLifecycle()
+    val calendars by settingsViewModel.calendars.collectAsStateWithLifecycle()
+    val selectedCalendarId by settingsViewModel.selectedCalendarId.collectAsStateWithLifecycle()
     val settings = state.settings
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    var showCalendarPicker by remember { mutableStateOf(false) }
+    var pendingFirstPick by remember { mutableStateOf(false) }
     val enableCalendarSync = {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         settingsViewModel.setCalendarSync(true)
+        pendingFirstPick = true
+        settingsViewModel.loadCalendars()
         if (agendaState.data.isNotEmpty()) studentViewModel.syncAgendaToCalendar(agendaState.data)
     }
     val calendarLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         if (grants.values.all { it }) enableCalendarSync()
     }
+    LaunchedEffect(calendars, pendingFirstPick) {
+        if (pendingFirstPick && calendars.isNotEmpty()) {
+            if (selectedCalendarId == null) showCalendarPicker = true
+            pendingFirstPick = false
+        }
+    }
     if (settings == null) {
         LoadingState()
         return
+    }
+    LaunchedEffect(settings.calendarSyncEnabled) {
+        if (settings.calendarSyncEnabled && context.hasCalendarPermissions()) {
+            settingsViewModel.loadCalendars()
+        }
+    }
+    if (showCalendarPicker) {
+        CalendarAccountPickerDialog(
+            calendars = calendars,
+            selectedCalendarId = selectedCalendarId,
+            onSelect = { id ->
+                settingsViewModel.selectCalendar(id)
+                showCalendarPicker = false
+                if (agendaState.data.isNotEmpty()) {
+                    studentViewModel.syncAgendaToCalendar(agendaState.data)
+                }
+            },
+            onDismiss = { showCalendarPicker = false }
+        )
     }
     androidx.compose.foundation.lazy.LazyColumn(
         modifier = Modifier.padding(16.dp),
@@ -1604,6 +1769,16 @@ fun SettingsScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 LanguageSelector(settings.languageTag, settingsViewModel::setLanguage)
+            }
+        }
+        item {
+            DataCard {
+                Text(
+                    text = stringResource(R.string.settings_theme),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                ThemeSelector(settings.themeMode, settingsViewModel::setThemeMode)
             }
         }
         item {
@@ -1637,6 +1812,29 @@ fun SettingsScreen(
                         }
                     }
                 )
+                if (settings.calendarSyncEnabled) {
+                    val selectedName = calendars.firstOrNull { it.id == selectedCalendarId }
+                        ?.let { it.accountName.ifBlank { it.displayName } }
+                    LabelValue(
+                        R.string.settings_calendar_account,
+                        selectedName ?: stringResource(R.string.settings_calendar_account_none)
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (context.hasCalendarPermissions()) {
+                                settingsViewModel.loadCalendars()
+                                showCalendarPicker = true
+                            } else {
+                                calendarLauncher.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Rounded.CalendarMonth, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.settings_calendar_account_choose))
+                    }
+                }
                 settings.lastSyncAt?.let {
                     LabelValue(R.string.settings_last_sync, formatInstant(it))
                 }
@@ -1725,6 +1923,87 @@ internal fun LanguageSelector(
                     onLanguageSelected(option.languageTag)
                 },
                 label = { Text(stringResource(option.title)) }
+            )
+        }
+    }
+}
+
+@Composable
+internal fun CalendarAccountPickerDialog(
+    calendars: List<CalendarAccount>,
+    selectedCalendarId: Long?,
+    onSelect: (Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        },
+        title = { Text(stringResource(R.string.settings_calendar_account)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (calendars.isEmpty()) {
+                    Text(stringResource(R.string.settings_calendar_account_empty))
+                }
+                calendars.forEach { calendar ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(calendar.id) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (calendar.id == selectedCalendarId) {
+                            Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        } else {
+                            Spacer(Modifier.width(24.dp))
+                        }
+                        Column {
+                            Text(calendar.displayName, style = MaterialTheme.typography.bodyLarge)
+                            if (calendar.accountName.isNotBlank() && calendar.accountName != calendar.displayName) {
+                                Text(
+                                    calendar.accountName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+internal fun ThemeSelector(
+    selectedMode: ThemeMode,
+    onModeSelected: (ThemeMode) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        ThemeMode.entries.forEach { mode ->
+            FilterChip(
+                selected = selectedMode == mode,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onModeSelected(mode)
+                },
+                label = {
+                    Text(
+                        stringResource(
+                            when (mode) {
+                                ThemeMode.System -> R.string.settings_theme_system
+                                ThemeMode.Light -> R.string.settings_theme_light
+                                ThemeMode.Dark -> R.string.settings_theme_dark
+                            }
+                        )
+                    )
+                }
             )
         }
     }

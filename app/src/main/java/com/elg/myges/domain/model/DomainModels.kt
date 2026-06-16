@@ -172,12 +172,25 @@ data class NotificationPreferences(
     val documents: Boolean
 )
 
+enum class ThemeMode {
+    System,
+    Light,
+    Dark
+}
+
 data class UserSettings(
     val languageTag: String?,
     val notifications: NotificationPreferences,
     val calendarSyncEnabled: Boolean,
     val biometricEnabled: Boolean = false,
+    val themeMode: ThemeMode = ThemeMode.System,
     val lastSyncAt: Instant?
+)
+
+data class CalendarAccount(
+    val id: Long,
+    val displayName: String,
+    val accountName: String
 )
 
 enum class Feature {

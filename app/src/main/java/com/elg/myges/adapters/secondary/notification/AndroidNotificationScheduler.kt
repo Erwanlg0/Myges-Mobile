@@ -14,7 +14,10 @@ import androidx.core.content.ContextCompat
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.elg.myges.MainActivity
@@ -66,6 +69,23 @@ class AndroidNotificationScheduler @Inject constructor(
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_STUDENT_SYNC,
             ExistingPeriodicWorkPolicy.UPDATE,
+            request
+        )
+    }
+
+    override suspend fun runStudentSyncNow() {
+        val request = OneTimeWorkRequestBuilder<StudentSyncWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            WORK_STUDENT_SYNC_NOW,
+            ExistingWorkPolicy.KEEP,
             request
         )
     }
@@ -225,6 +245,7 @@ class AndroidNotificationScheduler @Inject constructor(
         const val CHANNEL_STUDENT = "student"
         const val NOTIFICATION_SYNC_FAILURE = 1001
         const val WORK_STUDENT_SYNC = "student_sync"
+        const val WORK_STUDENT_SYNC_NOW = "student_sync_now"
         const val ROUTE_DASHBOARD = "dashboard"
         const val ROUTE_AGENDA = "agenda"
         const val ROUTE_GRADES = "grades"

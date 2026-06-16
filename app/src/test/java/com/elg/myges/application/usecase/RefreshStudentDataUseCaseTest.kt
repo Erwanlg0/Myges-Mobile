@@ -114,6 +114,7 @@ private class RecordingSettingsRepository(
     override suspend fun setAgendaNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setProjectNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setThemeMode(themeMode: com.elg.myges.domain.model.ThemeMode) = Unit
 
     override suspend fun markSynced() {
         events += "markSynced"
@@ -133,6 +134,10 @@ private class RecordingCalendarSyncPort(
         syncedEvents = events
         this.events += "calendar:${events.size}"
     }
+
+    override suspend fun availableCalendars(): List<com.elg.myges.domain.model.CalendarAccount> = emptyList()
+    override suspend fun selectedCalendarId(): Long? = null
+    override suspend fun selectCalendar(id: Long) = Unit
 }
 
 private fun sampleAgendaEvent(): AgendaEvent {

@@ -502,17 +502,17 @@ fun JsonElement.toPracticalDocuments(fallbackYear: String? = null): List<Academi
     }
 }
 
-fun JsonElement.toDocuments(): List<AcademicDocument> {
+fun JsonElement.toDocuments(fallbackYear: String? = null): List<AcademicDocument> {
     val root = objectOrData()
     val annualArray = root["annualDocuments"] as? JsonArray
     val docsArray = root["documents"] as? JsonArray
     if (annualArray != null || docsArray != null) {
-        val annual = annualArray?.map { it.objectOrData().toDocument() }.orEmpty()
-        val dossier = docsArray?.map { it.objectOrData().toDocument() }.orEmpty()
+        val annual = annualArray?.map { it.objectOrData().toDocument(parentYear = fallbackYear) }.orEmpty()
+        val dossier = docsArray?.map { it.objectOrData().toDocument(parentYear = fallbackYear) }.orEmpty()
         return annual + dossier
     }
     return arrayOrNested("items", "data").map { element ->
-        element.objectOrData().toDocument()
+        element.objectOrData().toDocument(parentYear = fallbackYear)
     }
 }
 

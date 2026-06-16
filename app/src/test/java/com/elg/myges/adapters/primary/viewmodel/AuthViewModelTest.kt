@@ -192,6 +192,7 @@ private class AuthRecordingNotificationScheduler : NotificationScheduler {
         syncScheduled = true
     }
 
+    override suspend fun runStudentSyncNow() = Unit
     override suspend fun cancelStudentSync() = Unit
     override suspend fun showSyncFailure() = Unit
     override suspend fun showNewGrade(grade: Grade) = Unit

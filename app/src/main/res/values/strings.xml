@@ -3,6 +3,7 @@
 
     <string name="action_cancel">Annuler</string>
     <string name="action_close">Fermer</string>
+    <string name="action_scroll_top">Revenir en haut</string>
     <string name="action_retry">Réessayer</string>
     <string name="action_sync_now">Synchroniser maintenant</string>
     <string name="cd_open_navigation">Ouvrir la navigation</string>
@@ -21,6 +22,7 @@
     <string name="state_offline_empty_body">Aucune donnée locale n’est encore disponible. Reconnectez-vous au réseau pour synchroniser MyGES.</string>
     <string name="state_refreshing">Synchronisation en cours</string>
     <string name="state_loading">Chargement en cours…</string>
+    <string name="state_loading_first_sync">Première synchronisation : la récupération de toutes vos données peut prendre jusqu\'à 10 minutes. Vous pouvez fermer l\'application, le téléchargement continue en arrière-plan.</string>
 
     <string name="error_empty_response">La réponse reçue est vide.</string>
     <string name="error_network">Connexion impossible. Vérifiez votre réseau.</string>
@@ -65,6 +67,8 @@
     <string name="agenda_empty_title">Agenda vide</string>
     <string name="agenda_empty_body">Aucun événement n’est disponible dans le cache local.</string>
     <string name="agenda_sync_calendar">Synchroniser le calendrier</string>
+    <string name="agenda_connect_google">Connecter un compte Google Agenda</string>
+    <string name="agenda_sync_done">Synchronisation du calendrier terminée</string>
     <string name="agenda_details_title">Détail du cours</string>
     <string name="agenda_end">Fin</string>
     <string name="agenda_filter_empty">Aucun événement pour cette vue.</string>
@@ -175,7 +179,7 @@
     <string name="documents_open">Télécharger et ouvrir</string>
     <string name="documents_updated_at">Mis à jour</string>
     <string name="documents_annual">Documents annuels</string>
-    <string name="documents_folder">Documents dossier</string>
+    <string name="documents_folder">Supports de cours</string>
 
     <string name="directory_title">Trombinoscope</string>
     <string name="directory_empty_title">Aucun contact</string>
@@ -209,8 +213,16 @@
     <string name="settings_title">Réglages</string>
     <string name="settings_calendar_sync">Synchronisation calendrier</string>
     <string name="settings_calendar_select_title">Sélectionner un compte de calendrier</string>
+    <string name="settings_calendar_account">Compte Google</string>
+    <string name="settings_calendar_account_choose">Changer de compte / calendrier</string>
+    <string name="settings_calendar_account_none">Aucun calendrier sélectionné</string>
+    <string name="settings_calendar_account_empty">Aucun calendrier disponible sur cet appareil.</string>
     <string name="settings_clear_cache">Vider le cache</string>
     <string name="settings_language">Langue</string>
+    <string name="settings_theme">Thème</string>
+    <string name="settings_theme_system">Système</string>
+    <string name="settings_theme_light">Clair</string>
+    <string name="settings_theme_dark">Sombre</string>
     <string name="settings_language_english">Anglais</string>
     <string name="settings_language_french">Français</string>
     <string name="settings_language_system">Système</string>

@@ -307,7 +307,7 @@ private fun StudentScaffold(
         ) {
             composable("dashboard") { DashboardScreen(studentViewModel, onNavigateToTab = { route -> navController.navigateTo(route) }) }
             composable("agenda?id={id}") { backStackEntry ->
-                AgendaScreen(studentViewModel, highlightedEventId = backStackEntry.arguments?.getString("id"))
+                AgendaScreen(studentViewModel, settingsViewModel, highlightedEventId = backStackEntry.arguments?.getString("id"))
             }
             composable("grades?id={id}") { backStackEntry ->
                 GradesScreen(studentViewModel, highlightedGradeId = backStackEntry.arguments?.getString("id"))

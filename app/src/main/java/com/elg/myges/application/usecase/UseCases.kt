@@ -16,6 +16,7 @@ import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
 import com.elg.myges.domain.model.Project
 import com.elg.myges.domain.model.Session
+import com.elg.myges.domain.model.ThemeMode
 import com.elg.myges.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -30,6 +31,7 @@ class CompleteOAuthLoginUseCase @Inject constructor(
         sessionRepository.authenticateWithToken(accessToken, expiresAt, enableBiometric)
         notificationScheduler.ensureChannels()
         notificationScheduler.scheduleStudentSync()
+        notificationScheduler.runStudentSyncNow()
     }
 }
 
@@ -173,6 +175,7 @@ class UpdateSettingsUseCase @Inject constructor(
     suspend fun agendaNotifications(enabled: Boolean) = repository.setAgendaNotificationsEnabled(enabled)
     suspend fun projectNotifications(enabled: Boolean) = repository.setProjectNotificationsEnabled(enabled)
     suspend fun documentNotifications(enabled: Boolean) = repository.setDocumentNotificationsEnabled(enabled)
+    suspend fun themeMode(themeMode: ThemeMode) = repository.setThemeMode(themeMode)
 }
 
 class SyncAgendaToCalendarUseCase @Inject constructor(
@@ -181,4 +184,12 @@ class SyncAgendaToCalendarUseCase @Inject constructor(
     suspend operator fun invoke(events: List<AgendaEvent>) {
         calendarSyncPort.sync(events)
     }
+}
+
+class CalendarAccountsUseCase @Inject constructor(
+    private val calendarSyncPort: CalendarSyncPort
+) {
+    suspend fun available() = calendarSyncPort.availableCalendars()
+    suspend fun selected() = calendarSyncPort.selectedCalendarId()
+    suspend fun select(id: Long) = calendarSyncPort.selectCalendar(id)
 }

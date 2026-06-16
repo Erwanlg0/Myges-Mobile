@@ -79,6 +79,8 @@ class StudentViewModel @Inject constructor(
     val documentOpenRequests = MutableSharedFlow<DocumentOpenRequest>()
     private val _refreshSucceeded = MutableSharedFlow<Unit>()
     val refreshSucceeded: SharedFlow<Unit> = _refreshSucceeded
+    private val _calendarSyncCompleted = MutableSharedFlow<Unit>()
+    val calendarSyncCompleted: SharedFlow<Unit> = _calendarSyncCompleted
 
     val agendaDateToNavigate = MutableSharedFlow<LocalDate>()
     val gradesPeriodToNavigate = MutableSharedFlow<String>()
@@ -154,6 +156,7 @@ class StudentViewModel @Inject constructor(
             refreshing.value = true
             error.value = null
             runCatching { syncAgendaToCalendarUseCase(events) }
+                .onSuccess { _calendarSyncCompleted.emit(Unit) }
                 .onFailure { handleFailure(it) }
             refreshing.value = false
         }

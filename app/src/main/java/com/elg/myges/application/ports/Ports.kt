@@ -4,6 +4,7 @@ import android.net.Uri
 import com.elg.myges.domain.model.Absence
 import com.elg.myges.domain.model.AcademicDocument
 import com.elg.myges.domain.model.AgendaEvent
+import com.elg.myges.domain.model.CalendarAccount
 import com.elg.myges.domain.model.Course
 import com.elg.myges.domain.model.DashboardSummary
 import com.elg.myges.domain.model.DirectoryPerson
@@ -12,6 +13,7 @@ import com.elg.myges.domain.model.NewsItem
 import com.elg.myges.domain.model.Practical
 import com.elg.myges.domain.model.Project
 import com.elg.myges.domain.model.Session
+import com.elg.myges.domain.model.ThemeMode
 import com.elg.myges.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
@@ -52,6 +54,7 @@ interface SettingsRepository {
     suspend fun setAgendaNotificationsEnabled(enabled: Boolean)
     suspend fun setProjectNotificationsEnabled(enabled: Boolean)
     suspend fun setDocumentNotificationsEnabled(enabled: Boolean)
+    suspend fun setThemeMode(themeMode: ThemeMode)
     suspend fun markSynced()
     suspend fun clearSyncMetadata()
 }
@@ -62,11 +65,15 @@ interface NetworkMonitor {
 
 interface CalendarSyncPort {
     suspend fun sync(events: List<AgendaEvent>)
+    suspend fun availableCalendars(): List<CalendarAccount>
+    suspend fun selectedCalendarId(): Long?
+    suspend fun selectCalendar(id: Long)
 }
 
 interface NotificationScheduler {
     fun ensureChannels()
     suspend fun scheduleStudentSync()
+    suspend fun runStudentSyncNow()
     suspend fun cancelStudentSync()
     suspend fun showSyncFailure()
     suspend fun showNewGrade(grade: Grade)

@@ -3,6 +3,7 @@
 
     <string name="action_cancel">Cancel</string>
     <string name="action_close">Close</string>
+    <string name="action_scroll_top">Scroll to top</string>
     <string name="action_retry">Retry</string>
     <string name="action_sync_now">Sync now</string>
     <string name="cd_open_navigation">Open navigation</string>
@@ -21,6 +22,7 @@
     <string name="state_offline_empty_body">No local data is available yet. Reconnect to the network to sync MyGES.</string>
     <string name="state_refreshing">Syncing</string>
     <string name="state_loading">Loading…</string>
+    <string name="state_loading_first_sync">First sync: fetching all your data can take up to 10 minutes. You can close the app, the download continues in the background.</string>
 
     <string name="error_empty_response">The received response is empty.</string>
     <string name="error_network">Unable to connect. Check your network.</string>
@@ -65,6 +67,8 @@
     <string name="agenda_empty_title">Empty agenda</string>
     <string name="agenda_empty_body">No event is available in the local cache.</string>
     <string name="agenda_sync_calendar">Sync calendar</string>
+    <string name="agenda_connect_google">Connect a Google Calendar account</string>
+    <string name="agenda_sync_done">Calendar sync complete</string>
     <string name="agenda_details_title">Class details</string>
     <string name="agenda_end">End</string>
     <string name="agenda_filter_empty">No event for this view.</string>
@@ -175,7 +179,7 @@
     <string name="documents_open">Download and open</string>
     <string name="documents_updated_at">Updated</string>
     <string name="documents_annual">Annual documents</string>
-    <string name="documents_folder">Project documents</string>
+    <string name="documents_folder">Course materials</string>
 
     <string name="directory_title">Directory</string>
     <string name="directory_empty_title">No contacts</string>
@@ -209,8 +213,16 @@
     <string name="settings_title">Settings</string>
     <string name="settings_calendar_sync">Calendar sync</string>
     <string name="settings_calendar_select_title">Select a calendar account</string>
+    <string name="settings_calendar_account">Google account</string>
+    <string name="settings_calendar_account_choose">Change account / calendar</string>
+    <string name="settings_calendar_account_none">No calendar selected</string>
+    <string name="settings_calendar_account_empty">No calendar available on this device.</string>
     <string name="settings_clear_cache">Clear cache</string>
     <string name="settings_language">Language</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_french">French</string>
     <string name="settings_language_system">System</string>

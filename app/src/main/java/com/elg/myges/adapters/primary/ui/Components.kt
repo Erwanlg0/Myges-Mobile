@@ -15,18 +15,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -35,12 +40,14 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.elg.myges.R
 import com.elg.myges.adapters.primary.state.FeatureUiState
 import com.elg.myges.adapters.primary.state.messageRes
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun <T> FeatureStateContent(
     state: FeatureUiState<T>,
@@ -48,34 +55,39 @@ fun <T> FeatureStateContent(
     @StringRes emptyTitle: Int,
     @StringRes emptyBody: Int,
     onRetry: () -> Unit,
+    listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.(T) -> Unit
 ) {
-    when {
-        (state.loading || state.refreshing) && empty(state.data) -> LoadingState()
-        !state.online && empty(state.data) -> OfflineState(onRetry)
-        state.error != null && empty(state.data) -> ErrorState(state.error, onRetry)
-        empty(state.data) -> EmptyState(emptyTitle, emptyBody, onRetry)
-        else -> LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (!state.online) {
-                item { StateBanner(R.string.state_offline) }
+    PullToRefreshBox(
+        isRefreshing = state.refreshing && !empty(state.data),
+        onRefresh = onRetry,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        when {
+            (state.loading || state.refreshing) && empty(state.data) -> LoadingState(firstSync = true)
+            !state.online && empty(state.data) -> OfflineState(onRetry)
+            state.error != null && empty(state.data) -> ErrorState(state.error, onRetry)
+            empty(state.data) -> EmptyState(emptyTitle, emptyBody, onRetry)
+            else -> LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (!state.online) {
+                    item { StateBanner(R.string.state_offline) }
+                }
+                if (state.error != null) {
+                    item { StateBanner(state.error) }
+                }
+                content(state.data)
             }
-            if (state.error != null) {
-                item { StateBanner(state.error) }
-            }
-            if (state.refreshing) {
-                item { RefreshingRow() }
-            }
-            content(state.data)
         }
     }
 }
 
 @Composable
-fun LoadingState() {
+fun LoadingState(firstSync: Boolean = false) {
     Box(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         contentAlignment = Alignment.Center
@@ -90,6 +102,14 @@ fun LoadingState() {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (firstSync) {
+                Text(
+                    text = stringResource(R.string.state_loading_first_sync),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

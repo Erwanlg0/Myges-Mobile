@@ -417,6 +417,7 @@ private class RepositorySettingsRepository : SettingsRepository {
     override suspend fun setAgendaNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setProjectNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setThemeMode(themeMode: com.elg.myges.domain.model.ThemeMode) = Unit
     override suspend fun markSynced() = Unit
     override suspend fun clearSyncMetadata() = Unit
 }
@@ -430,6 +431,7 @@ private class RepositoryNotificationScheduler : NotificationScheduler {
 
     override fun ensureChannels() = Unit
     override suspend fun scheduleStudentSync() = Unit
+    override suspend fun runStudentSyncNow() = Unit
     override suspend fun cancelStudentSync() = Unit
     override suspend fun showSyncFailure() = Unit
     override suspend fun showNewGrade(grade: Grade) {
