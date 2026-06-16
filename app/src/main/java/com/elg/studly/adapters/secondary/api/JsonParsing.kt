@@ -373,7 +373,7 @@ fun JsonElement.toProjects(currentUserId: String? = null, fallbackYear: String? 
                 students = groupRoot.array("project_group_students", "students").mapNotNull { student ->
                     student.objectOrData().directoryDisplayName()
                 },
-                isMine = groupId in userGroupIds
+                isMine = groupId in userGroupIds || groupRoot.isCurrentUserGroupMember(currentUserId)
             )
         }
         val stepFileCount = root.array("steps", "projectSteps").sumOf { it.objectOrData().array("files").size }
@@ -458,7 +458,7 @@ fun JsonElement.toPracticals(currentUserId: String? = null, fallbackYear: String
                 students = groupRoot.array("project_group_students", "students").mapNotNull { student ->
                     student.objectOrData().directoryDisplayName()
                 },
-                isMine = groupId in userGroupIds
+                isMine = groupId in userGroupIds || groupRoot.isCurrentUserGroupMember(currentUserId)
             )
         }
         Practical(
@@ -694,6 +694,14 @@ private fun JsonObject.arrayText(key: String, vararg textKeys: String): String? 
         .mapNotNull { (it as? JsonObject)?.text(*textKeys) }
         .takeIf { it.isNotEmpty() }
         ?.joinToString(", ")
+}
+
+/** True when the current user appears in this group's student list (membership fallback to project_group_logs). */
+private fun JsonObject.isCurrentUserGroupMember(currentUserId: String?): Boolean {
+    if (currentUserId.isNullOrBlank()) return false
+    return array("project_group_students", "students").any { student ->
+        student.objectOrData().text("user_id", "uid", "u_id", "id", "studentId", "student_id") == currentUserId
+    }
 }
 
 private fun JsonObject.directoryDisplayName(): String? {

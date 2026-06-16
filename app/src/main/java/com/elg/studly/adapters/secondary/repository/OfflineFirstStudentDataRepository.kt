@@ -42,6 +42,7 @@ import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ProjectGroup
 import com.elg.studly.domain.model.StudentProfile
 import com.elg.studly.domain.model.SyncFeature
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -206,7 +207,9 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
                 val today = LocalDate.now(ZoneOffset.UTC)
                 val currentAcademicYearStart = (if (today.monthValue >= 9) today.year else today.year - 1).toString()
-                val finalSyncYears = if (force) years else years.filter { it >= currentAcademicYearStart }.ifEmpty { years }
+                // First launch (or forced refresh) fetches every year; routine syncs only recent years.
+                val isFirstSync = settingsRepository.settings.first().lastSyncAt == null
+                val finalSyncYears = if (force || isFirstSync) years else years.filter { it >= currentAcademicYearStart }.ifEmpty { years }
 
                 val nextProjectStepProjects = if (academicDue) {
                     runCatching { api.nextProjectSteps()?.toNextProjectStepProjects().orEmpty() }.getOrDefault(emptyList())
@@ -667,7 +670,20 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     fileCount = max(current.fileCount, next.fileCount),
                     year = current.year ?: next.year,
                     courseId = current.courseId ?: next.courseId,
-                    groups = (current.groups + next.groups).distinctBy { it.id }
+                    groups = mergeGroups(current.groups, next.groups)
+                )
+            }
+        }
+    }
+
+    /** Merge duplicate groups from different payloads, OR-ing membership so an isMine flag is never lost. */
+    private fun mergeGroups(a: List<ProjectGroup>, b: List<ProjectGroup>): List<ProjectGroup> {
+        return (a + b).groupBy { it.id }.values.map { duplicates ->
+            duplicates.reduce { current, next ->
+                current.copy(
+                    name = current.name.ifBlank { next.name },
+                    students = if (current.students.size >= next.students.size) current.students else next.students,
+                    isMine = current.isMine || next.isMine
                 )
             }
         }

@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(rtk grep *)"
+      "Bash(rtk grep *)",
+      "Bash(./gradlew :app:compileDebugKotlin --quiet)",
+      "Bash(./gradlew :app:testDebugUnitTest --quiet --tests \"*I18nResourceParityTest*\")",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }

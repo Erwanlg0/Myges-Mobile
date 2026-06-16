@@ -1,21 +1,27 @@
 package com.elg.studly.domain.model
 
+import java.time.Instant
+
 data class ProjectProgress(
     val completedSteps: Int,
     val totalSteps: Int,
     val fraction: Double
 )
 
+/** A step is done once its status says so, or once its deadline is in the past. */
+private fun ProjectStep.isCompleted(now: Instant): Boolean =
+    status.isCompletedStatus() || (deadline != null && deadline.isBefore(now))
+
 fun Project.progress(): ProjectProgress {
+    val now = Instant.now()
     val total = steps.size
-    if (total == 0) return ProjectProgress(0, 0, 0.0)
-    val now = java.time.Instant.now()
-    val sixMonthsAgo = now.minus(180, java.time.temporal.ChronoUnit.DAYS)
-    val completedCount = steps.count {
-        it.status.isCompletedStatus() || (it.deadline != null && it.deadline.isBefore(now) && it.deadline.isAfter(sixMonthsAgo))
+    // Progress is driven by the steps. The project-level `deadline` is unreliable (often just an
+    // update timestamp), so only an explicit completed status marks the whole project as done.
+    val projectDone = status.isCompletedStatus()
+    if (total == 0) {
+        return ProjectProgress(0, 0, if (projectDone) 1.0 else 0.0)
     }
-    val hasUncompleted = steps.any { !it.status.isCompletedStatus() }
-    val completed = if (hasUncompleted && completedCount == total) total - 1 else completedCount
+    val completed = if (projectDone) total else steps.count { it.isCompleted(now) }
     return ProjectProgress(
         completedSteps = completed,
         totalSteps = total,
@@ -24,15 +30,13 @@ fun Project.progress(): ProjectProgress {
 }
 
 fun Practical.progress(): ProjectProgress {
+    val now = Instant.now()
     val total = steps.size
-    if (total == 0) return ProjectProgress(0, 0, 0.0)
-    val now = java.time.Instant.now()
-    val sixMonthsAgo = now.minus(180, java.time.temporal.ChronoUnit.DAYS)
-    val completedCount = steps.count {
-        it.status.isCompletedStatus() || (it.deadline != null && it.deadline.isBefore(now) && it.deadline.isAfter(sixMonthsAgo))
+    val practicalDone = status.isCompletedStatus()
+    if (total == 0) {
+        return ProjectProgress(0, 0, if (practicalDone) 1.0 else 0.0)
     }
-    val hasUncompleted = steps.any { !it.status.isCompletedStatus() }
-    val completed = if (hasUncompleted && completedCount == total) total - 1 else completedCount
+    val completed = if (practicalDone) total else steps.count { it.isCompleted(now) }
     return ProjectProgress(
         completedSteps = completed,
         totalSteps = total,

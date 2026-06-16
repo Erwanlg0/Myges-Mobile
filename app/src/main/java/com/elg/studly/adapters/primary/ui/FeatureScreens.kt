@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -92,8 +96,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -130,7 +137,9 @@ import com.elg.studly.domain.model.toGradeSummary
 import coil.compose.AsyncImage
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.FormatStyle
 
 @Composable
 fun DashboardScreen(
@@ -352,7 +361,7 @@ fun AgendaScreen(
     val selectedCalendarId by settingsViewModel.selectedCalendarId.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    var selectedMode by remember { mutableStateOf(AgendaMode.Week7) }
+    var selectedMode by remember { mutableStateOf(AgendaMode.Grid) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
     var showCalendarPicker by remember { mutableStateOf(false) }
@@ -520,7 +529,7 @@ fun AgendaScreen(
                         onClick = {
                             selectedDate = when (selectedMode) {
                                 AgendaMode.Day -> selectedDate.minusDays(1)
-                                AgendaMode.Week5, AgendaMode.Week7 -> selectedDate.minusWeeks(1)
+                                AgendaMode.Grid, AgendaMode.Week5, AgendaMode.Week7 -> selectedDate.minusWeeks(1)
                                 AgendaMode.Month -> selectedDate.minusMonths(1)
                                 else -> selectedDate
                             }
@@ -531,9 +540,13 @@ fun AgendaScreen(
                     
                     val headerText = when (selectedMode) {
                         AgendaMode.Day -> formatDate(selectedDate)
-                        AgendaMode.Week5, AgendaMode.Week7 -> {
+                        AgendaMode.Grid, AgendaMode.Week5, AgendaMode.Week7 -> {
                             val startOfWeek = selectedDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
-                            val endDay = if (selectedMode == AgendaMode.Week5) 4 else 6
+                            val endDay = when (selectedMode) {
+                                AgendaMode.Week5 -> 4
+                                AgendaMode.Grid -> 5
+                                else -> 6
+                            }
                             val endOfWeek = startOfWeek.plusDays(endDay.toLong())
                             "${formatDate(startOfWeek)} - ${formatDate(endOfWeek)}"
                         }
@@ -554,7 +567,7 @@ fun AgendaScreen(
                         onClick = {
                             selectedDate = when (selectedMode) {
                                 AgendaMode.Day -> selectedDate.plusDays(1)
-                                AgendaMode.Week5, AgendaMode.Week7 -> selectedDate.plusWeeks(1)
+                                AgendaMode.Grid, AgendaMode.Week5, AgendaMode.Week7 -> selectedDate.plusWeeks(1)
                                 AgendaMode.Month -> selectedDate.plusMonths(1)
                                 else -> selectedDate
                             }
@@ -567,6 +580,19 @@ fun AgendaScreen(
         }
         
         when (selectedMode) {
+            AgendaMode.Grid -> {
+                val startOfWeek = selectedDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                item {
+                    AgendaWeekGrid(
+                        weekStart = startOfWeek,
+                        events = events,
+                        onOpen = { ev ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            selectedEvent = ev
+                        }
+                    )
+                }
+            }
             AgendaMode.List -> {
                 if (events.isEmpty()) {
                     item { CompactCard { Text(stringResource(R.string.agenda_filter_empty)) } }
@@ -677,6 +703,23 @@ fun AgendaScreen(
     }
 }
 
+private val CC_SUBJECT_REGEX = Regex("^(cc|contrôle continu)\\s*\\d*$", RegexOption.IGNORE_CASE)
+
+/** Keeps only the "main" grade rows, dropping CC/exam sub-rows already folded into a course average. */
+private fun deriveMainGrades(source: List<Grade>): List<Grade> {
+    val structuredKeys = source
+        .filter { it.subject.isBlank() && !it.id.contains("-cc-") && !it.id.contains("-exam") }
+        .map { it.courseName to it.period }
+        .toSet()
+    return source.filter { grade ->
+        !grade.id.contains("-cc-") &&
+        !grade.id.contains("-exam") &&
+        !((grade.courseName to grade.period) in structuredKeys &&
+            (grade.subject.matches(CC_SUBJECT_REGEX) ||
+             grade.subject.trim().equals("examen", ignoreCase = true)))
+    }
+}
+
 @Composable
 fun GradesScreen(
     viewModel: StudentViewModel,
@@ -718,6 +761,26 @@ fun GradesScreen(
     }
     var blockAssignments by remember(gradesList) {
         mutableStateOf(loadGradeBlocks(simulationPrefs, gradesList.map { it.blockKey() }.toSet()))
+    }
+    var groupByBlock by remember { mutableStateOf(simulationPrefs.getBoolean("group_by_block", false)) }
+    val hasBlocks = remember(blockAssignments) { blockAssignments.values.any { it.isNotBlank() } }
+    LaunchedEffect(hasBlocks) { if (!hasBlocks) groupByBlock = false }
+
+    val displayedGrades = remember(gradesList, selectedYear, selectedSemester, simulationMode, simulatedValues) {
+        val filtered = gradesList.filter { grade ->
+            (selectedYear == null || grade.academicYearLabel() == selectedYear) &&
+                (selectedSemester == null || grade.semesterLabel() == selectedSemester)
+        }
+        (if (simulationMode) filtered.withSimulatedValues(simulatedValues) else filtered)
+            .withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet())
+    }
+    val mainGrades = remember(displayedGrades) { deriveMainGrades(displayedGrades) }
+    // Block grouping spans semesters within the selected year, so it ignores the semester filter.
+    val blockMainGrades = remember(gradesList, selectedYear, simulationMode, simulatedValues) {
+        val yearGrades = gradesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }
+        val yearDisplayed = (if (simulationMode) yearGrades.withSimulatedValues(simulatedValues) else yearGrades)
+            .withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet())
+        deriveMainGrades(yearDisplayed)
     }
 
     LaunchedEffect(viewModel) {
@@ -778,17 +841,7 @@ fun GradesScreen(
         emptyTitle = R.string.grades_empty_title,
         emptyBody = R.string.grades_empty_body,
         onRetry = viewModel::refresh
-    ) { grades ->
-        val filteredGrades = grades.filter { grade ->
-            (selectedYear == null || grade.academicYearLabel() == selectedYear) &&
-                (selectedSemester == null || grade.semesterLabel() == selectedSemester)
-        }
-        val displayedGrades = if (simulationMode) {
-            filteredGrades.withSimulatedValues(simulatedValues)
-        } else {
-            filteredGrades
-        }.withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet())
-
+    ) { _ ->
         if (years.isNotEmpty()) {
             item {
                 Row(
@@ -830,36 +883,39 @@ fun GradesScreen(
                         }
                     }
 
-                    var semesterExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        CompactCard(
-                            modifier = Modifier.clickable { semesterExpanded = true }
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                    // Block mode spans semesters, so the semester filter is hidden there.
+                    if (!groupByBlock) {
+                        var semesterExpanded by remember { mutableStateOf(false) }
+                        Box(modifier = Modifier.weight(1f)) {
+                            CompactCard(
+                                modifier = Modifier.clickable { semesterExpanded = true }
                             ) {
-                                Text(
-                                    text = selectedSemester ?: stringResource(R.string.common_all),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = selectedSemester ?: stringResource(R.string.common_all),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Icon(Icons.Rounded.ArrowDropDown, contentDescription = null)
+                                }
                             }
-                        }
-                        DropdownMenu(
-                            expanded = semesterExpanded,
-                            onDismissRequest = { semesterExpanded = false }
-                        ) {
-                            (listOf(null) + semesters).forEach { semester ->
-                                DropdownMenuItem(
-                                    text = { Text(semester ?: stringResource(R.string.common_all)) },
-                                    onClick = {
-                                        selectedSemester = semester
-                                        semesterExpanded = false
-                                    }
-                                )
+                            DropdownMenu(
+                                expanded = semesterExpanded,
+                                onDismissRequest = { semesterExpanded = false }
+                            ) {
+                                (listOf(null) + semesters).forEach { semester ->
+                                    DropdownMenuItem(
+                                        text = { Text(semester ?: stringResource(R.string.common_all)) },
+                                        onClick = {
+                                            selectedSemester = semester
+                                            semesterExpanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -867,21 +923,8 @@ fun GradesScreen(
             }
         }
 
-        val structuredMainKeys = displayedGrades
-            .filter { it.subject.isBlank() && !it.id.contains("-cc-") && !it.id.contains("-exam") }
-            .map { it.courseName to it.period }
-            .toSet()
-        val ccSubjectRegex = Regex("^(cc|contrôle continu)\\s*\\d*$", RegexOption.IGNORE_CASE)
-        val mainGrades = displayedGrades.filter { grade ->
-            !grade.id.contains("-cc-") &&
-            !grade.id.contains("-exam") &&
-            !((grade.courseName to grade.period) in structuredMainKeys &&
-                (grade.subject.matches(ccSubjectRegex) ||
-                 grade.subject.trim().equals("examen", ignoreCase = true)))
-        }
-
         item { GradeSummaryCard(mainGrades, displayedGrades) }
-        if (blockAssignments.isNotEmpty()) {
+        if (!groupByBlock && blockAssignments.isNotEmpty()) {
             item { GradeBlockAveragesCard(mainGrades, blockAssignments) }
         }
         item {
@@ -921,12 +964,55 @@ fun GradesScreen(
             }
         }
         
-        val gradeItems = mainGrades
-        items(gradeItems, key = { it.id }) { grade ->
-            GradeCard(
-                grade = grade,
-                onOpen = { selectedGrade = grade }
-            )
+        if (hasBlocks) {
+            item {
+                fun setGroupByBlock(value: Boolean) {
+                    groupByBlock = value
+                    simulationPrefs.edit().putBoolean("group_by_block", value).apply()
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = !groupByBlock,
+                        onClick = { setGroupByBlock(false) },
+                        label = { Text(stringResource(R.string.grades_group_semester)) }
+                    )
+                    FilterChip(
+                        selected = groupByBlock,
+                        onClick = { setGroupByBlock(true) },
+                        label = { Text(stringResource(R.string.grades_group_block)) }
+                    )
+                }
+            }
+        }
+
+        if (groupByBlock) {
+            val grouped = blockMainGrades.groupBy { blockAssignments[it.blockKey()]?.takeIf(String::isNotBlank) }
+            val orderedBlocks = grouped.keys.filterNotNull()
+                .sortedWith(compareBy<String> { it.toIntOrNull() ?: Int.MAX_VALUE }.thenBy { it })
+            orderedBlocks.forEach { block ->
+                val blockGrades = grouped[block].orEmpty()
+                item(key = "block-$block") {
+                    GradeGroupHeader(stringResource(R.string.grades_block_prefix, block), blockGrades)
+                }
+                items(blockGrades, key = { "b-${it.id}" }) { grade ->
+                    GradeCard(grade = grade, onOpen = { selectedGrade = grade })
+                }
+            }
+            grouped[null]?.takeIf { it.isNotEmpty() }?.let { unassigned ->
+                item(key = "block-none") {
+                    GradeGroupHeader(stringResource(R.string.grades_block_unassigned), unassigned)
+                }
+                items(unassigned, key = { "u-${it.id}" }) { grade ->
+                    GradeCard(grade = grade, onOpen = { selectedGrade = grade })
+                }
+            }
+        } else {
+            items(mainGrades, key = { it.id }) { grade ->
+                GradeCard(grade = grade, onOpen = { selectedGrade = grade })
+            }
         }
     }
 }
@@ -2358,6 +2444,31 @@ private fun GradeCard(
 }
 
 @Composable
+private fun GradeGroupHeader(title: String, grades: List<Grade>) {
+    val avg = remember(grades) { grades.toGradeSummary().weightedAverage }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        if (avg != null) {
+            Text(
+                text = stringResource(R.string.grades_value_format, formatNumber(avg), formatNumber(20.0)),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = gradeColor(avg, 20.0)
+            )
+        }
+    }
+}
+
+@Composable
 internal fun GradeSummaryCard(
     grades: List<Grade>,
     allGrades: List<Grade> = grades
@@ -3335,7 +3446,243 @@ private enum class LanguageOption(@StringRes val title: Int, val languageTag: St
     English(R.string.settings_language_english, "en")
 }
 
+private val GRID_HOUR_HEIGHT = 56.dp
+private val GRID_TIME_GUTTER = 44.dp
+private val GRID_DAY_MIN_WIDTH = 96.dp
+
+private val EVENT_PALETTE = listOf(
+    Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFE53935),
+    Color(0xFF8E24AA), Color(0xFFF4511E), Color(0xFF00897B),
+    Color(0xFF3949AB), Color(0xFF6D4C41)
+)
+
+private fun eventColor(event: AgendaEvent): Color {
+    val key = event.courseId?.takeIf { it.isNotBlank() } ?: event.title.ifBlank { event.id }
+    val idx = (key.hashCode() and 0x7fffffff) % EVENT_PALETTE.size
+    return EVENT_PALETTE[idx]
+}
+
+private fun timeLabel(instant: Instant, zone: ZoneId): String {
+    val t = instant.atZone(zone)
+    return "%02d:%02d".format(t.hour, t.minute)
+}
+
+private data class DayLayoutEvent(
+    val event: AgendaEvent,
+    val startMin: Int,
+    val endMin: Int,
+    val lane: Int,
+    val laneCount: Int
+)
+
+private fun layoutDayEvents(events: List<AgendaEvent>, zone: ZoneId): List<DayLayoutEvent> {
+    if (events.isEmpty()) return emptyList()
+    val items = events.map { ev ->
+        val s = ev.startsAt.atZone(zone)
+        val e = ev.endsAt.atZone(zone)
+        val startMin = s.hour * 60 + s.minute
+        var endMin = e.hour * 60 + e.minute
+        if (e.toLocalDate() != s.toLocalDate()) endMin = 24 * 60
+        if (endMin <= startMin) endMin = startMin + 30
+        Triple(ev, startMin, endMin)
+    }.sortedBy { it.second }
+
+    val result = mutableListOf<DayLayoutEvent>()
+    var i = 0
+    while (i < items.size) {
+        var clusterEnd = items[i].third
+        var j = i + 1
+        while (j < items.size && items[j].second < clusterEnd) {
+            clusterEnd = maxOf(clusterEnd, items[j].third)
+            j++
+        }
+        val cluster = items.subList(i, j)
+        val laneEnds = mutableListOf<Int>()
+        val laneOf = IntArray(cluster.size)
+        cluster.forEachIndexed { idx, (_, s, e) ->
+            val lane = laneEnds.indexOfFirst { it <= s }
+            if (lane == -1) {
+                laneEnds.add(e)
+                laneOf[idx] = laneEnds.size - 1
+            } else {
+                laneEnds[lane] = e
+                laneOf[idx] = lane
+            }
+        }
+        val laneCount = laneEnds.size
+        cluster.forEachIndexed { idx, (ev, s, e) ->
+            result.add(DayLayoutEvent(ev, s, e, laneOf[idx], laneCount))
+        }
+        i = j
+    }
+    return result
+}
+
+@Composable
+private fun AgendaWeekGrid(
+    weekStart: LocalDate,
+    events: List<AgendaEvent>,
+    onOpen: (AgendaEvent) -> Unit
+) {
+    val zone = remember { ZoneId.systemDefault() }
+    val days = remember(weekStart) { (0 until 6).map { weekStart.plusDays(it.toLong()) } }
+    val eventsByDay = remember(events, days) {
+        days.associateWith { day -> events.filter { it.startsAt.atZone(zone).toLocalDate() == day } }
+    }
+    val allDayEvents = remember(eventsByDay) { eventsByDay.values.flatten() }
+    val startHour = remember(allDayEvents) {
+        (allDayEvents.minOfOrNull { it.startsAt.atZone(zone).hour } ?: 8).coerceAtMost(8)
+    }
+    val endHour = remember(allDayEvents) {
+        val maxEnd = allDayEvents.maxOfOrNull {
+            val e = it.endsAt.atZone(zone)
+            if (e.minute > 0) e.hour + 1 else e.hour
+        } ?: 19
+        maxEnd.coerceAtLeast(19).coerceAtMost(24)
+    }
+    val rangeStartMin = startHour * 60
+    val hours = remember(startHour, endHour) { (startHour until endHour).toList() }
+    val totalHeight = GRID_HOUR_HEIGHT * hours.size
+    val maxBodyHeight = (LocalConfiguration.current.screenHeightDp * 0.7f).dp
+    val bodyHeight = if (totalHeight < maxBodyHeight) totalHeight else maxBodyHeight
+    val scrollH = rememberScrollState()
+    val locale = currentJavaLocale()
+    val dayFmt = remember(locale) { DateTimeFormatter.ofPattern("EEE d", locale) }
+    val hourFmt = remember(locale) { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale) }
+    val today = LocalDate.now()
+
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        // Fill the available width when it fits; fall back to a scrollable min-width grid on narrow screens.
+        val dayWidth = maxOf(GRID_DAY_MIN_WIDTH, (maxWidth - GRID_TIME_GUTTER) / days.size)
+        Column {
+            Row {
+                Spacer(Modifier.width(GRID_TIME_GUTTER))
+                Row(Modifier.horizontalScroll(scrollH)) {
+                    days.forEach { day ->
+                        val isToday = day == today
+                        Box(
+                            modifier = Modifier.width(dayWidth).padding(4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = day.format(dayFmt).replaceFirstChar { it.uppercase() },
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier.height(bodyHeight).verticalScroll(rememberScrollState())
+            ) {
+                Row {
+                    Column(Modifier.width(GRID_TIME_GUTTER)) {
+                        hours.forEach { h ->
+                            Box(Modifier.height(GRID_HOUR_HEIGHT)) {
+                                Text(
+                                    text = LocalTime.of(h, 0).format(hourFmt),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(end = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                    Row(Modifier.horizontalScroll(scrollH)) {
+                        days.forEach { day ->
+                            Box(
+                                modifier = Modifier
+                                    .width(dayWidth)
+                                    .height(totalHeight)
+                                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                            ) {
+                                Column {
+                                    hours.forEach { _ ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(GRID_HOUR_HEIGHT)
+                                                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                        )
+                                    }
+                                }
+                                layoutDayEvents(eventsByDay[day].orEmpty(), zone).forEach { le ->
+                                    val topDp = GRID_HOUR_HEIGHT * ((le.startMin - rangeStartMin) / 60f)
+                                    val hDp = (GRID_HOUR_HEIGHT * ((le.endMin - le.startMin) / 60f)).coerceAtLeast(22.dp)
+                                    val laneW = dayWidth / le.laneCount
+                                    EventBlock(
+                                        event = le.event,
+                                        zone = zone,
+                                        modifier = Modifier
+                                            .offset(x = laneW * le.lane, y = topDp)
+                                            .width(laneW)
+                                            .height(hDp)
+                                            .padding(1.dp),
+                                        onOpen = { onOpen(le.event) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EventBlock(
+    event: AgendaEvent,
+    zone: ZoneId,
+    modifier: Modifier,
+    onOpen: () -> Unit
+) {
+    val timeText = "${timeLabel(event.startsAt, zone)}–${timeLabel(event.endsAt, zone)}"
+    val description = listOfNotNull(
+        event.title.takeIf { it.isNotBlank() },
+        timeText,
+        event.room?.takeIf { it.isNotBlank() }
+    ).joinToString(", ")
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(eventColor(event))
+            .clickable(onClick = onOpen, role = Role.Button)
+            .semantics(mergeDescendants = true) { contentDescription = description }
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+    ) {
+        Column {
+            Text(
+                text = event.title.orUntitled(),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${timeLabel(event.startsAt, zone)}–${timeLabel(event.endsAt, zone)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.85f),
+                maxLines = 1
+            )
+            event.room?.takeIf { it.isNotBlank() }?.let { room ->
+                Text(
+                    text = room,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
 private enum class AgendaMode(@StringRes val title: Int) {
+    Grid(R.string.agenda_mode_grid),
     Day(R.string.agenda_mode_day),
     Week5(R.string.agenda_mode_week_5),
     Week7(R.string.agenda_mode_week_7),

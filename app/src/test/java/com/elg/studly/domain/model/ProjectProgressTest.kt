@@ -41,29 +41,74 @@ class ProjectProgressTest {
     }
 
     @Test
-    fun projectProgressCapsBeforeOneIfUncompleted() {
+    fun projectProgressIsFullWhenAllDeadlinesPassed() {
         val past = java.time.Instant.now().minusSeconds(3600)
         val progress = project(
             ProjectStep("one", "Draft", past, "todo"),
             ProjectStep("two", "Final", past, "todo")
         ).progress()
 
-        assertEquals(1, progress.completedSteps)
+        assertEquals(2, progress.completedSteps)
         assertEquals(2, progress.totalSteps)
-        assertEquals(0.5, progress.fraction, 0.0)
+        assertEquals(1.0, progress.fraction, 0.0)
     }
 
     @Test
-    fun projectProgressIgnoresDeadlinesOlderThanSixMonths() {
+    fun projectProgressCountsDeadlinesOlderThanSixMonths() {
         val veryPast = java.time.Instant.now().minus(190, java.time.temporal.ChronoUnit.DAYS)
         val progress = project(
             ProjectStep("one", "Draft", veryPast, "todo"),
             ProjectStep("two", "Final", veryPast, "completed")
         ).progress()
 
-        assertEquals(1, progress.completedSteps)
+        assertEquals(2, progress.completedSteps)
         assertEquals(2, progress.totalSteps)
-        assertEquals(0.5, progress.fraction, 0.0)
+        assertEquals(1.0, progress.fraction, 0.0)
+    }
+
+    @Test
+    fun projectProgressIgnoresProjectDeadlineAndUsesSteps() {
+        // The project deadline is unreliable (update timestamp); only step deadlines/status count.
+        val past = java.time.Instant.now().minusSeconds(3600)
+        val future = java.time.Instant.now().plusSeconds(3600)
+        val progress = Project(
+            id = "project-1",
+            name = "Project",
+            courseName = null,
+            groupName = null,
+            status = null,
+            deadline = past,
+            steps = listOf(
+                ProjectStep("one", "Draft", future, "todo"),
+                ProjectStep("two", "Final", future, "todo")
+            ),
+            fileCount = 0
+        ).progress()
+
+        assertEquals(0, progress.completedSteps)
+        assertEquals(2, progress.totalSteps)
+        assertEquals(0.0, progress.fraction, 0.0)
+    }
+
+    @Test
+    fun projectProgressIsFullWhenStatusCompleted() {
+        val future = java.time.Instant.now().plusSeconds(3600)
+        val progress = Project(
+            id = "project-1",
+            name = "Project",
+            courseName = null,
+            groupName = null,
+            status = "terminé",
+            deadline = null,
+            steps = listOf(
+                ProjectStep("one", "Draft", future, "todo"),
+                ProjectStep("two", "Final", future, "todo")
+            ),
+            fileCount = 0
+        ).progress()
+
+        assertEquals(2, progress.completedSteps)
+        assertEquals(1.0, progress.fraction, 0.0)
     }
 
     private fun project(vararg steps: ProjectStep): Project {

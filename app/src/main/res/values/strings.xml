@@ -95,6 +95,10 @@
     <string name="grades_breakdown_title">Détail par composant</string>
     <string name="grades_block">Bloc</string>
     <string name="grades_block_average">Moyennes de bloc</string>
+    <string name="grades_group_semester">Par semestre</string>
+    <string name="grades_group_block">Par bloc</string>
+    <string name="grades_block_prefix">Bloc %1$s</string>
+    <string name="grades_block_unassigned">Sans bloc</string>
     <string name="grades_cc_average">Moyenne CC</string>
     <string name="grades_general_average">Moyenne Générale (G)</string>
     <string name="grades_cc_title">Contrôles Continus (CC)</string>
@@ -118,6 +122,7 @@
     <string name="projects_progress_label">Progression</string>
     <string name="agenda_mode_week_5">Semaine (5j)</string>
     <string name="agenda_mode_week_7">Semaine (7j)</string>
+    <string name="agenda_mode_grid">Grille</string>
     <string name="agenda_mode_month">Mois</string>
     <string name="agenda_sync_calendar_export">Exporter le calendrier (.ics)</string>
 
