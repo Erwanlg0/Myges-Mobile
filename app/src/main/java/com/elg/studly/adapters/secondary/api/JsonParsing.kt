@@ -166,10 +166,19 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
         "publishDate", "publish_date", "published", "updatedAt", 
         "update_date", "date_note", "dateNote", "published_at", "created_at"
     )
-    return arrayOrNested("grades", "items", "data").flatMap { element ->
+    // A single course object exposes "grades" as a primitive component array and/or "exam".
+    // Detect that case so we don't unwrap the component array as if it were the grade list.
+    val rootObj = this as? JsonObject
+    val componentArray = rootObj?.get("grades") as? JsonArray
+    val isSingleStructuredCourse = rootObj != null && (
+        rootObj.containsKey("exam") ||
+        (componentArray != null && componentArray.all { it is JsonPrimitive })
+    )
+    val elements = if (isSingleStructuredCourse) listOf(this) else arrayOrNested("grades", "items", "data")
+    return elements.flatMap { element ->
         val root = element.objectOrData()
         val baseId = root.text("id", "gradeId", "uid", "rc_id") ?: stableId(root)
-        
+
         if (!root.containsKey("grades") && !root.containsKey("exam") && !root.containsKey("course")) {
             return@flatMap listOf(
                 root.toGrade(
@@ -228,7 +237,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
             resultList.add(
                 root.toGrade(
                     idSuffix = "cc-$index",
-                    subject = "CC ${index + 1}",
+                    subject = "CC${index + 1}",
                     value = pair.first,
                     scale = root.number("scale", "outOf", "bareme"),
                     date = pair.second ?: root.localDate(*dateKeys),
@@ -623,11 +632,16 @@ private fun String.toMimeType(): String? {
         "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         "xls" -> "application/vnd.ms-excel"
         "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        "ppt" -> "application/vnd.ms-powerpoint"
+        "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
         "zip" -> "application/zip"
         "txt" -> "text/plain"
         "md" -> "text/markdown"
+        "csv" -> "text/csv"
+        "html", "htm" -> "text/html"
         "png" -> "image/png"
         "jpg", "jpeg" -> "image/jpeg"
+        "gif" -> "image/gif"
         else -> takeIf { it.contains('/') }
     }
 }
@@ -690,6 +704,27 @@ private fun JsonObject.directoryDisplayName(): String? {
         ).joinToString(" ").ifBlank { text("name", "email", "mail") }
 }
 
+private fun String.mimeTypeToFileExtension(): String? {
+    return when (trim().lowercase().substringBefore(';')) {
+        "application/pdf" -> "pdf"
+        "application/msword" -> "doc"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx"
+        "application/vnd.ms-excel" -> "xls"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx"
+        "application/vnd.ms-powerpoint" -> "ppt"
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx"
+        "application/zip" -> "zip"
+        "text/plain" -> "txt"
+        "text/markdown" -> "md"
+        "text/csv" -> "csv"
+        "text/html" -> "html"
+        "image/png" -> "png"
+        "image/jpeg" -> "jpg"
+        "image/gif" -> "gif"
+        else -> null
+    }
+}
+
 private fun JsonObject.toDocument(
     parentTitle: String? = null,
     parentYear: String? = null,
@@ -698,14 +733,16 @@ private fun JsonObject.toDocument(
     inlineContent: String? = null
 ): AcademicDocument {
     val title = text("title", "name", "label", "pf_title", "psf_name", "psf_desc") ?: parentTitle ?: ""
-    val extension = text("extension", "psf_file_type")
+    val rawExt = text("extension", "psf_file_type")
+    val extension = if (rawExt != null && rawExt.contains('/')) rawExt.mimeTypeToFileExtension() else rawExt
     return AcademicDocument(
         id = text("id", "documentId", "document_id", "oc_id", "pf_id", "psf_id", "uid") ?: stableId(this),
         title = title,
         category = text("category", "type"),
         year = text("year", "academicYear") ?: parentYear,
         mimeType = text("mimeType", "contentType")?.toMimeType() ?: extension?.toMimeType(),
-        fileName = text("fileName", "filename", "file", "pf_file", "psf_file", "psf_name") ?: title.toDocumentFileName(extension),
+        fileName = (text("fileName", "filename", "file", "pf_file", "psf_file", "psf_name") ?: title)
+            .toDocumentFileName(extension),
         downloadUrl = text("downloadUrl", "url", "href") ?: linkHref("url", "download", "file"),
         updatedAt = instant("updatedAt", "last_update", "update_date", "pf_crea_date", "psf_end_upload", "psf_begin_upload", "date", "createdAt"),
         ownerId = ownerId,

@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -1523,6 +1524,7 @@ fun DocumentsScreen(
     val state by viewModel.documents.collectAsStateWithLifecycle()
     val downloadingDocumentIds by viewModel.downloadingDocumentIds.collectAsStateWithLifecycle()
     val documentDownloadProgress by viewModel.documentDownloadProgress.collectAsStateWithLifecycle()
+    val documentError by viewModel.documentError.collectAsStateWithLifecycle()
     var documentOpenTriggered by remember(highlightedDocumentId) { mutableStateOf(false) }
 
     val generalDocuments = remember(state.data) {
@@ -1568,6 +1570,7 @@ fun DocumentsScreen(
         onRetry = viewModel::refresh,
         listState = listState
     ) { _ ->
+        documentError?.let { item { StateBanner(it) } }
         if (years.isNotEmpty()) {
             item {
                 var yearExpanded by remember { mutableStateOf(false) }
@@ -1654,7 +1657,12 @@ fun DocumentsScreen(
 }
 
 private fun AcademicDocument.filterYear(): String? {
-    year?.takeIf { it.isNotBlank() }?.let { return it }
+    year?.takeIf { it.isNotBlank() }?.let { raw ->
+        // Normalize to academic-year form so "2025" merges with "2025-2026".
+        Regex("\\d{4}\\s*-\\s*\\d{4}").find(raw)?.value?.replace(" ", "")?.let { return it }
+        raw.trim().toIntOrNull()?.let { return "$it-${it + 1}" }
+        return raw
+    }
     val instant = updatedAt ?: return null
     val date = instant.atZone(ZoneId.systemDefault()).toLocalDate()
     val start = if (date.monthValue >= 8) date.year else date.year - 1
@@ -2159,12 +2167,15 @@ private fun GradeCard(
     onOpen: () -> Unit
 ) {
     CompactCard(modifier = Modifier.clickable(onClick = onOpen)) {
+        val title = grade.courseName.ifBlank { grade.subject }
         Text(
-            text = grade.courseName.orUntitled(),
+            text = title.orUntitled(),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )
-        Text(grade.subject.orUntitled())
+        if (grade.subject.isNotBlank() && grade.courseName.isNotBlank()) {
+            Text(grade.subject)
+        }
         if (grade.value != null) {
             Text(
                 text = stringResource(
@@ -2183,9 +2194,6 @@ private fun GradeCard(
             )
         }
         LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
-        if (grade.value != null) {
-            LabelValue(R.string.grades_average, formatNumber(grade.average))
-        }
         LabelValue(R.string.common_date, formatDate(grade.date))
         if (!grade.period.isNullOrBlank()) {
             LabelValue(R.string.common_period, grade.period)
@@ -2562,20 +2570,37 @@ internal fun CourseCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (!course.syllabus.isNullOrBlank()) {
+                    val savedMsg = stringResource(R.string.courses_syllabus_saved)
+                    val failedMsg = stringResource(R.string.courses_syllabus_save_failed)
+                    val saveSyllabus: () -> Unit = {
+                        val uri = PdfGenerator.savePdfToDownloads(
+                            context = context,
+                            text = course.syllabus,
+                            title = "${course.name} - Syllabus",
+                            fileName = "${course.name}_syllabus"
+                        )
+                        if (uri != null) {
+                            Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
+                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "application/pdf")
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            runCatching { context.startActivity(viewIntent) }
+                        } else {
+                            Toast.makeText(context, failedMsg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    val storagePermissionLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestPermission()
+                    ) { granted ->
+                        if (granted) saveSyllabus() else Toast.makeText(context, failedMsg, Toast.LENGTH_SHORT).show()
+                    }
                     TextButton(
                         onClick = {
-                            runCatching {
-                                val file = File(context.cacheDir, "${course.name}_syllabus.pdf")
-                                file.outputStream().use {
-                                    PdfGenerator.generatePdfFromText(course.syllabus, "${course.name} - Syllabus", it)
-                                }
-                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                                val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/pdf"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(Intent.createChooser(intent, "Syllabus - ${course.name}"))
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                saveSyllabus()
+                            } else {
+                                storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                             }
                         },
                         modifier = Modifier.weight(1f)

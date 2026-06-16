@@ -30,6 +30,7 @@
     <string name="error_permission_denied">L’autorisation nécessaire a été refusée.</string>
     <string name="error_remote">Le service Studly a refusé la requête.</string>
     <string name="error_storage">Le stockage local est indisponible.</string>
+    <string name="error_document_unavailable">Document indisponible : le lien de téléchargement a expiré ou nécessite une reconnexion.</string>
     <string name="error_unauthorized">La session a expiré. Reconnectez-vous.</string>
     <string name="error_unexpected">Une erreur inattendue est survenue.</string>
 
@@ -251,4 +252,6 @@
     </plurals>
     <string name="courses_download_syllabus">Télécharger Syllabus</string>
     <string name="courses_download_file">Télécharger</string>
+    <string name="courses_syllabus_saved">Syllabus enregistré dans Téléchargements</string>
+    <string name="courses_syllabus_save_failed">Échec de l\'enregistrement du syllabus</string>
 </resources>

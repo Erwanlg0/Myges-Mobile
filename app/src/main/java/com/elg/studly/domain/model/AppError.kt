@@ -7,6 +7,7 @@ sealed interface AppError {
     data object EmptyResponse : AppError
     data object PermissionDenied : AppError
     data object Storage : AppError
+    data object DocumentUnavailable : AppError
     data class Remote(val code: Int?, val message: String?) : AppError
     data class Unexpected(val message: String?) : AppError
 }

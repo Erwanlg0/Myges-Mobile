@@ -30,9 +30,13 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import java.util.concurrent.ConcurrentHashMap
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -87,6 +91,7 @@ object DependencyModule {
             }
         }
         return OkHttpClient.Builder()
+            .cookieJar(InMemoryCookieJar())
             .addInterceptor(MygesAuthInterceptor(appConfig.userAgent, sessionRepository))
             .addInterceptor(ApiRetryInterceptor())
             .addInterceptor(NoContentAsEmptyJsonInterceptor())
@@ -135,4 +140,29 @@ object DependencyModule {
     }
 
     private const val DATABASE_NAME = "Studly.db"
+}
+
+/**
+ * Minimal in-memory cookie jar so cookies set during a redirect chain (e.g. the CAS
+ * SSO flow used by ges-dl.kordis.fr file downloads) are carried across hops within
+ * the process lifetime. Not persisted to disk.
+ */
+private class InMemoryCookieJar : CookieJar {
+    private val store = ConcurrentHashMap<String, MutableList<Cookie>>()
+
+    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+        val host = url.host
+        val existing = store.getOrPut(host) { mutableListOf() }
+        cookies.forEach { cookie ->
+            existing.removeAll { it.name == cookie.name }
+            existing.add(cookie)
+        }
+    }
+
+    override fun loadForRequest(url: HttpUrl): List<Cookie> {
+        val now = System.currentTimeMillis()
+        val cookies = store[url.host] ?: return emptyList()
+        cookies.removeAll { it.expiresAt < now }
+        return cookies.filter { it.matches(url) }
+    }
 }

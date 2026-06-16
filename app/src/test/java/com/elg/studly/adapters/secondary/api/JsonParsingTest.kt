@@ -202,13 +202,13 @@ class JsonParsingTest {
         // CC 1 Component
         val cc1 = grades[1]
         assertEquals("456-cc-0", cc1.id)
-        assertEquals("CC 1", cc1.subject)
+        assertEquals("CC1", cc1.subject)
         assertEquals(16.5, cc1.value ?: 0.0, 0.0)
 
         // CC 2 Component
         val cc2 = grades[2]
         assertEquals("456-cc-1", cc2.id)
-        assertEquals("CC 2", cc2.subject)
+        assertEquals("CC2", cc2.subject)
         assertEquals(12.0, cc2.value ?: 0.0, 0.0)
     }
 
@@ -235,6 +235,31 @@ class JsonParsingTest {
         assertEquals(12.5, grades[0].value ?: 0.0, 0.0)
         assertEquals("456-exam", grades[3].id)
         assertEquals(15.0, grades[3].value ?: 0.0, 0.0)
+    }
+
+    @Test
+    fun gradesParseSingleCourseObjectNotWrappedInArray() {
+        val grades = json.parseToJsonElement(
+            """
+            {
+              "rc_id": 789,
+              "course": "Maths",
+              "grades": [20, 18],
+              "exam": 5,
+              "trimester_name": "Semestre 1"
+            }
+            """.trimIndent()
+        ).toGrades()
+
+        // Main + CC1 + CC2 + Examen
+        assertEquals(4, grades.size)
+        assertEquals("", grades[0].subject)
+        assertEquals("CC1", grades[1].subject)
+        assertEquals(20.0, grades[1].value ?: 0.0, 0.0)
+        assertEquals("CC2", grades[2].subject)
+        assertEquals(18.0, grades[2].value ?: 0.0, 0.0)
+        assertEquals("Examen", grades[3].subject)
+        assertEquals(5.0, grades[3].value ?: 0.0, 0.0)
     }
 
     @Test

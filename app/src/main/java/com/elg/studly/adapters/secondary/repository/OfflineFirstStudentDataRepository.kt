@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType
 import retrofit2.HttpException
 import java.io.File
@@ -261,10 +262,21 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     onProgress(1f)
                     file
                 } else {
-                    val remoteUrl = document.downloadUrl ?: "me/annualDocuments/${document.id}"
+                    val remoteUrl = document.normalizedDownloadUrl()
                     val response = api.download(remoteUrl)
                     if (!response.isSuccessful) throw HttpException(response)
                     val body = response.body() ?: throw AppException(AppError.EmptyResponse)
+                    // ges-dl signed links redirect to the CAS login page when the link has
+                    // expired / the session is not valid; the body is then an HTML login page,
+                    // not the document. Detect this so we don't hand the viewer a broken file.
+                    val finalUrl = response.raw().request.url
+                    val isLoginRedirect = finalUrl.host.contains("cas", ignoreCase = true) ||
+                        finalUrl.encodedPath.contains("login", ignoreCase = true) ||
+                        finalUrl.encodedPath.contains("j_spring", ignoreCase = true)
+                    val isHtml = body.contentType()?.let {
+                        it.type == "text" && it.subtype.equals("html", ignoreCase = true)
+                    } == true
+                    if (isLoginRedirect || isHtml) throw AppException(AppError.DocumentUnavailable)
                     val fileName = response.headers()["Content-Disposition"]?.contentDispositionFileName()
                         ?: document.fileName.withExtension(body.contentType())
                     val file = File(directory, fileName.sanitizedFileName())
@@ -292,6 +304,19 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 throw throwable.toRepositoryException()
             }
         }
+    }
+
+    private fun AcademicDocument.normalizedDownloadUrl(): String {
+        val url = downloadUrl ?: return "me/annualDocuments/$id"
+        // ges-dl signed links are CAS-protected and reject the OAuth bearer (they
+        // redirect to the CAS login page). When the link carries a courseId, the
+        // bearer-authenticated API serves the same file at me/{courseId}/files/{ocId}.
+        val parsed = url.toHttpUrlOrNull()
+        if (parsed != null && parsed.host.contains("ges-dl", ignoreCase = true)) {
+            val courseId = parsed.queryParameter("courseId")
+            if (!courseId.isNullOrBlank()) return "me/$courseId/files/$id"
+        }
+        return url
     }
 
     private fun Throwable.toRepositoryException(): AppException {
@@ -334,8 +359,17 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             "application/zip" -> "zip"
             "text/plain" -> "txt"
             "text/markdown" -> "md"
+            "text/csv" -> "csv"
+            "text/html" -> "html"
             "image/png" -> "png"
             "image/jpeg" -> "jpg"
+            "image/gif" -> "gif"
+            "application/msword" -> "doc"
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx"
+            "application/vnd.ms-excel" -> "xls"
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx"
+            "application/vnd.ms-powerpoint" -> "ppt"
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx"
             else -> null
         }
     }
@@ -389,10 +423,13 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             val practicalPayloads = listOfNotNull(practicalsJson) + coursePracticalPayloads
             val practicals = practicalPayloads.flatMap { it.toPracticals(currentUserId, year) }.distinctBy { it.id }
 
+            val myProjectIds = projects.filter { it.groups.isEmpty() || it.groups.any { g -> g.isMine } }.map { it.id }.toSet()
+            val myPracticalIds = practicals.filter { it.groups.isEmpty() || it.groups.any { g -> g.isMine } }.map { it.id }.toSet()
+
             val documents = runCatching { api.annualDocuments(year)?.toDocuments(year).orEmpty() }.getOrDefault(emptyList()) +
                 courseDocuments(newCourses) +
-                projectPayloads.flatMap { it.toProjectDocuments(year) } +
-                practicalPayloads.flatMap { it.toPracticalDocuments(year) } +
+                projectPayloads.flatMap { it.toProjectDocuments(year) }.filter { it.ownerId in myProjectIds } +
+                practicalPayloads.flatMap { it.toPracticalDocuments(year) }.filter { it.ownerId in myPracticalIds } +
                 syllabusDocuments(courses)
                 
             val availablePeriods = (grades.mapNotNull { it.period } + courses.mapNotNull { it.period })
@@ -458,13 +495,11 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                         ?.toDocuments()
                         .orEmpty()
                         .map { document ->
-                            if (document.downloadUrl != null) {
-                                val originalUrl = document.downloadUrl
-                                val separator = if (originalUrl.contains("?")) "&" else "?"
-                                document.copy(downloadUrl = "$originalUrl${separator}courseId=${course.id}")
-                            } else {
-                                document.copy(downloadUrl = "me/${course.id}/files/${document.id}")
-                            }
+                            // The "links.href" returned by the API points at ges-dl.kordis.fr,
+                            // which is CAS-protected and rejects the OAuth bearer (redirects to
+                            // the login page). The bearer-authenticated API serves the file
+                            // directly at me/{courseId}/files/{ocId}, so always use that path.
+                            document.copy(downloadUrl = "me/${course.id}/files/${document.id}")
                         }
                 }.getOrDefault(emptyList())
             }
@@ -542,20 +577,27 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         documents: List<AcademicDocument>
     ) {
         val settings = settingsRepository.settings.first()
+        val today = LocalDate.now(ZoneOffset.UTC)
+        val currentAcademicYearStart = (if (today.monthValue >= 9) today.year else today.year - 1).toString()
+
         if (settings.notifications.agenda && previousIds.agenda.isNotEmpty()) {
             agenda.filter { it.id !in previousIds.agenda }.forEach { notificationScheduler.showAgendaChange(it) }
         }
         if (settings.notifications.grades && previousIds.grades.isNotEmpty()) {
-            grades.filter { it.id !in previousIds.grades }.forEach { notificationScheduler.showNewGrade(it) }
+            grades.filter { it.id !in previousIds.grades && (it.academicYearStart() == null || it.academicYearStart()!! >= currentAcademicYearStart) }
+                .forEach { notificationScheduler.showNewGrade(it) }
         }
         if (settings.notifications.absences && previousIds.absences.isNotEmpty()) {
-            absences.filter { it.id !in previousIds.absences }.forEach { notificationScheduler.showNewAbsence(it) }
+            absences.filter { it.id !in previousIds.absences && (it.academicYearStart() == null || it.academicYearStart()!! >= currentAcademicYearStart) }
+                .forEach { notificationScheduler.showNewAbsence(it) }
         }
         if (settings.notifications.projects && previousIds.projects.isNotEmpty()) {
-            projects.filter { it.id !in previousIds.projects }.forEach { notificationScheduler.showProjectDeadline(it) }
+            projects.filter { it.id !in previousIds.projects && (it.year == null || it.year!! >= currentAcademicYearStart) }
+                .forEach { notificationScheduler.showProjectDeadline(it) }
         }
         if (settings.notifications.documents && previousIds.documents.isNotEmpty()) {
-            documents.filter { it.id !in previousIds.documents }.forEach { notificationScheduler.showNewDocument(it) }
+            documents.filter { it.id !in previousIds.documents && (it.year == null || it.year!! >= currentAcademicYearStart) }
+                .forEach { notificationScheduler.showNewDocument(it) }
         }
     }
 

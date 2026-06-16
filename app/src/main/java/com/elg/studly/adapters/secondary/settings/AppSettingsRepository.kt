@@ -29,9 +29,9 @@ class AppSettingsRepository @Inject constructor(
             notifications = NotificationPreferences(
                 grades = preferences[NOTIFY_GRADES] ?: true,
                 absences = preferences[NOTIFY_ABSENCES] ?: true,
-                agenda = preferences[NOTIFY_AGENDA] ?: true,
-                projects = preferences[NOTIFY_PROJECTS] ?: true,
-                documents = preferences[NOTIFY_DOCUMENTS] ?: true
+                agenda = preferences[NOTIFY_AGENDA] ?: false,
+                projects = preferences[NOTIFY_PROJECTS] ?: false,
+                documents = preferences[NOTIFY_DOCUMENTS] ?: false
             ),
             calendarSyncEnabled = preferences[CALENDAR_SYNC] ?: false,
             biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,

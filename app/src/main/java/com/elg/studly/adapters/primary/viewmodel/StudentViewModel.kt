@@ -74,6 +74,8 @@ class StudentViewModel @Inject constructor(
     private val error = MutableStateFlow<AppError?>(null)
     private val _downloadingDocumentIds = MutableStateFlow(emptySet<String>())
     private val _documentDownloadProgress = MutableStateFlow(emptyMap<String, Float?>())
+    private val _documentError = MutableStateFlow<AppError?>(null)
+    val documentError: StateFlow<AppError?> = _documentError
     val downloadingDocumentIds: StateFlow<Set<String>> = _downloadingDocumentIds
     val documentDownloadProgress: StateFlow<Map<String, Float?>> = _documentDownloadProgress
     val documentOpenRequests = MutableSharedFlow<DocumentOpenRequest>()
@@ -144,6 +146,7 @@ class StudentViewModel @Inject constructor(
             if (refreshing.value) return@launch
             refreshing.value = true
             error.value = null
+            _documentError.value = null
             runCatching { refreshStudentDataUseCase() }
                 .onSuccess { _refreshSucceeded.emit(Unit) }
                 .onFailure { handleFailure(it) }
@@ -166,14 +169,20 @@ class StudentViewModel @Inject constructor(
         viewModelScope.launch {
             _downloadingDocumentIds.update { it + document.id }
             _documentDownloadProgress.update { it + (document.id to null) }
-            error.value = null
+            _documentError.value = null
             runCatching {
                 downloadDocumentUseCase(document) { progress ->
                     _documentDownloadProgress.update { it + (document.id to progress) }
                 }
             }
                 .onSuccess { uri -> documentOpenRequests.emit(DocumentOpenRequest(uri, document.resolvedMimeType())) }
-                .onFailure { handleFailure(it) }
+                .onFailure { throwable ->
+                    val appError = throwable.toAppError()
+                    // Download failures stay local to the documents screen; only an expired
+                    // session should escalate to the global handler (which triggers logout).
+                    if (appError == AppError.Unauthorized) handleFailure(throwable)
+                    else _documentError.value = appError
+                }
             _downloadingDocumentIds.update { it - document.id }
             _documentDownloadProgress.update { it - document.id }
         }

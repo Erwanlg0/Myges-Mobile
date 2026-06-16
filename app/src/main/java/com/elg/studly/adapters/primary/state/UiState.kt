@@ -21,6 +21,7 @@ fun AppError.messageRes(): Int {
         AppError.PermissionDenied -> R.string.error_permission_denied
         is AppError.Remote -> R.string.error_remote
         AppError.Storage -> R.string.error_storage
+        AppError.DocumentUnavailable -> R.string.error_document_unavailable
         AppError.Unauthorized -> R.string.error_unauthorized
         is AppError.Unexpected -> R.string.error_unexpected
     }

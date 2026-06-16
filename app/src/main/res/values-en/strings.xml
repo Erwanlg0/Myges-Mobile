@@ -30,6 +30,7 @@
     <string name="error_permission_denied">The required permission was denied.</string>
     <string name="error_remote">The Studly service rejected the request.</string>
     <string name="error_storage">Local storage is unavailable.</string>
+    <string name="error_document_unavailable">Document unavailable: the download link has expired or requires signing in again.</string>
     <string name="error_unauthorized">The session expired. Sign in again.</string>
     <string name="error_unexpected">An unexpected error occurred.</string>
 
@@ -251,4 +252,6 @@
     </plurals>
     <string name="courses_download_syllabus">Download Syllabus</string>
     <string name="courses_download_file">Download</string>
+    <string name="courses_syllabus_saved">Syllabus saved to Downloads</string>
+    <string name="courses_syllabus_save_failed">Failed to save syllabus</string>
 </resources>
