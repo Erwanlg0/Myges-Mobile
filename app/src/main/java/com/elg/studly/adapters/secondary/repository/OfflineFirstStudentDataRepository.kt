@@ -21,6 +21,7 @@ import com.elg.studly.adapters.secondary.api.toPracticalDocuments
 import com.elg.studly.adapters.secondary.api.toProjectDocuments
 import com.elg.studly.adapters.secondary.api.toProjects
 import com.elg.studly.adapters.secondary.api.toYears
+import com.elg.studly.adapters.secondary.storage.ProjectGroupEntity
 import com.elg.studly.adapters.secondary.storage.StudentDao
 import com.elg.studly.adapters.secondary.storage.toDomain
 import com.elg.studly.adapters.secondary.storage.toEntity
@@ -57,7 +58,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType
+import okhttp3.ResponseBody
 import retrofit2.HttpException
+import retrofit2.Response
 import java.io.File
 import java.io.IOException
 import java.net.URLDecoder
@@ -425,26 +428,27 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     }
 
     override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {
-        withContext(Dispatchers.IO) {
-            try {
-                val response = api.joinGroup(courseId, projectId, groupId)
-                if (!response.isSuccessful) throw HttpException(response)
-                refreshProjectGroups(courseId, projectId)
-            } catch (throwable: Throwable) {
-                throw throwable.toRepositoryException()
-            }
-        }
+        changeGroupMembership(courseId, projectId) { api.joinGroup(courseId, projectId, groupId) }
     }
 
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {
+        changeGroupMembership(courseId, projectId) { api.leaveGroup(courseId, projectId, groupId) }
+    }
+
+    private suspend fun changeGroupMembership(
+        courseId: String,
+        projectId: String,
+        action: suspend () -> Response<ResponseBody>
+    ) {
         withContext(Dispatchers.IO) {
-            try {
-                val response = api.leaveGroup(courseId, projectId, groupId)
-                if (!response.isSuccessful) throw HttpException(response)
-                refreshProjectGroups(courseId, projectId)
+            val failure = try {
+                val response = action()
+                if (!response.isSuccessful) HttpException(response) else null
             } catch (throwable: Throwable) {
-                throw throwable.toRepositoryException()
+                throwable
             }
+            refreshProjectGroups(courseId, projectId)
+            failure?.let { throw it.toRepositoryException() }
         }
     }
 
@@ -453,11 +457,21 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             delay(2_000)
             val currentUserId = dao.profile()?.id
             val year = dao.projects().firstOrNull { it.id == projectId }?.year
-            val payload = if (year != null) api.projects(year) else api.courseProjects(courseId)
-            val project = payload?.toProjects(currentUserId)?.firstOrNull { it.id == projectId }
-                ?: return@runCatching
-            if (project.groups.isNotEmpty()) {
-                dao.replaceGroupsForProject(projectId, project.toGroupEntities())
+            val fromYear = year?.let { api.projects(it) }
+                ?.toProjects(currentUserId)?.firstOrNull { it.id == projectId }?.groups.orEmpty()
+            val fromCourse = api.courseProjects(courseId)
+                ?.toProjects(currentUserId)?.firstOrNull { it.id == projectId }?.groups.orEmpty()
+            val groups = mergeGroups(fromYear, fromCourse)
+            if (groups.isNotEmpty()) {
+                dao.replaceGroupsForProject(projectId, groups.map { group ->
+                    ProjectGroupEntity(
+                        projectId = projectId,
+                        id = group.id,
+                        name = group.name,
+                        students = group.students.joinToString("\n"),
+                        isMine = group.isMine
+                    )
+                })
             }
         }
     }
