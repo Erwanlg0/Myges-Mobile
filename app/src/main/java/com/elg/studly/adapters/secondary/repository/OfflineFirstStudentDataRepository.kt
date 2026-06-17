@@ -178,12 +178,12 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return dao.observeNews().map { news -> news.map { it.toDomain() } }
     }
 
-    override suspend fun syncAll(force: Boolean) {
+    override suspend fun syncAll(force: Boolean, features: Set<SyncFeature>?) {
         withContext(Dispatchers.IO) {
             try {
                 purgeExpiredDocumentCache(File(context.cacheDir, DOCUMENT_CACHE))
 
-                val due = dueFeatures(force)
+                val due = features ?: dueFeatures(force)
                 if (due.isEmpty()) return@withContext
 
                 val needAgenda = SyncFeature.Agenda in due

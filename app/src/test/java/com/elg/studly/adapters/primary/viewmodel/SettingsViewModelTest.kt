@@ -330,7 +330,7 @@ private class RecordingStudentDataRepository(
     override fun observeDocuments(): Flow<List<AcademicDocument>> = flowOf(emptyList())
     override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = flowOf(emptyList())
-    override suspend fun syncAll(force: Boolean) = Unit
+    override suspend fun syncAll(force: Boolean, features: Set<SyncFeature>?) = Unit
     override suspend fun clearCache() {
         events += "clearCache"
     }

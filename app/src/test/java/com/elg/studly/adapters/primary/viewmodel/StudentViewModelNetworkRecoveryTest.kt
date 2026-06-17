@@ -258,7 +258,7 @@ private class FakeStudentDataRepository : StudentDataRepository {
     override fun observeDocuments(): Flow<List<AcademicDocument>> = documents
     override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = news
-    override suspend fun syncAll(force: Boolean) {
+    override suspend fun syncAll(force: Boolean, features: Set<SyncFeature>?) {
         syncFailure?.let { throw it }
         syncCount += 1
     }

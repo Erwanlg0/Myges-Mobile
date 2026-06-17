@@ -135,8 +135,8 @@ class RefreshStudentDataUseCase @Inject constructor(
     private val notificationScheduler: NotificationScheduler
 ) {
     
-    suspend operator fun invoke(force: Boolean = false) {
-        repository.syncAll(force)
+    suspend operator fun invoke(force: Boolean = false, features: Set<SyncFeature>? = null) {
+        repository.syncAll(force, features)
         val settings = settingsRepository.settings.first()
         if (settings.calendarSyncEnabled) {
             runCatching { calendarSyncPort.sync(repository.observeAgenda().first()) }

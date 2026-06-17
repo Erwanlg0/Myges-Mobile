@@ -34,6 +34,7 @@ import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.toAppError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -154,18 +155,19 @@ class StudentViewModel @Inject constructor(
     }
 
     
-    fun refresh() = launchRefresh(force = true)
+    fun refresh(feature: SyncFeature? = null) =
+        launchRefresh(force = true, features = feature?.let { setOf(it) })
 
-    
+
     private fun autoRefresh() = launchRefresh(force = false)
 
-    private fun launchRefresh(force: Boolean) {
+    private fun launchRefresh(force: Boolean, features: Set<SyncFeature>? = null) {
         viewModelScope.launch {
             if (refreshing.value) return@launch
             refreshing.value = true
             error.value = null
             _documentError.value = null
-            runCatching { refreshStudentDataUseCase(force) }
+            runCatching { refreshStudentDataUseCase(force, features) }
                 .onSuccess { _refreshSucceeded.emit(Unit) }
                 .onFailure { handleFailure(it) }
             refreshing.value = false

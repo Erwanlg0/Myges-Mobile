@@ -41,7 +41,7 @@ interface StudentDataRepository {
     fun observeDocuments(): Flow<List<AcademicDocument>>
     fun observeDirectory(): Flow<List<DirectoryPerson>>
     fun observeNews(): Flow<List<NewsItem>>
-    suspend fun syncAll(force: Boolean = false)
+    suspend fun syncAll(force: Boolean = false, features: Set<SyncFeature>? = null)
     suspend fun clearCache()
     suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit = {}): Uri
     suspend fun joinGroup(courseId: String, projectId: String, groupId: String)

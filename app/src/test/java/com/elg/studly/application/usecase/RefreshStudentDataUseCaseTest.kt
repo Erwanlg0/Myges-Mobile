@@ -86,7 +86,7 @@ private class RecordingStudentDataRepository(
     override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = flowOf(emptyList())
 
-    override suspend fun syncAll(force: Boolean) {
+    override suspend fun syncAll(force: Boolean, features: Set<SyncFeature>?) {
         events += "sync"
     }
 

@@ -449,7 +449,7 @@ fun AgendaScreen(
         empty = List<AgendaEvent>::isEmpty,
         emptyTitle = R.string.agenda_empty_title,
         emptyBody = R.string.agenda_empty_body,
-        onRetry = viewModel::refresh
+        onRetry = { viewModel.refresh(SyncFeature.Agenda) }
     ) { events ->
         
         item {
@@ -828,7 +828,7 @@ fun GradesScreen(
         empty = List<Grade>::isEmpty,
         emptyTitle = R.string.grades_empty_title,
         emptyBody = R.string.grades_empty_body,
-        onRetry = viewModel::refresh
+        onRetry = { viewModel.refresh(SyncFeature.Grades) }
     ) { _ ->
         if (years.isNotEmpty()) {
             item {
@@ -1071,7 +1071,7 @@ fun AbsencesScreen(
         empty = List<Absence>::isEmpty,
         emptyTitle = R.string.absences_empty_title,
         emptyBody = R.string.absences_empty_body,
-        onRetry = viewModel::refresh
+        onRetry = { viewModel.refresh(SyncFeature.Absences) }
     ) { absences ->
         val filteredAbsences = absences.filter { absence ->
             (selectedYear == null || absence.academicYearLabel() == selectedYear) &&
@@ -1266,7 +1266,7 @@ fun CoursesScreen(viewModel: StudentViewModel) {
         empty = List<Course>::isEmpty,
         emptyTitle = R.string.courses_empty_title,
         emptyBody = R.string.courses_empty_body,
-        onRetry = viewModel::refresh
+        onRetry = { viewModel.refresh(SyncFeature.Documents) }
     ) { _ ->
         if (years.size > 1 || periods.size > 1) {
             item {
@@ -1373,8 +1373,6 @@ fun ProjectsScreen(
     val years = remember(state.data) { state.data.mapNotNull { it.year }.distinct().sortedDescending() }
     val filteredProjects = remember(state.data, selectedYear) {
         state.data
-            .filter { it.name.isNotBlank() }
-            .filter { selectedYear == null || it.year == selectedYear }
             .sortedWith(compareByDescending<Project> { it.year }.thenByDescending { it.startsAt ?: it.deadline }.thenBy { it.name })
     }
     selectedProject?.let { selected ->
@@ -1400,7 +1398,7 @@ fun ProjectsScreen(
         empty = List<Project>::isEmpty,
         emptyTitle = R.string.projects_empty_title,
         emptyBody = R.string.projects_empty_body,
-        onRetry = viewModel::refresh
+        onRetry = { viewModel.refresh(SyncFeature.Projects) }
     ) {
         if (years.size > 1) {
             item {
@@ -1457,7 +1455,7 @@ fun PracticalsScreen(viewModel: StudentViewModel) {
         empty = List<Practical>::isEmpty,
         emptyTitle = R.string.practicals_empty_title,
         emptyBody = R.string.practicals_empty_body,
-        onRetry = viewModel::refresh
+        onRetry = { viewModel.refresh(SyncFeature.Projects) }
     ) {
         if (years.size > 1) {
             item {
@@ -1494,7 +1492,7 @@ fun DirectoryScreen(viewModel: StudentViewModel) {
         empty = List<DirectoryPerson>::isEmpty,
         emptyTitle = R.string.directory_empty_title,
         emptyBody = R.string.directory_empty_body,
-        onRetry = viewModel::refresh
+        onRetry = { viewModel.refresh(SyncFeature.Directory) }
     ) {
         item {
             DirectoryFilterRow(
@@ -1662,7 +1660,7 @@ fun DocumentsScreen(
         empty = { allDocs -> allDocs.none { it.ownerId == null } },
         emptyTitle = R.string.documents_empty_title,
         emptyBody = R.string.documents_empty_body,
-        onRetry = viewModel::refresh,
+        onRetry = { viewModel.refresh(SyncFeature.Documents) },
         listState = listState
     ) { _ ->
         documentError?.let { item { StateBanner(it) } }
