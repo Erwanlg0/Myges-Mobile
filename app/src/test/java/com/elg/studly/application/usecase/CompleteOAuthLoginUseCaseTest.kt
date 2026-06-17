@@ -2,12 +2,17 @@ package com.elg.studly.application.usecase
 
 import com.elg.studly.application.ports.NotificationScheduler
 import com.elg.studly.application.ports.SessionRepository
+import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
 import com.elg.studly.domain.model.AgendaEvent
 import com.elg.studly.domain.model.Grade
+import com.elg.studly.domain.model.NotificationPreferences
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
+import com.elg.studly.domain.model.SyncFeature
+import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
@@ -21,7 +26,7 @@ class CompleteOAuthLoginUseCaseTest {
     fun completeOAuthLoginStoresTokenAndSchedulesSync() = runTest {
         val sessionRepository = RecordingSessionRepository()
         val notificationScheduler = RecordingNotificationScheduler()
-        val useCase = CompleteOAuthLoginUseCase(sessionRepository, notificationScheduler)
+        val useCase = CompleteOAuthLoginUseCase(sessionRepository, StubSettingsRepository(), notificationScheduler)
         val expiresAt = Instant.parse("2026-06-12T12:00:00Z")
 
         useCase("oauth-token", expiresAt, true)
@@ -62,7 +67,7 @@ private class RecordingNotificationScheduler : NotificationScheduler {
         channelsEnsured = true
     }
 
-    override suspend fun scheduleStudentSync() {
+    override suspend fun scheduleStudentSync(intervalMinutes: Long) {
         syncScheduled = true
     }
 
@@ -74,5 +79,34 @@ private class RecordingNotificationScheduler : NotificationScheduler {
     override suspend fun showAgendaChange(event: AgendaEvent) = Unit
     override suspend fun showProjectDeadline(project: Project) = Unit
     override suspend fun showNewDocument(document: AcademicDocument) = Unit
-    override suspend fun scheduleEventReminders(events: List<AgendaEvent>, leadMinutes: Int) = Unit
+    override suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int) = Unit
+}
+
+private class StubSettingsRepository : SettingsRepository {
+    override val settings = MutableStateFlow(
+        UserSettings(
+            languageTag = null,
+            notifications = NotificationPreferences(true, true, true, true, true),
+            calendarSyncEnabled = false,
+            lastSyncAt = null
+        )
+    )
+
+    override suspend fun setLanguageTag(languageTag: String?) = Unit
+    override suspend fun setCalendarSyncEnabled(enabled: Boolean) = Unit
+    override suspend fun setBiometricEnabled(enabled: Boolean) = Unit
+    override suspend fun setGradeNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setAbsenceNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setAgendaNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setProjectNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
+    override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
+    override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
+    override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
+    override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun lastFetchedAt(feature: SyncFeature): Instant? = null
+    override suspend fun markFeatureFetched(feature: SyncFeature) = Unit
+    override suspend fun markSynced() = Unit
+    override suspend fun clearSyncMetadata() = Unit
 }

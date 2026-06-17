@@ -313,6 +313,28 @@ class JsonParsingTest {
     }
 
     @Test
+    fun absencesResolvePeriodByOwnYearNotFirstMatchingSemester() {
+        // Two Semestre-1 absences in different academic years; both years present in the period list.
+        val payload = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                { "id": "a-2023", "date": 1697328000000, "course_name": "Algo", "justified": false },
+                { "id": "a-2025", "date": 1760486400000, "course_name": "Algo", "justified": false }
+              ]
+            }
+            """.trimIndent()
+        )
+        val periods = listOf("2025-2026 - Semestre 1", "2023-2024 - Semestre 1")
+
+        val absences = payload.toAbsences(year = "2025", availablePeriods = periods)
+
+        val byId = absences.associateBy { it.id }
+        assertEquals("2023-2024 - Semestre 1", byId.getValue("a-2023").period)
+        assertEquals("2025-2026 - Semestre 1", byId.getValue("a-2025").period)
+    }
+
+    @Test
     fun documentsParseKordisAnnualDocumentPayload() {
         val documents = json.parseToJsonElement(
             """

@@ -25,6 +25,8 @@ import com.elg.studly.domain.model.AppException
 import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.NotificationPreferences
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ReminderTarget
+import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.UserSettings
 import io.mockk.every
 import io.mockk.mockk
@@ -426,6 +428,11 @@ private class RepositorySettingsRepository : SettingsRepository {
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
     override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
+    override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
+    override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun lastFetchedAt(feature: SyncFeature): Instant? = null
+    override suspend fun markFeatureFetched(feature: SyncFeature) = Unit
     override suspend fun markSynced() = Unit
     override suspend fun clearSyncMetadata() = Unit
 }
@@ -438,9 +445,10 @@ private class RepositoryNotificationScheduler : NotificationScheduler {
     val documents = mutableListOf<String>()
 
     override fun ensureChannels() = Unit
-    override suspend fun scheduleStudentSync() = Unit
+    override suspend fun scheduleStudentSync(intervalMinutes: Long) = Unit
     override suspend fun runStudentSyncNow() = Unit
     override suspend fun cancelStudentSync() = Unit
+    override suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int) = Unit
     override suspend fun showSyncFailure() = Unit
     override suspend fun showNewGrade(grade: Grade) {
         grades += grade.id

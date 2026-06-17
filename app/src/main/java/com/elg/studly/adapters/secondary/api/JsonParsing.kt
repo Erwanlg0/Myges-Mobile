@@ -277,11 +277,18 @@ fun JsonElement.toAbsences(year: String? = null, availablePeriods: List<String> 
         val isSem2 = month in 2..8
         val targetSemesterName = if (isSem2) "Semestre 2" else "Semestre 1"
 
-        var resolvedPeriod = availablePeriods.firstOrNull { it.contains(targetSemesterName, ignoreCase = true) }
+        // Academic year derived from the absence's own date (Sept-Dec belongs to the year that starts).
+        val startYearNum = if (month >= 9) startsAtLdt.year else startsAtLdt.year - 1
+        val yearLabel = "$startYearNum-${startYearNum + 1}"
 
-        if (resolvedPeriod == null && year != null) {
-            val startYearNum = year.toIntOrNull() ?: 2026
-            resolvedPeriod = "$startYearNum-${startYearNum + 1} - Semestre ${if (isSem2) 2 else 1}"
+        // Match a known period only when BOTH the academic year and the semester line up,
+        // otherwise a Semestre-1 absence would borrow the first Semestre-1 period of any year.
+        var resolvedPeriod = availablePeriods.firstOrNull {
+            it.contains(yearLabel) && it.contains(targetSemesterName, ignoreCase = true)
+        }
+
+        if (resolvedPeriod == null) {
+            resolvedPeriod = "$yearLabel - Semestre ${if (isSem2) 2 else 1}"
         }
 
         Absence(

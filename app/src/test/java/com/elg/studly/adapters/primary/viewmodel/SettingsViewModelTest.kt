@@ -10,6 +10,7 @@ import com.elg.studly.application.usecase.CalendarAccountsUseCase
 import com.elg.studly.application.usecase.ClearCacheUseCase
 import com.elg.studly.application.usecase.LogoutUseCase
 import com.elg.studly.application.usecase.ObserveSettingsUseCase
+import com.elg.studly.application.usecase.RescheduleSyncUseCase
 import com.elg.studly.application.usecase.UpdateSettingsUseCase
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
@@ -25,7 +26,9 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.NotificationPreferences
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
+import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -145,10 +148,11 @@ class SettingsViewModelTest {
     ): SettingsViewModel {
         return SettingsViewModel(
             ObserveSettingsUseCase(settingsRepository),
-            UpdateSettingsUseCase(settingsRepository),
+            UpdateSettingsUseCase(settingsRepository, studentDataRepository, notificationScheduler),
             ClearCacheUseCase(studentDataRepository, settingsRepository),
             LogoutUseCase(sessionRepository, notificationScheduler),
-            CalendarAccountsUseCase(StubCalendarSyncPort())
+            CalendarAccountsUseCase(StubCalendarSyncPort()),
+            RescheduleSyncUseCase(settingsRepository, notificationScheduler)
         )
     }
 }
@@ -211,6 +215,11 @@ private class RecordingSettingsRepository(
 
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
     override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
+    override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
+    override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun lastFetchedAt(feature: SyncFeature): Instant? = null
+    override suspend fun markFeatureFetched(feature: SyncFeature) = Unit
 
     override suspend fun markSynced() = Unit
 
@@ -232,7 +241,7 @@ private class RecordingStudentDataRepository(
     override fun observeDocuments(): Flow<List<AcademicDocument>> = flowOf(emptyList())
     override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = flowOf(emptyList())
-    override suspend fun syncAll() = Unit
+    override suspend fun syncAll(force: Boolean) = Unit
     override suspend fun clearCache() {
         events += "clearCache"
     }
@@ -259,7 +268,7 @@ private class RecordingNotificationScheduler(
     private val events: MutableList<String>
 ) : NotificationScheduler {
     override fun ensureChannels() = Unit
-    override suspend fun scheduleStudentSync() = Unit
+    override suspend fun scheduleStudentSync(intervalMinutes: Long) = Unit
     override suspend fun runStudentSyncNow() = Unit
     override suspend fun cancelStudentSync() {
         events += "cancelSync"
@@ -270,4 +279,5 @@ private class RecordingNotificationScheduler(
     override suspend fun showAgendaChange(event: AgendaEvent) = Unit
     override suspend fun showProjectDeadline(project: Project) = Unit
     override suspend fun showNewDocument(document: AcademicDocument) = Unit
+    override suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int) = Unit
 }

@@ -2,6 +2,7 @@ package com.elg.studly.application.usecase
 
 import android.net.Uri
 import com.elg.studly.application.ports.CalendarSyncPort
+import com.elg.studly.application.ports.NotificationScheduler
 import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.application.ports.StudentDataRepository
 import com.elg.studly.domain.model.Absence
@@ -15,6 +16,8 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.NotificationPreferences
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ReminderTarget
+import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,7 +34,7 @@ class RefreshStudentDataUseCaseTest {
         val repository = RecordingStudentDataRepository(events)
         val settingsRepository = RecordingSettingsRepository(events)
         val calendarSyncPort = RecordingCalendarSyncPort(events)
-        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort)
+        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, StubNotificationScheduler())
 
         useCase()
 
@@ -44,7 +47,7 @@ class RefreshStudentDataUseCaseTest {
         val repository = RecordingStudentDataRepository(events)
         val settingsRepository = RecordingSettingsRepository(events, calendarSyncEnabled = true)
         val calendarSyncPort = RecordingCalendarSyncPort(events)
-        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort)
+        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, StubNotificationScheduler())
         val agenda = listOf(sampleAgendaEvent())
         repository.agenda.value = agenda
 
@@ -83,7 +86,7 @@ private class RecordingStudentDataRepository(
     override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = flowOf(emptyList())
 
-    override suspend fun syncAll() {
+    override suspend fun syncAll(force: Boolean) {
         events += "sync"
     }
 
@@ -118,6 +121,11 @@ private class RecordingSettingsRepository(
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
     override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
+    override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
+    override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun lastFetchedAt(feature: SyncFeature): Instant? = null
+    override suspend fun markFeatureFetched(feature: SyncFeature) = Unit
 
     override suspend fun markSynced() {
         events += "markSynced"
@@ -141,6 +149,20 @@ private class RecordingCalendarSyncPort(
     override suspend fun availableCalendars(): List<com.elg.studly.domain.model.CalendarAccount> = emptyList()
     override suspend fun selectedCalendarId(): Long? = null
     override suspend fun selectCalendar(id: Long) = Unit
+}
+
+private class StubNotificationScheduler : NotificationScheduler {
+    override fun ensureChannels() = Unit
+    override suspend fun scheduleStudentSync(intervalMinutes: Long) = Unit
+    override suspend fun runStudentSyncNow() = Unit
+    override suspend fun cancelStudentSync() = Unit
+    override suspend fun showSyncFailure() = Unit
+    override suspend fun showNewGrade(grade: Grade) = Unit
+    override suspend fun showNewAbsence(absence: Absence) = Unit
+    override suspend fun showAgendaChange(event: AgendaEvent) = Unit
+    override suspend fun showProjectDeadline(project: Project) = Unit
+    override suspend fun showNewDocument(document: AcademicDocument) = Unit
+    override suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int) = Unit
 }
 
 private fun sampleAgendaEvent(): AgendaEvent {

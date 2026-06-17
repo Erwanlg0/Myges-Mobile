@@ -37,7 +37,9 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.NotificationPreferences
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
+import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
@@ -216,7 +218,7 @@ class StudentViewModelNetworkRecoveryTest {
             ObserveDocumentsUseCase(repository),
             ObserveDirectoryUseCase(repository),
             ObserveNewsUseCase(repository),
-            RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort),
+            RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, notificationScheduler),
             SyncAgendaToCalendarUseCase(calendarSyncPort),
             DownloadDocumentUseCase(repository),
             JoinGroupUseCase(repository),
@@ -256,7 +258,7 @@ private class FakeStudentDataRepository : StudentDataRepository {
     override fun observeDocuments(): Flow<List<AcademicDocument>> = documents
     override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = news
-    override suspend fun syncAll() {
+    override suspend fun syncAll(force: Boolean) {
         syncFailure?.let { throw it }
         syncCount += 1
     }
@@ -296,6 +298,11 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
     override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
+    override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
+    override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun lastFetchedAt(feature: SyncFeature): Instant? = null
+    override suspend fun markFeatureFetched(feature: SyncFeature) = Unit
     override suspend fun markSynced() = Unit
     override suspend fun clearSyncMetadata() = Unit
 }
@@ -325,7 +332,7 @@ private class FakeNotificationScheduler : NotificationScheduler {
     var syncCancelled = false
 
     override fun ensureChannels() = Unit
-    override suspend fun scheduleStudentSync() = Unit
+    override suspend fun scheduleStudentSync(intervalMinutes: Long) = Unit
     override suspend fun runStudentSyncNow() = Unit
     override suspend fun cancelStudentSync() {
         syncCancelled = true
@@ -336,4 +343,5 @@ private class FakeNotificationScheduler : NotificationScheduler {
     override suspend fun showAgendaChange(event: AgendaEvent) = Unit
     override suspend fun showProjectDeadline(project: Project) = Unit
     override suspend fun showNewDocument(document: AcademicDocument) = Unit
+    override suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int) = Unit
 }
