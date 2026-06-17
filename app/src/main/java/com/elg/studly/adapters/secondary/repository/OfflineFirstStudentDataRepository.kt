@@ -48,7 +48,6 @@ import com.elg.studly.domain.model.StudentProfile
 import com.elg.studly.domain.model.SyncFeature
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -428,51 +427,49 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     }
 
     override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {
-        changeGroupMembership(courseId, projectId) { api.joinGroup(courseId, projectId, groupId) }
+        changeGroupMembership(projectId, groupId, join = true) { api.joinGroup(courseId, projectId, groupId) }
     }
 
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {
-        changeGroupMembership(courseId, projectId) { api.leaveGroup(courseId, projectId, groupId) }
+        changeGroupMembership(projectId, groupId, join = false) { api.leaveGroup(courseId, projectId, groupId) }
     }
 
     private suspend fun changeGroupMembership(
-        courseId: String,
         projectId: String,
+        groupId: String,
+        join: Boolean,
         action: suspend () -> Response<ResponseBody>
     ) {
         withContext(Dispatchers.IO) {
-            val failure = try {
-                val response = action()
-                if (!response.isSuccessful) HttpException(response) else null
+            val response = try {
+                action()
             } catch (throwable: Throwable) {
-                throwable
+                throw throwable.toRepositoryException()
             }
-            refreshProjectGroups(courseId, projectId)
-            failure?.let { throw it.toRepositoryException() }
+            if (!response.isSuccessful) throw HttpException(response).toRepositoryException()
+            applyGroupMembership(projectId, groupId, join)
         }
     }
 
-    private suspend fun refreshProjectGroups(courseId: String, projectId: String) {
+    private suspend fun applyGroupMembership(projectId: String, groupId: String, join: Boolean) {
         runCatching {
-            delay(2_000)
-            val currentUserId = dao.profile()?.id
-            val year = dao.projects().firstOrNull { it.id == projectId }?.year
-            val fromYear = year?.let { api.projects(it) }
-                ?.toProjects(currentUserId)?.firstOrNull { it.id == projectId }?.groups.orEmpty()
-            val fromCourse = api.courseProjects(courseId)
-                ?.toProjects(currentUserId)?.firstOrNull { it.id == projectId }?.groups.orEmpty()
-            val groups = mergeGroups(fromYear, fromCourse)
-            if (groups.isNotEmpty()) {
-                dao.replaceGroupsForProject(projectId, groups.map { group ->
-                    ProjectGroupEntity(
-                        projectId = projectId,
-                        id = group.id,
-                        name = group.name,
-                        students = group.students.joinToString("\n"),
-                        isMine = group.isMine
+            val selfName = dao.profile()?.displayName?.trim().orEmpty()
+            val current = dao.projectGroups().filter { it.projectId == projectId }
+            if (current.isEmpty()) return@runCatching
+            val updated = current.map { group ->
+                val students = group.students.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                val withoutSelf = students.filter { !it.equals(selfName, ignoreCase = true) }
+                when {
+                    group.id == groupId && join -> group.copy(
+                        isMine = true,
+                        students = (withoutSelf + selfName).filter { it.isNotEmpty() }.joinToString("\n")
                     )
-                })
+                    group.id == groupId -> group.copy(isMine = false, students = withoutSelf.joinToString("\n"))
+                    join -> group.copy(isMine = false, students = withoutSelf.joinToString("\n"))
+                    else -> group
+                }
             }
+            dao.replaceGroupsForProject(projectId, updated)
         }
     }
 
