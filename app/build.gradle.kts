@@ -29,12 +29,12 @@ android {
         applicationId = "com.elg.studly"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "beta-0.0.2"
+        versionCode = 4
+        versionName = "beta-0.0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-    
+
         buildConfigField(
             "String",
             "MYGES_API_BASE_URL",

@@ -44,6 +44,7 @@ class AppSettingsRepository @Inject constructor(
             calendarSyncEnabled = preferences[CALENDAR_SYNC] ?: false,
             biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
             themeMode = preferences[THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
+            dynamicColorEnabled = preferences[DYNAMIC_COLOR] ?: false,
             refreshIntervals = preferences.toRefreshIntervals(),
             classReminderLeadMinutes = clampReminderLeadMinutes(preferences[CLASS_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
             deadlineReminderLeadMinutes = clampReminderLeadMinutes(preferences[DEADLINE_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
@@ -61,6 +62,10 @@ class AppSettingsRepository @Inject constructor(
 
     override suspend fun setThemeMode(themeMode: ThemeMode) {
         context.settingsDataStore.edit { preferences -> preferences[THEME_MODE] = themeMode.name }
+    }
+
+    override suspend fun setDynamicColorEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { preferences -> preferences[DYNAMIC_COLOR] = enabled }
     }
 
     override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) {
@@ -150,6 +155,7 @@ class AppSettingsRepository @Inject constructor(
         val CLASS_REMINDER_LEAD = intPreferencesKey("class_reminder_lead_minutes")
         val DEADLINE_REMINDER_LEAD = intPreferencesKey("deadline_reminder_lead_minutes")
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
 
         val INTERVAL_KEYS = SyncFeature.entries.associateWith {
             intPreferencesKey("refresh_interval_${it.name.lowercase()}")

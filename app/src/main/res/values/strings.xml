@@ -120,11 +120,11 @@
     <string name="projects_detail_title">Détail du projet</string>
     <string name="projects_steps_title">Étapes</string>
     <string name="projects_progress_label">Progression</string>
-    <string name="agenda_mode_week_5">Semaine (5j)</string>
     <string name="agenda_mode_week_7">Semaine (7j)</string>
     <string name="agenda_mode_grid">Grille</string>
     <string name="agenda_mode_month">Mois</string>
     <string name="agenda_sync_calendar_export">Exporter le calendrier (.ics)</string>
+    <string name="agenda_export_title">Exporter l\'agenda</string>
 
     <string name="absences_title">Absences</string>
     <string name="absences_empty_title">Aucune absence</string>
@@ -232,6 +232,7 @@
     <string name="settings_theme_system">Système</string>
     <string name="settings_theme_light">Clair</string>
     <string name="settings_theme_dark">Sombre</string>
+    <string name="settings_dynamic_color">Couleurs dynamiques (Material You)</string>
     <string name="settings_language_english">Anglais</string>
     <string name="settings_language_french">Français</string>
     <string name="settings_language_system">Système</string>

@@ -43,13 +43,16 @@ class MainActivity : AppCompatActivity() {
         requestNotificationPermissionIfNeeded()
         handleIntent(intent)
         setContent {
-            val themeMode by observeSettings().collectAsStateWithLifecycle(initialValue = null)
-            val darkTheme = when (themeMode?.themeMode) {
+            val settings by observeSettings().collectAsStateWithLifecycle(initialValue = null)
+            val darkTheme = when (settings?.themeMode) {
                 ThemeMode.Light -> false
                 ThemeMode.Dark -> true
                 else -> isSystemInDarkTheme()
             }
-            MygesTheme(darkTheme = darkTheme) {
+            MygesTheme(
+                darkTheme = darkTheme,
+                dynamicColor = settings?.dynamicColorEnabled == true
+            ) {
                 MygesApp(
                     oauthCallbackUri = oauthCallbackUri,
                     onOAuthCallbackConsumed = { oauthCallbackUri = null },

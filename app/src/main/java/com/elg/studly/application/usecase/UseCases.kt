@@ -239,6 +239,7 @@ class UpdateSettingsUseCase @Inject constructor(
     suspend fun projectNotifications(enabled: Boolean) = repository.setProjectNotificationsEnabled(enabled)
     suspend fun documentNotifications(enabled: Boolean) = repository.setDocumentNotificationsEnabled(enabled)
     suspend fun themeMode(themeMode: ThemeMode) = repository.setThemeMode(themeMode)
+    suspend fun dynamicColor(enabled: Boolean) = repository.setDynamicColorEnabled(enabled)
     suspend fun refreshInterval(feature: SyncFeature, minutes: Int) = repository.setRefreshInterval(feature, minutes)
 
     /** Persists the class reminder lead time and (re)schedules reminders for cached data. */

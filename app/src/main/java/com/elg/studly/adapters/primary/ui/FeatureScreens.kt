@@ -510,7 +510,7 @@ fun AgendaScreen(
                                 putExtra(Intent.EXTRA_STREAM, uri)
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
-                            context.startActivity(Intent.createChooser(intent, "Export Agenda"))
+                            context.startActivity(Intent.createChooser(intent, context.getString(R.string.agenda_export_title)))
                         }
                     },
                     modifier = Modifier.weight(1f)
@@ -533,7 +533,7 @@ fun AgendaScreen(
                         onClick = {
                             selectedDate = when (selectedMode) {
                                 AgendaMode.Day -> selectedDate.minusDays(1)
-                                AgendaMode.Grid, AgendaMode.Week5, AgendaMode.Week7 -> selectedDate.minusWeeks(1)
+                                AgendaMode.Grid, AgendaMode.Week7 -> selectedDate.minusWeeks(1)
                                 AgendaMode.Month -> selectedDate.minusMonths(1)
                                 else -> selectedDate
                             }
@@ -544,10 +544,9 @@ fun AgendaScreen(
                     
                     val headerText = when (selectedMode) {
                         AgendaMode.Day -> formatDate(selectedDate)
-                        AgendaMode.Grid, AgendaMode.Week5, AgendaMode.Week7 -> {
+                        AgendaMode.Grid, AgendaMode.Week7 -> {
                             val startOfWeek = selectedDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
                             val endDay = when (selectedMode) {
-                                AgendaMode.Week5 -> 4
                                 AgendaMode.Grid -> 5
                                 else -> 6
                             }
@@ -571,7 +570,7 @@ fun AgendaScreen(
                         onClick = {
                             selectedDate = when (selectedMode) {
                                 AgendaMode.Day -> selectedDate.plusDays(1)
-                                AgendaMode.Grid, AgendaMode.Week5, AgendaMode.Week7 -> selectedDate.plusWeeks(1)
+                                AgendaMode.Grid, AgendaMode.Week7 -> selectedDate.plusWeeks(1)
                                 AgendaMode.Month -> selectedDate.plusMonths(1)
                                 else -> selectedDate
                             }
@@ -590,10 +589,7 @@ fun AgendaScreen(
                     AgendaWeekGrid(
                         weekStart = startOfWeek,
                         events = events,
-                        onOpen = { ev ->
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            selectedEvent = ev
-                        }
+                        onOpen = { ev -> selectedEvent = ev }
                     )
                 }
             }
@@ -604,10 +600,7 @@ fun AgendaScreen(
                     items(events, key = { it.id }) { event ->
                         AgendaEventCard(
                             event = event,
-                            onOpen = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectedEvent = event
-                            }
+                            onOpen = { selectedEvent = event }
                         )
                     }
                 }
@@ -620,17 +613,14 @@ fun AgendaScreen(
                     items(dayEvents, key = { it.id }) { event ->
                         AgendaEventCard(
                             event = event,
-                            onOpen = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectedEvent = event
-                            }
+                            onOpen = { selectedEvent = event }
                         )
                     }
                 }
             }
-            AgendaMode.Week5, AgendaMode.Week7 -> {
+            AgendaMode.Week7 -> {
                 val startOfWeek = selectedDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
-                val numDays = if (selectedMode == AgendaMode.Week5) 5 else 7
+                val numDays = 7
                 val daysList = (0 until numDays).map { startOfWeek.plusDays(it.toLong()) }
                 
                 var hasAnyEvent = false
@@ -650,10 +640,7 @@ fun AgendaScreen(
                         items(dayEvents, key = { it.id }) { event ->
                             AgendaEventCard(
                                 event = event,
-                                onOpen = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    selectedEvent = event
-                                }
+                                onOpen = { selectedEvent = event }
                             )
                         }
                     }
@@ -685,10 +672,7 @@ fun AgendaScreen(
                     items(dayEvents, key = { it.id }) { event ->
                         AgendaEventCard(
                             event = event,
-                            onOpen = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectedEvent = event
-                            }
+                            onOpen = { selectedEvent = event }
                         )
                     }
                 } else {
@@ -1885,6 +1869,13 @@ fun SettingsScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 ThemeSelector(settings.themeMode, settingsViewModel::setThemeMode)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    SwitchRow(
+                        title = R.string.settings_dynamic_color,
+                        checked = settings.dynamicColorEnabled,
+                        onCheckedChange = settingsViewModel::setDynamicColor
+                    )
+                }
             }
         }
         item {
@@ -3833,7 +3824,6 @@ private fun EventBlock(
 private enum class AgendaMode(@StringRes val title: Int) {
     Grid(R.string.agenda_mode_grid),
     Day(R.string.agenda_mode_day),
-    Week5(R.string.agenda_mode_week_5),
     Week7(R.string.agenda_mode_week_7),
     Month(R.string.agenda_mode_month),
     List(R.string.agenda_mode_list)
@@ -3849,7 +3839,14 @@ private fun MonthCalendarGrid(
     val lengthOfMonth = selectedDate.lengthOfMonth()
     val firstDayOfWeek = firstOfMonth.dayOfWeek.value
     
-    val daysOfWeek = listOf("M", "T", "W", "T", "F", "S", "S")
+    val locale = currentJavaLocale()
+    val daysOfWeek = remember(locale) {
+        (1..7).map {
+            java.time.DayOfWeek.of(it)
+                .getDisplayName(java.time.format.TextStyle.NARROW, locale)
+                .uppercase(locale)
+        }
+    }
     
     Column(
         modifier = Modifier

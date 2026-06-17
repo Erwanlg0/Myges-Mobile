@@ -210,6 +210,7 @@ private class RecordingSettingsRepository(
     }
 
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
+    override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
 
     override suspend fun markSynced() = Unit
 

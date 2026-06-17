@@ -19,6 +19,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -126,6 +130,12 @@ fun OfflineState(onRetry: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Icon(
+                imageVector = Icons.Rounded.WifiOff,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Text(
                 text = stringResource(R.string.state_offline_empty_title),
                 style = MaterialTheme.typography.titleLarge,
@@ -160,6 +170,12 @@ fun EmptyState(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Icon(
+                imageVector = Icons.Rounded.Inbox,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Text(
                 text = stringResource(title),
                 style = MaterialTheme.typography.titleLarge,
@@ -197,6 +213,12 @@ fun ErrorState(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Icon(
+                imageVector = Icons.Rounded.ErrorOutline,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
             Text(
                 text = stringResource(R.string.state_error_title),
                 style = MaterialTheme.typography.titleLarge,
@@ -234,6 +256,12 @@ fun ErrorState(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Icon(
+                imageVector = Icons.Rounded.ErrorOutline,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
             Text(
                 text = stringResource(R.string.state_error_title),
                 style = MaterialTheme.typography.titleLarge,

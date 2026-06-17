@@ -189,6 +189,7 @@ data class UserSettings(
     val calendarSyncEnabled: Boolean,
     val biometricEnabled: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.System,
+    val dynamicColorEnabled: Boolean = false,
     val refreshIntervals: RefreshIntervals = RefreshIntervals(),
     /** Lead time (minutes) before a class/practical session starts. 0 = no reminder. */
     val classReminderLeadMinutes: Int = NO_REMINDER_MINUTES,

@@ -295,6 +295,7 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setProjectNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
+    override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
     override suspend fun markSynced() = Unit
     override suspend fun clearSyncMetadata() = Unit
 }

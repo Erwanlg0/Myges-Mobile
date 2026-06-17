@@ -59,6 +59,7 @@ interface SettingsRepository {
     suspend fun setProjectNotificationsEnabled(enabled: Boolean)
     suspend fun setDocumentNotificationsEnabled(enabled: Boolean)
     suspend fun setThemeMode(themeMode: ThemeMode)
+    suspend fun setDynamicColorEnabled(enabled: Boolean)
     suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int)
     suspend fun setClassReminderLeadMinutes(minutes: Int)
     suspend fun setDeadlineReminderLeadMinutes(minutes: Int)

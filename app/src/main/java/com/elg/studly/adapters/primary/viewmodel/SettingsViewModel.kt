@@ -81,6 +81,10 @@ class SettingsViewModel @Inject constructor(
         updateSettingsUseCase.themeMode(themeMode)
     }
 
+    fun setDynamicColor(enabled: Boolean) = launchSettingChange {
+        updateSettingsUseCase.dynamicColor(enabled)
+    }
+
     fun setCalendarSync(enabled: Boolean) = launchSettingChange {
         updateSettingsUseCase.calendarSync(enabled)
     }
