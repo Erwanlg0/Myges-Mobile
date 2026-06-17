@@ -2,8 +2,17 @@ package com.elg.studly.adapters.primary.navigation
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.provider.OpenableColumns
+import android.widget.Toast
+import java.io.File
+import java.io.FileOutputStream
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -81,6 +90,41 @@ data class Destination(
     val icon: ImageVector
 )
 
+private fun saveToDownloads(context: Context, uri: Uri, mimeType: String?): Boolean {
+    val resolver = context.contentResolver
+    val displayName = runCatching {
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+    }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "document"
+    return runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+                if (!mimeType.isNullOrBlank()) put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: return false
+            resolver.openOutputStream(target)?.use { output ->
+                resolver.openInputStream(uri)?.use { input -> input.copyTo(output) } ?: return false
+            } ?: return false
+            values.clear()
+            values.put(MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(target, values, null, null)
+        } else {
+            val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                .apply { mkdirs() }
+            val target = File(downloads, displayName)
+            FileOutputStream(target).use { output ->
+                resolver.openInputStream(uri)?.use { input -> input.copyTo(output) } ?: return false
+            }
+        }
+        true
+    }.getOrDefault(false)
+}
+
 private val destinations = listOf(
     Destination("dashboard", R.string.dashboard_title, Icons.Rounded.Home),
     Destination("agenda", R.string.agenda_title, Icons.Rounded.Event),
@@ -150,10 +194,21 @@ private fun StudentRoute(
 
     LaunchedEffect(studentViewModel) {
         studentViewModel.documentOpenRequests.collect { request ->
+            if (request.downloadOnly) {
+                if (saveToDownloads(context, request.uri, request.mimeType)) {
+                    Toast.makeText(context, R.string.documents_saved_to_downloads, Toast.LENGTH_LONG).show()
+                } else {
+                    studentViewModel.reportOpenDocumentFailure()
+                }
+                return@collect
+            }
             val openWithMime = { mime: String ->
                 val intent = Intent(Intent.ACTION_VIEW)
                     .setDataAndType(request.uri, mime)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (intent.resolveActivity(context.packageManager) == null) {
+                    throw ActivityNotFoundException("No app can open $mime")
+                }
                 context.startActivity(Intent.createChooser(intent, null))
             }
             try {
@@ -171,7 +226,11 @@ private fun StudentRoute(
                         throw exception
                     }
                 } catch (e: ActivityNotFoundException) {
-                    studentViewModel.reportOpenDocumentFailure()
+                    if (saveToDownloads(context, request.uri, request.mimeType)) {
+                        Toast.makeText(context, R.string.documents_saved_to_downloads, Toast.LENGTH_LONG).show()
+                    } else {
+                        studentViewModel.reportOpenDocumentFailure()
+                    }
                 }
             }
         }

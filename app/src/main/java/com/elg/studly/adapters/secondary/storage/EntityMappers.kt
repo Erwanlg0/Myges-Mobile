@@ -143,7 +143,8 @@ fun Project.toEntity() = ProjectEntity(
     year = year,
     courseId = courseId,
     startsAtEpochMillis = startsAt?.toEpochMilli(),
-    groupMode = groupMode
+    groupMode = groupMode,
+    maxStudents = maxStudents
 )
 
 fun Project.toGroupEntities() = groups.map { group ->
@@ -182,7 +183,8 @@ fun ProjectEntity.toDomain(
     courseId = courseId,
     groups = groups.map { it.toDomain() },
     startsAt = startsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
-    groupMode = groupMode
+    groupMode = groupMode,
+    maxStudents = maxStudents
 )
 
 fun ProjectGroupEntity.toDomain() = ProjectGroup(

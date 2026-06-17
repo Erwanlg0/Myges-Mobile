@@ -699,7 +699,8 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     year = current.year ?: next.year,
                     courseId = current.courseId ?: next.courseId,
                     groups = mergeGroups(current.groups, next.groups),
-                    groupMode = current.groupMode ?: next.groupMode
+                    groupMode = current.groupMode ?: next.groupMode,
+                    maxStudents = current.maxStudents ?: next.maxStudents
                 )
             }
         }

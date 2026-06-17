@@ -52,7 +52,8 @@ import javax.inject.Inject
 
 data class DocumentOpenRequest(
     val uri: Uri,
-    val mimeType: String?
+    val mimeType: String?,
+    val downloadOnly: Boolean = false
 )
 
 @HiltViewModel
@@ -185,7 +186,11 @@ class StudentViewModel @Inject constructor(
         }
     }
 
-    fun openDocument(document: AcademicDocument) {
+    fun openDocument(document: AcademicDocument) = fetchDocument(document, downloadOnly = false)
+
+    fun downloadDocument(document: AcademicDocument) = fetchDocument(document, downloadOnly = true)
+
+    private fun fetchDocument(document: AcademicDocument, downloadOnly: Boolean) {
         viewModelScope.launch {
             _downloadingDocumentIds.update { it + document.id }
             _documentDownloadProgress.update { it + (document.id to null) }
@@ -195,7 +200,7 @@ class StudentViewModel @Inject constructor(
                     _documentDownloadProgress.update { it + (document.id to progress) }
                 }
             }
-                .onSuccess { uri -> documentOpenRequests.emit(DocumentOpenRequest(uri, document.resolvedMimeType())) }
+                .onSuccess { uri -> documentOpenRequests.emit(DocumentOpenRequest(uri, document.resolvedMimeType(), downloadOnly)) }
                 .onFailure { throwable ->
                     val appError = throwable.toAppError()
                     

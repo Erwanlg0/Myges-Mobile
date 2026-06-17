@@ -88,7 +88,8 @@ data class Project(
     val courseId: String? = null,
     val groups: List<ProjectGroup> = emptyList(),
     val startsAt: Instant? = null,
-    val groupMode: String? = null
+    val groupMode: String? = null,
+    val maxStudents: Int? = null
 )
 
 data class Practical(

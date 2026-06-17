@@ -397,7 +397,8 @@ fun JsonElement.toProjects(currentUserId: String? = null, fallbackYear: String? 
             courseId = root.text("rc_id", "rcId", "courseId"),
             groups = groups,
             startsAt = startsAt,
-            groupMode = root.text("project_type_group", "type_group", "groupMode")
+            groupMode = root.text("project_type_group", "type_group", "groupMode"),
+            maxStudents = root.number("project_max_student_group", "max_student_group", "maxStudents")?.toInt()
         )
     }
 }

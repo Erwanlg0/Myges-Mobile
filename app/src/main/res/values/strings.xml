@@ -169,6 +169,7 @@
     <string name="projects_view_all_groups">Voir tous les groupes</string>
     <string name="deposit_document">Déposer un document</string>
     <string name="group_join">Rejoindre ce groupe</string>
+    <string name="group_full">Groupe complet</string>
     <string name="group_leave">Quitter le groupe</string>
     <string name="projects_deliverables_label">Rendus :</string>
 
@@ -187,6 +188,8 @@
     <string name="documents_category">Catégorie</string>
     <string name="documents_downloading">Téléchargement</string>
     <string name="documents_open">Télécharger et ouvrir</string>
+    <string name="documents_saved_to_downloads">Fichier enregistré dans Téléchargements</string>
+    <string name="documents_download_only">Télécharger</string>
     <string name="documents_updated_at">Mis à jour</string>
     <string name="documents_annual">Documents annuels</string>
     <string name="documents_folder">Supports de cours</string>

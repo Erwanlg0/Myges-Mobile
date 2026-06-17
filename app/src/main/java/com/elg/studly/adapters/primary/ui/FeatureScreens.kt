@@ -1373,6 +1373,7 @@ fun ProjectsScreen(
     val years = remember(state.data) { state.data.mapNotNull { it.year }.distinct().sortedDescending() }
     val filteredProjects = remember(state.data, selectedYear) {
         state.data
+            .filter { selectedYear == null || it.year == selectedYear }
             .sortedWith(compareByDescending<Project> { it.year }.thenByDescending { it.startsAt ?: it.deadline }.thenBy { it.name })
     }
     selectedProject?.let { selected ->
@@ -1383,6 +1384,7 @@ fun ProjectsScreen(
             downloadingDocumentIds = downloadingDocumentIds,
             documentDownloadProgress = documentDownloadProgress,
             onOpenDocument = viewModel::openDocument,
+            onDownloadDocument = viewModel::downloadDocument,
             onDeposit = viewModel::requestDeposit,
             onJoinGroup = project.courseId?.let { rcId ->
                 { groupId: String -> viewModel.joinGroup(rcId, project.id, groupId) }
@@ -1440,6 +1442,7 @@ fun PracticalsScreen(viewModel: StudentViewModel) {
             downloadingDocumentIds = downloadingDocumentIds,
             documentDownloadProgress = documentDownloadProgress,
             onOpenDocument = viewModel::openDocument,
+            onDownloadDocument = viewModel::downloadDocument,
             onDeposit = viewModel::requestDeposit,
             onJoinGroup = practical.courseId?.let { rcId ->
                 { groupId: String -> viewModel.joinGroup(rcId, practical.id, groupId) }
@@ -1717,6 +1720,7 @@ fun DocumentsScreen(
                     downloading = document.id in downloadingDocumentIds,
                     progress = documentDownloadProgress[document.id],
                     showCategory = false,
+                    onDownload = { viewModel.downloadDocument(document) },
                     onOpen = { viewModel.openDocument(document) }
                 )
             }
@@ -1728,6 +1732,7 @@ fun DocumentsScreen(
                     document = document,
                     downloading = document.id in downloadingDocumentIds,
                     progress = documentDownloadProgress[document.id],
+                    onDownload = { viewModel.downloadDocument(document) },
                     onOpen = { viewModel.openDocument(document) }
                 )
             }
@@ -3104,6 +3109,7 @@ private fun ProjectDetailsDialog(
     downloadingDocumentIds: Set<String>,
     documentDownloadProgress: Map<String, Float?>,
     onOpenDocument: (AcademicDocument) -> Unit,
+    onDownloadDocument: (AcademicDocument) -> Unit,
     onDeposit: (String) -> Unit,
     onJoinGroup: ((String) -> Unit)? = null,
     onLeaveGroup: ((String) -> Unit)? = null,
@@ -3209,8 +3215,10 @@ private fun ProjectDetailsDialog(
                             downloadingDocumentIds = downloadingDocumentIds,
                             documentDownloadProgress = documentDownloadProgress,
                             onOpenDocument = onOpenDocument,
+                            onDownloadDocument = onDownloadDocument,
                             onJoinGroup = onJoinGroup,
                             onLeaveGroup = onLeaveGroup,
+                            maxStudents = project.maxStudents,
                             onDismiss = { showAllGroupsDialog = false }
                         )
                     }
@@ -3238,6 +3246,7 @@ private fun ProjectDetailsDialog(
                             downloading = document.id in downloadingDocumentIds,
                             progress = documentDownloadProgress[document.id],
                             showDownloadButton = true,
+                            onDownload = { onDownloadDocument(document) },
                             onOpen = { onOpenDocument(document) }
                         )
                     }
@@ -3259,8 +3268,10 @@ private fun AllGroupsDialog(
     downloadingDocumentIds: Set<String>,
     documentDownloadProgress: Map<String, Float?>,
     onOpenDocument: (AcademicDocument) -> Unit,
+    onDownloadDocument: (AcademicDocument) -> Unit,
     onJoinGroup: ((String) -> Unit)? = null,
     onLeaveGroup: ((String) -> Unit)? = null,
+    maxStudents: Int? = null,
     onDismiss: () -> Unit
 ) {
     val sortedGroups = remember(groups) {
@@ -3310,6 +3321,7 @@ private fun AllGroupsDialog(
                                     downloading = document.id in downloadingDocumentIds,
                                     progress = documentDownloadProgress[document.id],
                                     showDownloadButton = group.isMine,
+                                    onDownload = { onDownloadDocument(document) },
                                     onOpen = { onOpenDocument(document) }
                                 )
                             }
@@ -3326,14 +3338,23 @@ private fun AllGroupsDialog(
                                 Text(stringResource(R.string.group_leave))
                             }
                         } else if (!group.isMine && !alreadyInAGroup && onJoinGroup != null) {
+                            val isFull = maxStudents != null && group.students.size >= maxStudents
                             Spacer(Modifier.height(8.dp))
-                            Button(
-                                onClick = { onJoinGroup(group.id) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Rounded.GroupAdd, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.group_join))
+                            if (isFull) {
+                                Text(
+                                    text = stringResource(R.string.group_full),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            } else {
+                                Button(
+                                    onClick = { onJoinGroup(group.id) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Rounded.GroupAdd, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.group_join))
+                                }
                             }
                         }
                     }
@@ -3412,6 +3433,7 @@ internal fun DocumentCard(
     progress: Float?,
     showDownloadButton: Boolean = true,
     showCategory: Boolean = true,
+    onDownload: (() -> Unit)? = null,
     onOpen: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
@@ -3425,23 +3447,38 @@ internal fun DocumentCard(
         LabelValue(R.string.profile_year, document.year.orEmpty())
         LabelValue(R.string.documents_updated_at, formatInstant(document.updatedAt))
         if (showDownloadButton) {
-            OutlinedButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onOpen()
-                },
-                enabled = !downloading
-            ) {
-                if (downloading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(Icons.Rounded.Download, contentDescription = null)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onOpen()
+                    },
+                    enabled = !downloading
+                ) {
+                    if (downloading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Rounded.Download, contentDescription = null)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(if (downloading) R.string.documents_downloading else R.string.documents_open))
                 }
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(if (downloading) R.string.documents_downloading else R.string.documents_open))
+                if (onDownload != null) {
+                    OutlinedButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onDownload()
+                        },
+                        enabled = !downloading
+                    ) {
+                        Icon(Icons.Rounded.Download, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.documents_download_only))
+                    }
+                }
             }
             if (downloading) {
                 if (progress == null) {
@@ -4145,6 +4182,7 @@ private fun PracticalDetailsDialog(
     downloadingDocumentIds: Set<String>,
     documentDownloadProgress: Map<String, Float?>,
     onOpenDocument: (AcademicDocument) -> Unit,
+    onDownloadDocument: (AcademicDocument) -> Unit,
     onDeposit: (String) -> Unit,
     onJoinGroup: ((String) -> Unit)? = null,
     onLeaveGroup: ((String) -> Unit)? = null,
@@ -4228,6 +4266,7 @@ private fun PracticalDetailsDialog(
                             downloadingDocumentIds = downloadingDocumentIds,
                             documentDownloadProgress = documentDownloadProgress,
                             onOpenDocument = onOpenDocument,
+                            onDownloadDocument = onDownloadDocument,
                             onJoinGroup = onJoinGroup,
                             onLeaveGroup = onLeaveGroup,
                             onDismiss = { showAllGroupsDialog = false }
@@ -4255,6 +4294,7 @@ private fun PracticalDetailsDialog(
                             downloading = document.id in downloadingDocumentIds,
                             progress = documentDownloadProgress[document.id],
                             showDownloadButton = true,
+                            onDownload = { onDownloadDocument(document) },
                             onOpen = { onOpenDocument(document) }
                         )
                     }
