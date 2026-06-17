@@ -693,7 +693,7 @@ fun AgendaScreen(
 
 private val CC_SUBJECT_REGEX = Regex("^(cc|contrôle continu)\\s*\\d*$", RegexOption.IGNORE_CASE)
 
-/** Keeps only the "main" grade rows, dropping CC/exam sub-rows already folded into a course average. */
+
 private fun deriveMainGrades(source: List<Grade>): List<Grade> {
     val structuredKeys = source
         .filter { it.subject.isBlank() && !it.id.contains("-cc-") && !it.id.contains("-exam") }
@@ -763,7 +763,7 @@ fun GradesScreen(
             .withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet())
     }
     val mainGrades = remember(displayedGrades) { deriveMainGrades(displayedGrades) }
-    // Block grouping spans semesters within the selected year, so it ignores the semester filter.
+    
     val blockMainGrades = remember(gradesList, selectedYear, simulationMode, simulatedValues) {
         val yearGrades = gradesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }
         val yearDisplayed = (if (simulationMode) yearGrades.withSimulatedValues(simulatedValues) else yearGrades)
@@ -871,7 +871,7 @@ fun GradesScreen(
                         }
                     }
 
-                    // Block mode spans semesters, so the semester filter is hidden there.
+                    
                     if (!groupByBlock) {
                         var semesterExpanded by remember { mutableStateOf(false) }
                         Box(modifier = Modifier.weight(1f)) {
@@ -1274,7 +1274,7 @@ fun CoursesScreen(viewModel: StudentViewModel) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Year Selector
+                    
                     var yearExpanded by remember { mutableStateOf(false) }
                     Box(modifier = Modifier.weight(1f)) {
                         CompactCard(modifier = Modifier.clickable { yearExpanded = true }) {
@@ -1307,7 +1307,7 @@ fun CoursesScreen(viewModel: StudentViewModel) {
                         }
                     }
 
-                    // Period Selector
+                    
                     var periodExpanded by remember { mutableStateOf(false) }
                     Box(modifier = Modifier.weight(1f)) {
                         CompactCard(modifier = Modifier.clickable { periodExpanded = true }) {
@@ -1751,7 +1751,7 @@ fun DocumentsScreen(
 
 private fun AcademicDocument.filterYear(): String? {
     year?.takeIf { it.isNotBlank() }?.let { raw ->
-        // Normalize to academic-year form so "2025" merges with "2025-2026".
+        
         Regex("\\d{4}\\s*-\\s*\\d{4}").find(raw)?.value?.replace(" ", "")?.let { return it }
         raw.trim().toIntOrNull()?.let { return "$it-${it + 1}" }
         return raw
@@ -3523,7 +3523,7 @@ fun NewsDetailScreen(newsItem: NewsItem, onBack: () -> Unit) {
                     settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
                     isNestedScrollingEnabled = true
-                    // Prevent the navigation drawer from stealing scroll/swipe gestures over the article.
+                    
                     setOnTouchListener { v, event ->
                         v.parent?.requestDisallowInterceptTouchEvent(true)
                         false
@@ -3537,7 +3537,7 @@ fun NewsDetailScreen(newsItem: NewsItem, onBack: () -> Unit) {
     }
 }
 
-/** Wraps raw article HTML with a responsive viewport + theme-aware styling for the news detail WebView. */
+
 private fun wrapNewsHtml(bodyHtml: String, dark: Boolean): String {
     val bg = if (dark) "#1c1b1f" else "#ffffff"
     val fg = if (dark) "#e6e1e5" else "#1c1b1f"
@@ -3692,7 +3692,7 @@ private fun AgendaWeekGrid(
     val today = LocalDate.now()
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        // Fill the available width when it fits; fall back to a scrollable min-width grid on narrow screens.
+        
         val dayWidth = maxOf(GRID_DAY_MIN_WIDTH, (maxWidth - GRID_TIME_GUTTER) / days.size)
         Column {
             Row {

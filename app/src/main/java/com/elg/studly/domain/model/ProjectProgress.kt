@@ -8,15 +8,15 @@ data class ProjectProgress(
     val fraction: Double
 )
 
-/** A step is done once its status says so, or once its deadline is in the past. */
+
 private fun ProjectStep.isCompleted(now: Instant): Boolean =
     status.isCompletedStatus() || (deadline != null && deadline.isBefore(now))
 
 fun Project.progress(): ProjectProgress {
     val now = Instant.now()
     val total = steps.size
-    // Progress is driven by the steps. The project-level `deadline` is unreliable (often just an
-    // update timestamp), so only an explicit completed status marks the whole project as done.
+    
+    
     val projectDone = status.isCompletedStatus()
     if (total == 0) {
         return ProjectProgress(0, 0, if (projectDone) 1.0 else 0.0)

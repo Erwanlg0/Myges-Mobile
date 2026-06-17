@@ -92,10 +92,6 @@ interface NotificationScheduler {
     suspend fun showProjectDeadline(project: Project)
     suspend fun showNewDocument(document: AcademicDocument)
 
-    /**
-     * (Re)schedules each target with the lead time matching its kind: [classLeadMinutes] for
-     * sessions, [deadlineLeadMinutes] for submissions. A 0 lead skips that kind. Always cancels
-     * previously scheduled reminders first.
-     */
+    
     suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int)
 }

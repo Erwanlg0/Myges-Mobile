@@ -166,8 +166,8 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
         "publishDate", "publish_date", "published", "updatedAt", 
         "update_date", "date_note", "dateNote", "published_at", "created_at"
     )
-    // A single course object exposes "grades" as a primitive component array and/or "exam".
-    // Detect that case so we don't unwrap the component array as if it were the grade list.
+    
+    
     val rootObj = this as? JsonObject
     val componentArray = rootObj?.get("grades") as? JsonArray
     val isSingleStructuredCourse = rootObj != null && (
@@ -188,7 +188,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
             )
         }
         
-        // Parse CC grades
+        
         val nestedGrades = root.array("grades")
         val ccGrades = nestedGrades.mapIndexedNotNull { index, gradeElement ->
             val value = when (gradeElement) {
@@ -203,11 +203,11 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
             value?.let { Pair(it, dateVal) }
         }
 
-        // Parse Exam
+        
         val examValue = root.number("exam", "examen")
         val examDate = root.localDate("date_exam", "exam_date")
 
-        // Compute/parse average
+        
         val ccAverage = if (ccGrades.isNotEmpty()) ccGrades.map { it.first }.average() else null
         val calculatedAverage = when {
             ccAverage != null && examValue != null -> 0.5 * ccAverage + 0.5 * examValue
@@ -220,7 +220,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
 
         val resultList = mutableListOf<Grade>()
 
-        // 1. Create the Main Grade Card
+        
         resultList.add(
             root.toGrade(
                 idSuffix = null,
@@ -232,7 +232,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
             )
         )
 
-        // 2. Create the CC component Grade cards
+        
         ccGrades.forEachIndexed { index, pair ->
             resultList.add(
                 root.toGrade(
@@ -246,7 +246,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
             )
         }
 
-        // 3. Create the Exam component Grade card
+        
         if (examValue != null) {
             resultList.add(
                 root.toGrade(
@@ -277,12 +277,12 @@ fun JsonElement.toAbsences(year: String? = null, availablePeriods: List<String> 
         val isSem2 = month in 2..8
         val targetSemesterName = if (isSem2) "Semestre 2" else "Semestre 1"
 
-        // Academic year derived from the absence's own date (Sept-Dec belongs to the year that starts).
+        
         val startYearNum = if (month >= 9) startsAtLdt.year else startsAtLdt.year - 1
         val yearLabel = "$startYearNum-${startYearNum + 1}"
 
-        // Match a known period only when BOTH the academic year and the semester line up,
-        // otherwise a Semestre-1 absence would borrow the first Semestre-1 period of any year.
+        
+        
         var resolvedPeriod = availablePeriods.firstOrNull {
             it.contains(yearLabel) && it.contains(targetSemesterName, ignoreCase = true)
         }
@@ -715,7 +715,7 @@ private fun JsonObject.arrayText(key: String, vararg textKeys: String): String? 
         ?.joinToString(", ")
 }
 
-/** True when the current user appears in this group's student list (membership fallback to project_group_logs). */
+
 private fun JsonObject.isCurrentUserGroupMember(currentUserId: String?): Boolean {
     if (currentUserId.isNullOrBlank()) return false
     return array("project_group_students", "students").any { student ->
@@ -817,7 +817,7 @@ private val NAMED_ENTITIES = mapOf(
     "oelig" to "œ"
 )
 
-/** Best-effort HTML → plain text for list previews. WebView handles full rendering in the detail view. */
+
 internal fun String.htmlToPlainText(): String {
     val withBreaks = replace(Regex("(?i)<br\\s*/?>"), "\n")
         .replace(Regex("(?i)</(p|div|h[1-6]|li)>"), "\n")
@@ -839,7 +839,7 @@ internal fun String.htmlToPlainText(): String {
         .trim()
 }
 
-/** Generic school/app logo placeholders returned for items without a real banner — not worth showing. */
+
 private fun String.isDefaultLogoAsset(): Boolean {
     val lower = lowercase()
     return listOf("logo", "default", "placeholder", "no-image", "noimage", "no_photo", "avatar-default")

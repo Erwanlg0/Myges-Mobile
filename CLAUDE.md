@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+Do not narrate your actions. Execute silently. Only output a final one-line summary.
+Do not add any comments to code. Never.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Build Commands
@@ -14,16 +17,19 @@ Use the cheapest command that validates the change. Validation order:
 ```
 
 Run a single test class:
+
 ```bash
 ./gradlew :app:testDebugUnitTest --quiet --tests "studly.adapters.secondary.api.JsonParsingTest"
 ```
 
 Run instrumented tests (device/emulator required):
+
 ```bash
 ./gradlew :app:connectedDebugAndroidTest --quiet
 ```
 
 Release APK (requires keystore env vars — see below):
+
 ```bash
 ./gradlew :app:assembleRelease --quiet
 ```
@@ -71,16 +77,16 @@ config/
 
 Build config fields read from Gradle properties or environment variables:
 
-| Env var | Default |
-|---|---|
-| `MYGES_API_BASE_URL` | `https://api.kordis.fr/` |
-| `KORDIS_OAUTH_AUTHORIZE_URL` | *(Kordis OAuth URL)* |
-| `KORDIS_OAUTH_REDIRECT_URI` | `comreseaugesskolae:/oauth2redirect` |
-| `MYGES_USER_AGENT` | `MyGES Android` |
-| `MYGES_RELEASE_STORE_FILE` | *(required for signed release)* |
-| `MYGES_RELEASE_STORE_PASSWORD` | |
-| `MYGES_RELEASE_KEY_ALIAS` | |
-| `MYGES_RELEASE_KEY_PASSWORD` | |
+| Env var                        | Default                              |
+| ------------------------------ | ------------------------------------ |
+| `MYGES_API_BASE_URL`           | `https://api.kordis.fr/`             |
+| `KORDIS_OAUTH_AUTHORIZE_URL`   | _(Kordis OAuth URL)_                 |
+| `KORDIS_OAUTH_REDIRECT_URI`    | `comreseaugesskolae:/oauth2redirect` |
+| `MYGES_USER_AGENT`             | `MyGES Android`                      |
+| `MYGES_RELEASE_STORE_FILE`     | _(required for signed release)_      |
+| `MYGES_RELEASE_STORE_PASSWORD` |                                      |
+| `MYGES_RELEASE_KEY_ALIAS`      |                                      |
+| `MYGES_RELEASE_KEY_PASSWORD`   |                                      |
 
 ## Testing Stack
 

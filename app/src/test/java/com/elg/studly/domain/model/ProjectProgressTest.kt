@@ -68,7 +68,7 @@ class ProjectProgressTest {
 
     @Test
     fun projectProgressIgnoresProjectDeadlineAndUsesSteps() {
-        // The project deadline is unreliable (update timestamp); only step deadlines/status count.
+        
         val past = java.time.Instant.now().minusSeconds(3600)
         val future = java.time.Instant.now().plusSeconds(3600)
         val progress = Project(

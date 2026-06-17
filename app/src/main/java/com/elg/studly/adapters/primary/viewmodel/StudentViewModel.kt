@@ -153,10 +153,10 @@ class StudentViewModel @Inject constructor(
         observeNetworkRecovery(networkMonitor.isOnline)
     }
 
-    /** Manual refresh (button / pull-to-refresh / retry) bypasses the per-feature intervals. */
+    
     fun refresh() = launchRefresh(force = true)
 
-    /** Automatic refresh (startup, network recovery) honours the per-feature intervals. */
+    
     private fun autoRefresh() = launchRefresh(force = false)
 
     private fun launchRefresh(force: Boolean) {
@@ -196,8 +196,8 @@ class StudentViewModel @Inject constructor(
                 .onSuccess { uri -> documentOpenRequests.emit(DocumentOpenRequest(uri, document.resolvedMimeType())) }
                 .onFailure { throwable ->
                     val appError = throwable.toAppError()
-                    // Download failures stay local to the documents screen; only an expired
-                    // session should escalate to the global handler (which triggers logout).
+                    
+                    
                     if (appError == AppError.Unauthorized) handleFailure(throwable)
                     else _documentError.value = appError
                 }
@@ -228,7 +228,7 @@ class StudentViewModel @Inject constructor(
     }
 
     fun reportOpenDocumentFailure() {
-        error.value = AppError.Storage
+        _documentError.value = AppError.Storage
     }
 
     private suspend fun handleFailure(throwable: Throwable) {

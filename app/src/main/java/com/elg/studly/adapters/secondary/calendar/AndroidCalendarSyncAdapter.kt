@@ -129,12 +129,7 @@ class AndroidCalendarSyncAdapter @Inject constructor(
         return null
     }
 
-    /**
-     * Reads the per-account event color palette (color_index -> ARGB) so we can set
-     * EVENT_COLOR_KEY. Google's calendar provider ignores raw EVENT_COLOR and only honors
-     * a color key that exists in the Colors table for the calendar's account, which is why
-     * events otherwise stay the default (blue).
-     */
+    
     private fun eventColorsForCalendar(calendarId: Long): Map<String, Int> {
         val account = accountForCalendar(calendarId) ?: return emptyMap()
         val (accountName, accountType) = account
@@ -267,17 +262,17 @@ class AndroidCalendarSyncAdapter @Inject constructor(
 
 private fun colorIdToArgb(colorId: String?): Int {
     return when (colorId) {
-        "1" -> 0xFF7986CB.toInt() // Lavender
-        "2" -> 0xFF33B679.toInt() // Sage
-        "3" -> 0xFF8E24AA.toInt() // Grape
-        "4" -> 0xFFE67C73.toInt() // Flamingo
-        "5" -> 0xFFF6BF26.toInt() // Banana
-        "6" -> 0xFFF4511E.toInt() // Tangerine
-        "7" -> 0xFF039BE5.toInt() // Peacock
-        "8" -> 0xFF616161.toInt() // Graphite
-        "9" -> 0xFF3F51B5.toInt() // Basil
-        "10" -> 0xFF0B8043.toInt() // Green
-        else -> 0xFFFFF56F.toInt() // Default Yellow
+        "1" -> 0xFF7986CB.toInt() 
+        "2" -> 0xFF33B679.toInt() 
+        "3" -> 0xFF8E24AA.toInt() 
+        "4" -> 0xFFE67C73.toInt() 
+        "5" -> 0xFFF6BF26.toInt() 
+        "6" -> 0xFFF4511E.toInt() 
+        "7" -> 0xFF039BE5.toInt() 
+        "8" -> 0xFF616161.toInt() 
+        "9" -> 0xFF3F51B5.toInt() 
+        "10" -> 0xFF0B8043.toInt() 
+        else -> 0xFFFFF56F.toInt() 
     }
 }
 

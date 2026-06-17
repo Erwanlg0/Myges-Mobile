@@ -189,7 +189,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 val needDocuments = SyncFeature.Documents in due
                 val needDirectory = SyncFeature.Directory in due
                 val needNews = SyncFeature.News in due
-                // Projects and documents share the (expensive) course/project payload fetch.
+                
                 val academicDue = needProjects || needDocuments
                 val needYears = needGrades || needAbsences || needDirectory || academicDue
 
@@ -207,7 +207,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
                 val today = LocalDate.now(ZoneOffset.UTC)
                 val currentAcademicYearStart = (if (today.monthValue >= 9) today.year else today.year - 1).toString()
-                // First launch (or forced refresh) fetches every year; routine syncs only recent years.
+                
                 val isFirstSync = settingsRepository.settings.first().lastSyncAt == null
                 val finalSyncYears = if (force || isFirstSync) years else years.filter { it >= currentAcademicYearStart }.ifEmpty { years }
 
@@ -344,7 +344,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             runCatching { api.speedMeetingAppointments()?.toNews().orEmpty() }.getOrDefault(emptyList())
     }
 
-    /** Periods used to attribute absences — derived from freshly fetched data or the local cache. */
+    
     private suspend fun absencePeriods(grades: List<Grade>?, courses: List<Course>?): List<String> {
         val resolvedGrades = grades ?: dao.grades().map { it.toDomain() }
         val resolvedCourses = courses ?: dao.courses().map { it.toDomain() }
@@ -383,9 +383,9 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     val response = api.download(remoteUrl)
                     if (!response.isSuccessful) throw HttpException(response)
                     val body = response.body() ?: throw AppException(AppError.EmptyResponse)
-                    // ges-dl signed links redirect to the CAS login page when the link has
-                    // expired / the session is not valid; the body is then an HTML login page,
-                    // not the document. Detect this so we don't hand the viewer a broken file.
+                    
+                    
+                    
                     val finalUrl = response.raw().request.url
                     val isLoginRedirect = finalUrl.host.contains("cas", ignoreCase = true) ||
                         finalUrl.encodedPath.contains("login", ignoreCase = true) ||
@@ -447,9 +447,9 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
     private fun AcademicDocument.normalizedDownloadUrl(): String {
         val url = downloadUrl ?: return "me/annualDocuments/$id"
-        // ges-dl signed links are CAS-protected and reject the OAuth bearer (they
-        // redirect to the CAS login page). When the link carries a courseId, the
-        // bearer-authenticated API serves the same file at me/{courseId}/files/{ocId}.
+        
+        
+        
         val parsed = url.toHttpUrlOrNull()
         if (parsed != null && parsed.host.contains("ges-dl", ignoreCase = true)) {
             val courseId = parsed.queryParameter("courseId")
@@ -614,10 +614,10 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                         ?.toDocuments()
                         .orEmpty()
                         .map { document ->
-                            // The "links.href" returned by the API points at ges-dl.kordis.fr,
-                            // which is CAS-protected and rejects the OAuth bearer (redirects to
-                            // the login page). The bearer-authenticated API serves the file
-                            // directly at me/{courseId}/files/{ocId}, so always use that path.
+                            
+                            
+                            
+                            
                             document.copy(downloadUrl = "me/${course.id}/files/${document.id}")
                         }
                 }.getOrDefault(emptyList())
@@ -676,7 +676,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         }
     }
 
-    /** Merge duplicate groups from different payloads, OR-ing membership so an isMine flag is never lost. */
+    
     private fun mergeGroups(a: List<ProjectGroup>, b: List<ProjectGroup>): List<ProjectGroup> {
         return (a + b).groupBy { it.id }.values.map { duplicates ->
             duplicates.reduce { current, next ->

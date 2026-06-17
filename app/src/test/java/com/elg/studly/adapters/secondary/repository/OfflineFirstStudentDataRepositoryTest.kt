@@ -195,7 +195,7 @@ private class RepositoryApi : MyGesApiService {
     override suspend fun courseFiles(rcId: String): JsonElement {
         courseFileRequests += rcId
         return jsonElement(
-            """{"result":[{"oc_id":"course-doc-1","title":"Course file","fileName":"course.pdf","extension":"pdf","links":[{"rel":"url","href":"https://ges-dl.kordis.fr/private/abc"}]}]}"""
+            """{"result":[{"oc_id":"course-doc-1","title":"Course file","fileName":"course.pdf","extension":"pdf","links":[{"rel":"url","href":"https://example.com/doc.pdf"}]}]}"""
         )
     }
 

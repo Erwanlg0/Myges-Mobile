@@ -38,12 +38,7 @@ import com.elg.studly.R
 
 private const val DEPOSIT_BASE_URL = "https://myges.fr/common/project-group-gestion/"
 
-/**
- * The project/practical file deposit lives on the legacy PrimeFaces/JSF extranet
- * (myges.fr), not the mobile REST API: it needs a JSESSIONID web session, a per-page
- * javax.faces.ViewState and the PrimeFaces chunkupload protocol. Reproducing that
- * natively is brittle, so the user uploads through the official web UI inside a WebView.
- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -101,7 +96,7 @@ fun DepositWebViewScreen(
                                 view: WebView,
                                 request: WebResourceRequest
                             ): Boolean {
-                                // Keep CAS login + JSF flow inside the WebView.
+                                
                                 return false
                             }
                         }

@@ -138,9 +138,9 @@ data class NewsItem(
     val title: String,
     val body: String?,
     val publishedAt: Instant?,
-    /** Full rich-text article (HTML, may embed images). Rendered in the news detail view. */
+    
     val html: String? = null,
-    /** Banner/illustration image URL (from `_links.photo.href`). */
+    
     val imageUrl: String? = null
 )
 
@@ -191,9 +191,9 @@ data class UserSettings(
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColorEnabled: Boolean = false,
     val refreshIntervals: RefreshIntervals = RefreshIntervals(),
-    /** Lead time (minutes) before a class/practical session starts. 0 = no reminder. */
+    
     val classReminderLeadMinutes: Int = NO_REMINDER_MINUTES,
-    /** Lead time (minutes) before a project/practical submission is due. 0 = no reminder. */
+    
     val deadlineReminderLeadMinutes: Int = NO_REMINDER_MINUTES,
     val lastSyncAt: Instant?
 ) {
@@ -203,25 +203,22 @@ data class UserSettings(
     }
 }
 
-/** Allowed lead times for the "remind me before an event" notification. 0 = disabled. */
+
 const val NO_REMINDER_MINUTES = 0
 val REMINDER_LEAD_CHOICES = listOf(0, 15, 30, 60, 120, 24 * 60)
 
 fun clampReminderLeadMinutes(minutes: Int): Int =
     if (minutes in REMINDER_LEAD_CHOICES) minutes else NO_REMINDER_MINUTES
 
-/** What a reminder is about — drives the notification wording. */
+
 enum class ReminderKind {
-    /** A scheduled session that is about to start (agenda course, practical session). */
+    
     Class,
-    /** A submission that is due (project deadline, practical step). */
+    
     Deadline
 }
 
-/**
- * A single thing the user wants to be reminded about [reminderLeadMinutes] before [dueAt].
- * [route] is the in-app navigation target (e.g. "agenda", "projects", "practicals").
- */
+
 data class ReminderTarget(
     val id: String,
     val title: String,
@@ -230,14 +227,14 @@ data class ReminderTarget(
     val route: String
 )
 
-/** Bounds for per-feature background refresh intervals, in minutes. */
+
 const val MIN_REFRESH_MINUTES = 15
 const val MAX_REFRESH_MINUTES = 24 * 60
 const val DEFAULT_REFRESH_MINUTES = 6 * 60
 
 fun clampRefreshMinutes(minutes: Int): Int = minutes.coerceIn(MIN_REFRESH_MINUTES, MAX_REFRESH_MINUTES)
 
-/** A data category that can be refreshed from the network on its own schedule. */
+
 enum class SyncFeature {
     Agenda,
     Grades,
@@ -248,10 +245,7 @@ enum class SyncFeature {
     News
 }
 
-/**
- * Minimum delay (minutes) between two automatic fetches of each feature. Manual refresh always
- * bypasses these. Values are clamped to [MIN_REFRESH_MINUTES]..[MAX_REFRESH_MINUTES].
- */
+
 data class RefreshIntervals(
     val agenda: Int = DEFAULT_REFRESH_MINUTES,
     val grades: Int = DEFAULT_REFRESH_MINUTES,
@@ -284,7 +278,7 @@ data class RefreshIntervals(
         }
     }
 
-    /** Smallest configured interval — used as the background worker cadence. */
+    
     fun smallestIntervalMinutes(): Int =
         clampRefreshMinutes(SyncFeature.entries.minOf { minutesFor(it) })
 }

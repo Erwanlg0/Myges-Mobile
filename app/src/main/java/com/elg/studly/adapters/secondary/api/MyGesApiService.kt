@@ -120,7 +120,7 @@ interface MyGesApiService {
     @GET("me/courses/{rcId}/practicals")
     suspend fun coursePracticals(@Path("rcId") rcId: String): JsonElement?
 
-    // Project/practical groups share the same route: POST = join, DELETE = leave.
+    
     @POST("me/courses/{rcId}/projects/{projectId}/groups/{groupId}")
     suspend fun joinGroup(
         @Path("rcId") rcId: String,

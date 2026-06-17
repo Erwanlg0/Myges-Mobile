@@ -16,11 +16,7 @@ import java.io.OutputStream
 
 object PdfGenerator {
 
-    /**
-     * Generates a PDF from [text], saves it into the public Downloads folder, and
-     * returns a content [Uri] that can be opened in an external viewer (ACTION_VIEW),
-     * or null on failure. Uses MediaStore on API 29+, legacy public dir below.
-     */
+    
     fun savePdfToDownloads(context: Context, text: String, title: String, fileName: String): Uri? {
         val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "document" }.let {
             if (it.endsWith(".pdf", ignoreCase = true)) it else "$it.pdf"
@@ -55,8 +51,8 @@ object PdfGenerator {
 
     fun generatePdfFromText(text: String, title: String, outputStream: OutputStream) {
         val pdfDocument = PdfDocument()
-        val pageWidth = 595 // A4 width in points
-        val pageHeight = 842 // A4 height in points
+        val pageWidth = 595 
+        val pageHeight = 842 
         val margin = 50f
         val contentWidth = pageWidth - 2 * margin
 
@@ -75,7 +71,7 @@ object PdfGenerator {
         }
 
         val lines = mutableListOf<String>()
-        // Simple manual line wrapping
+        
         text.split("\n").forEach { paragraph ->
             if (paragraph.isBlank()) {
                 lines.add("")
@@ -103,7 +99,7 @@ object PdfGenerator {
         var page = pdfDocument.startPage(pageInfo)
         var canvas = page.canvas
 
-        // Draw title
+        
         var yPosition = margin
         canvas.drawText(title, margin, yPosition + 18f, paintTitle)
         yPosition += 40f
@@ -111,7 +107,7 @@ object PdfGenerator {
         val lineHeight = 16f
         for (line in lines) {
             if (yPosition + lineHeight > pageHeight - margin) {
-                // Finish current page and start a new one
+                
                 pdfDocument.finishPage(page)
                 pageNumber++
                 pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()

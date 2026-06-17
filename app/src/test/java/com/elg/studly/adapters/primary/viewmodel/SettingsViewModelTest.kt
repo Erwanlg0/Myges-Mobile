@@ -91,6 +91,71 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun setCalendarSyncUpdatesSettingsRepository() = runTest(dispatcher) {
+        val settingsRepository = RecordingSettingsRepository()
+        val viewModel = settingsViewModel(settingsRepository = settingsRepository)
+
+        viewModel.setCalendarSync(true)
+        advanceUntilIdle()
+
+        assertEquals(true, settingsRepository.calendarSyncEnabled)
+    }
+
+    @Test
+    fun setBiometricUpdatesSettingsRepository() = runTest(dispatcher) {
+        val settingsRepository = RecordingSettingsRepository()
+        val viewModel = settingsViewModel(settingsRepository = settingsRepository)
+
+        viewModel.setBiometricEnabled(true)
+        advanceUntilIdle()
+
+        assertEquals(true, settingsRepository.biometricEnabled)
+    }
+
+    @Test
+    fun setNotificationsUpdatesSettingsRepository() = runTest(dispatcher) {
+        val settingsRepository = RecordingSettingsRepository()
+        val viewModel = settingsViewModel(settingsRepository = settingsRepository)
+
+        viewModel.setGradeNotifications(false)
+        viewModel.setAbsenceNotifications(false)
+        viewModel.setAgendaNotifications(false)
+        viewModel.setProjectNotifications(false)
+        advanceUntilIdle()
+
+        assertEquals(false, settingsRepository.gradeNotifications)
+        assertEquals(false, settingsRepository.absenceNotifications)
+        assertEquals(false, settingsRepository.agendaNotifications)
+        assertEquals(false, settingsRepository.projectNotifications)
+    }
+
+    @Test
+    fun setThemeAndColorUpdatesSettingsRepository() = runTest(dispatcher) {
+        val settingsRepository = RecordingSettingsRepository()
+        val viewModel = settingsViewModel(settingsRepository = settingsRepository)
+
+        viewModel.setThemeMode(com.elg.studly.domain.model.ThemeMode.Dark)
+        viewModel.setDynamicColor(true)
+        advanceUntilIdle()
+
+        assertEquals(com.elg.studly.domain.model.ThemeMode.Dark, settingsRepository.themeMode)
+        assertEquals(true, settingsRepository.dynamicColorEnabled)
+    }
+
+    @Test
+    fun setRefreshIntervalsUpdatesSettingsRepository() = runTest(dispatcher) {
+        val settingsRepository = RecordingSettingsRepository()
+        val viewModel = settingsViewModel(settingsRepository = settingsRepository)
+
+        viewModel.setRefreshInterval(SyncFeature.Grades, 30)
+        advanceUntilIdle()
+
+        assertEquals(30, settingsRepository.refreshIntervals[SyncFeature.Grades])
+    }
+
+
+
+    @Test
     fun clearCacheClearsRepositoryAndSyncMetadata() = runTest(dispatcher) {
         val events = mutableListOf<String>()
         val viewModel = settingsViewModel(
@@ -181,6 +246,7 @@ private class RecordingSettingsRepository(
 
     override suspend fun setBiometricEnabled(enabled: Boolean) {
         failure?.let { throw it }
+        this.biometricEnabled = enabled
     }
 
     override suspend fun setLanguageTag(languageTag: String?) {
@@ -190,22 +256,27 @@ private class RecordingSettingsRepository(
 
     override suspend fun setCalendarSyncEnabled(enabled: Boolean) {
         failure?.let { throw it }
+        this.calendarSyncEnabled = enabled
     }
 
     override suspend fun setGradeNotificationsEnabled(enabled: Boolean) {
         failure?.let { throw it }
+        this.gradeNotifications = enabled
     }
 
     override suspend fun setAbsenceNotificationsEnabled(enabled: Boolean) {
         failure?.let { throw it }
+        this.absenceNotifications = enabled
     }
 
     override suspend fun setAgendaNotificationsEnabled(enabled: Boolean) {
         failure?.let { throw it }
+        this.agendaNotifications = enabled
     }
 
     override suspend fun setProjectNotificationsEnabled(enabled: Boolean) {
         failure?.let { throw it }
+        this.projectNotifications = enabled
     }
 
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) {
@@ -213,9 +284,27 @@ private class RecordingSettingsRepository(
         documentNotifications = enabled
     }
 
-    override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
-    override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
-    override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
+
+
+    var themeMode: com.elg.studly.domain.model.ThemeMode? = null
+    var dynamicColorEnabled: Boolean? = null
+    var calendarSyncEnabled: Boolean? = null
+    var biometricEnabled: Boolean? = null
+    var gradeNotifications: Boolean? = null
+    var absenceNotifications: Boolean? = null
+    var agendaNotifications: Boolean? = null
+    var projectNotifications: Boolean? = null
+    val refreshIntervals = mutableMapOf<SyncFeature, Int>()
+
+    override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) {
+        this.themeMode = themeMode
+    }
+    override suspend fun setDynamicColorEnabled(enabled: Boolean) {
+        this.dynamicColorEnabled = enabled
+    }
+    override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) {
+        refreshIntervals[feature] = minutes
+    }
     override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
     override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit
     override suspend fun lastFetchedAt(feature: SyncFeature): Instant? = null
@@ -268,7 +357,9 @@ private class RecordingNotificationScheduler(
     private val events: MutableList<String>
 ) : NotificationScheduler {
     override fun ensureChannels() = Unit
-    override suspend fun scheduleStudentSync(intervalMinutes: Long) = Unit
+    override suspend fun scheduleStudentSync(intervalMinutes: Long) {
+        events += "scheduleStudentSync"
+    }
     override suspend fun runStudentSyncNow() = Unit
     override suspend fun cancelStudentSync() {
         events += "cancelSync"

@@ -191,7 +191,7 @@ class JsonParsingTest {
 
         assertEquals(3, grades.size)
         
-        // Main Card
+        
         val main = grades[0]
         assertEquals("456", main.id)
         assertEquals("Algorithmique", main.courseName)
@@ -199,13 +199,13 @@ class JsonParsingTest {
         assertEquals(14.25, main.value ?: 0.0, 0.0)
         assertEquals(2.0, main.coefficient ?: 0.0, 0.0)
 
-        // CC 1 Component
+        
         val cc1 = grades[1]
         assertEquals("456-cc-0", cc1.id)
         assertEquals("CC1", cc1.subject)
         assertEquals(16.5, cc1.value ?: 0.0, 0.0)
 
-        // CC 2 Component
+        
         val cc2 = grades[2]
         assertEquals("456-cc-1", cc2.id)
         assertEquals("CC2", cc2.subject)
@@ -251,7 +251,7 @@ class JsonParsingTest {
             """.trimIndent()
         ).toGrades()
 
-        // Main + CC1 + CC2 + Examen
+        
         assertEquals(4, grades.size)
         assertEquals("", grades[0].subject)
         assertEquals("CC1", grades[1].subject)
@@ -314,7 +314,7 @@ class JsonParsingTest {
 
     @Test
     fun absencesResolvePeriodByOwnYearNotFirstMatchingSemester() {
-        // Two Semestre-1 absences in different academic years; both years present in the period list.
+        
         val payload = json.parseToJsonElement(
             """
             {
@@ -420,7 +420,7 @@ class JsonParsingTest {
                   "type": "cours",
                   "update_date": 1776702686256,
                   "links": [
-                    { "rel": "url", "href": "https://ges-dl.kordis.fr/private/file" }
+                    { "rel": "url", "href": "https://api.kordis.fr/foo.pdf" }
                   ]
                 }
               ]
@@ -433,7 +433,7 @@ class JsonParsingTest {
         assertEquals("fiche listes chainées.pdf", documents.first().fileName)
         assertEquals("fiche listes chainées", documents.first().title)
         assertEquals("application/pdf", documents.first().mimeType)
-        assertEquals("https://ges-dl.kordis.fr/private/file", documents.first().downloadUrl)
+        assertEquals("https://api.kordis.fr/foo.pdf", documents.first().downloadUrl)
     }
 
     @Test
@@ -596,7 +596,7 @@ class JsonParsingTest {
                           "psf_file_type": "application/zip",
                           "psf_end_upload": 1774653214127,
                           "links": [
-                            { "rel": "url", "href": "https://ges-dl.kordis.fr/private/step-file" }
+                            { "rel": "url", "href": "https://api.kordis.fr/bar.zip" }
                           ]
                         }
                       ]
@@ -613,7 +613,7 @@ class JsonParsingTest {
         assertEquals("rendu.zip", documents.first().title)
         assertEquals("rendu.zip", documents.first().fileName)
         assertEquals("application/zip", documents.first().mimeType)
-        assertEquals("https://ges-dl.kordis.fr/private/step-file", documents.first().downloadUrl)
+        assertEquals("https://api.kordis.fr/bar.zip", documents.first().downloadUrl)
         assertEquals(Instant.ofEpochMilli(1774653214127), documents.first().updatedAt)
     }
 

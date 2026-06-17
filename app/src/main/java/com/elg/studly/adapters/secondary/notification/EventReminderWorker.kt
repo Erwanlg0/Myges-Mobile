@@ -8,11 +8,7 @@ import com.elg.studly.domain.model.ReminderKind
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
-/**
- * Fires a single "your event starts soon" notification. Enqueued by
- * [AndroidNotificationScheduler.scheduleEventReminders] with an initial delay so that it runs
- * [the configured lead time] before the event begins.
- */
+
 @HiltWorker
 class EventReminderWorker @AssistedInject constructor(
     @Assisted context: Context,

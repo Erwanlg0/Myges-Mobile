@@ -142,11 +142,7 @@ object DependencyModule {
     private const val DATABASE_NAME = "Studly.db"
 }
 
-/**
- * Minimal in-memory cookie jar so cookies set during a redirect chain (e.g. the CAS
- * SSO flow used by ges-dl.kordis.fr file downloads) are carried across hops within
- * the process lifetime. Not persisted to disk.
- */
+
 private class InMemoryCookieJar : CookieJar {
     private val store = ConcurrentHashMap<String, MutableList<Cookie>>()
 

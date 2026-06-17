@@ -134,7 +134,7 @@ class RefreshStudentDataUseCase @Inject constructor(
     private val calendarSyncPort: CalendarSyncPort,
     private val notificationScheduler: NotificationScheduler
 ) {
-    /** [force] = true bypasses the per-feature refresh intervals (manual refresh). */
+    
     suspend operator fun invoke(force: Boolean = false) {
         repository.syncAll(force)
         val settings = settingsRepository.settings.first()
@@ -156,7 +156,7 @@ class RefreshStudentDataUseCase @Inject constructor(
     }
 }
 
-/** Maps cached agenda / project / practical data into reminder targets. */
+
 internal fun buildReminderTargets(
     agenda: List<AgendaEvent>,
     projects: List<Project>,
@@ -242,13 +242,13 @@ class UpdateSettingsUseCase @Inject constructor(
     suspend fun dynamicColor(enabled: Boolean) = repository.setDynamicColorEnabled(enabled)
     suspend fun refreshInterval(feature: SyncFeature, minutes: Int) = repository.setRefreshInterval(feature, minutes)
 
-    /** Persists the class reminder lead time and (re)schedules reminders for cached data. */
+    
     suspend fun classReminderLead(minutes: Int) {
         repository.setClassReminderLeadMinutes(minutes)
         rescheduleReminders()
     }
 
-    /** Persists the deadline reminder lead time and (re)schedules reminders for cached data. */
+    
     suspend fun deadlineReminderLead(minutes: Int) {
         repository.setDeadlineReminderLeadMinutes(minutes)
         rescheduleReminders()
@@ -270,7 +270,7 @@ class UpdateSettingsUseCase @Inject constructor(
     }
 }
 
-/** Re-aligns the background sync worker cadence with the smallest configured refresh interval. */
+
 class RescheduleSyncUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val notificationScheduler: NotificationScheduler
