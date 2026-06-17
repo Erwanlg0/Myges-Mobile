@@ -20,6 +20,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.elg.studly.MainActivity
 import com.elg.studly.R
 import com.elg.studly.application.ports.NotificationScheduler
@@ -28,11 +29,15 @@ import com.elg.studly.domain.model.AcademicDocument
 import com.elg.studly.domain.model.AgendaEvent
 import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ReminderKind
+import com.elg.studly.domain.model.ReminderTarget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.text.NumberFormat
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.time.format.FormatStyle
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -164,6 +169,66 @@ class AndroidNotificationScheduler @Inject constructor(
         )
     }
 
+    override suspend fun scheduleReminders(
+        targets: List<ReminderTarget>,
+        classLeadMinutes: Int,
+        deadlineLeadMinutes: Int
+    ) {
+        val workManager = WorkManager.getInstance(context)
+        workManager.cancelAllWorkByTag(EventReminderWorker.TAG)
+
+        fun leadFor(kind: ReminderKind) = when (kind) {
+            ReminderKind.Class -> classLeadMinutes
+            ReminderKind.Deadline -> deadlineLeadMinutes
+        }
+        if (classLeadMinutes <= 0 && deadlineLeadMinutes <= 0) return
+
+        val now = Instant.now()
+        val horizon = now.plus(REMINDER_HORIZON_DAYS, ChronoUnit.DAYS)
+        targets.asSequence()
+            .filter { leadFor(it.kind) > 0 && it.dueAt.isAfter(now) && it.dueAt.isBefore(horizon) }
+            .sortedBy { it.dueAt }
+            .take(MAX_REMINDERS)
+            .forEach { target ->
+                val fireAt = target.dueAt.minus(leadFor(target.kind).toLong(), ChronoUnit.MINUTES)
+                val delayMillis = Duration.between(now, fireAt).toMillis().coerceAtLeast(0)
+                val request = OneTimeWorkRequestBuilder<EventReminderWorker>()
+                    .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+                    .addTag(EventReminderWorker.TAG)
+                    .setInputData(
+                        workDataOf(
+                            EventReminderWorker.KEY_ID to target.id,
+                            EventReminderWorker.KEY_TITLE to target.title,
+                            EventReminderWorker.KEY_DUE_AT to target.dueAt.toEpochMilli(),
+                            EventReminderWorker.KEY_KIND to target.kind.name,
+                            EventReminderWorker.KEY_ROUTE to target.route
+                        )
+                    )
+                    .build()
+                workManager.enqueueUniqueWork(
+                    "$WORK_EVENT_REMINDER:${target.id}",
+                    ExistingWorkPolicy.REPLACE,
+                    request
+                )
+            }
+    }
+
+    fun showReminder(id: String, title: String, dueAtEpochMillis: Long, kind: ReminderKind, route: String) {
+        val safeTitle = title.ifBlank { context.getString(R.string.common_untitled) }
+        val time = formatInstant(Instant.ofEpochMilli(dueAtEpochMillis))
+        val (titleRes, bodyRes) = when (kind) {
+            ReminderKind.Class -> R.string.notifications_event_reminder_title to R.string.notifications_event_reminder_body
+            ReminderKind.Deadline -> R.string.notifications_deadline_reminder_title to R.string.notifications_deadline_reminder_body
+        }
+        showNotification(
+            id = stableNotificationId("reminder:$id"),
+            title = context.getString(titleRes),
+            body = context.getString(bodyRes, safeTitle, time),
+            route = route,
+            subject = safeTitle
+        )
+    }
+
     override suspend fun showNewDocument(document: AcademicDocument) {
         showNotification(
             id = stableNotificationId("document:${document.id}"),
@@ -250,6 +315,9 @@ class AndroidNotificationScheduler @Inject constructor(
         const val NOTIFICATION_SYNC_FAILURE = 1001
         const val WORK_STUDENT_SYNC = "student_sync"
         const val WORK_STUDENT_SYNC_NOW = "student_sync_now"
+        const val WORK_EVENT_REMINDER = "event_reminder"
+        const val REMINDER_HORIZON_DAYS = 14L
+        const val MAX_REMINDERS = 100
         const val ROUTE_DASHBOARD = "dashboard"
         const val ROUTE_AGENDA = "agenda"
         const val ROUTE_GRADES = "grades"

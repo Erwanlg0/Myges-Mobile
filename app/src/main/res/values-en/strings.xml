@@ -245,6 +245,16 @@
     <string name="settings_notify_documents">Documents</string>
     <string name="settings_notify_grades">Grades</string>
     <string name="settings_notify_projects">Projects</string>
+    <string name="settings_notify_caption">Sent after each background sync, when new content appears.</string>
+    <string name="settings_reminder_class_title">Reminder before a class</string>
+    <string name="settings_reminder_class_desc">Lead time before each class and practical session starts.</string>
+    <string name="settings_reminder_deadline_title">Reminder before a deadline</string>
+    <string name="settings_reminder_deadline_desc">Lead time before each project and practical submission is due.</string>
+    <string name="settings_reminder_lead_off">Off</string>
+    <string name="notifications_event_reminder_title">Upcoming class</string>
+    <string name="notifications_event_reminder_body">%1$s starts at %2$s</string>
+    <string name="notifications_deadline_reminder_title">Upcoming deadline</string>
+    <string name="notifications_deadline_reminder_body">%1$s — due %2$s</string>
     <string name="settings_session">Session and cache</string>
 
     <string name="calendar_event_marker_prefix" translatable="false">Studly:</string>

@@ -132,6 +132,7 @@ import com.elg.studly.domain.model.ProjectGroup
 import com.elg.studly.domain.model.ProjectStep
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
+import com.elg.studly.domain.model.REMINDER_LEAD_CHOICES
 import com.elg.studly.domain.model.SyncFeature
 import androidx.compose.material3.Slider
 import kotlin.math.roundToInt
@@ -2060,11 +2061,62 @@ private fun NotificationPreferences(
     settingsViewModel: SettingsViewModel
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = stringResource(R.string.settings_notify_caption),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         SwitchRow(R.string.settings_notify_grades, settings.notifications.grades, settingsViewModel::setGradeNotifications)
         SwitchRow(R.string.settings_notify_absences, settings.notifications.absences, settingsViewModel::setAbsenceNotifications)
         SwitchRow(R.string.settings_notify_agenda, settings.notifications.agenda, settingsViewModel::setAgendaNotifications)
         SwitchRow(R.string.settings_notify_projects, settings.notifications.projects, settingsViewModel::setProjectNotifications)
         SwitchRow(R.string.settings_notify_documents, settings.notifications.documents, settingsViewModel::setDocumentNotifications)
+
+        Spacer(Modifier.height(4.dp))
+        ReminderLeadSelector(
+            title = R.string.settings_reminder_class_title,
+            description = R.string.settings_reminder_class_desc,
+            selectedMinutes = settings.classReminderLeadMinutes,
+            onSelect = settingsViewModel::setClassReminderLead
+        )
+        ReminderLeadSelector(
+            title = R.string.settings_reminder_deadline_title,
+            description = R.string.settings_reminder_deadline_desc,
+            selectedMinutes = settings.deadlineReminderLeadMinutes,
+            onSelect = settingsViewModel::setDeadlineReminderLead
+        )
+    }
+}
+
+@Composable
+private fun ReminderLeadSelector(
+    @StringRes title: Int,
+    @StringRes description: Int,
+    selectedMinutes: Int,
+    onSelect: (Int) -> Unit
+) {
+    Text(
+        text = stringResource(title),
+        style = MaterialTheme.typography.bodyLarge
+    )
+    Text(
+        text = stringResource(description),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        REMINDER_LEAD_CHOICES.forEach { minutes ->
+            FilterChip(
+                selected = selectedMinutes == minutes,
+                onClick = { onSelect(minutes) },
+                label = { Text(reminderLeadLabel(minutes)) }
+            )
+        }
     }
 }
 
@@ -2324,6 +2376,10 @@ internal fun SwitchRow(
         Switch(checked = checked, onCheckedChange = null)
     }
 }
+
+@Composable
+private fun reminderLeadLabel(minutes: Int): String =
+    if (minutes <= 0) stringResource(R.string.settings_reminder_lead_off) else formatDuration(minutes)
 
 @Composable
 fun StudentAvatar(

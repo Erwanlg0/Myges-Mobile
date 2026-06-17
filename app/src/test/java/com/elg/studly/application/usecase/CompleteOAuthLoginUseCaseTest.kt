@@ -74,4 +74,5 @@ private class RecordingNotificationScheduler : NotificationScheduler {
     override suspend fun showAgendaChange(event: AgendaEvent) = Unit
     override suspend fun showProjectDeadline(project: Project) = Unit
     override suspend fun showNewDocument(document: AcademicDocument) = Unit
+    override suspend fun scheduleEventReminders(events: List<AgendaEvent>, leadMinutes: Int) = Unit
 }

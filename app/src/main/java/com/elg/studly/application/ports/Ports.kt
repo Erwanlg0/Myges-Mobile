@@ -12,6 +12,7 @@ import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.ThemeMode
@@ -59,6 +60,8 @@ interface SettingsRepository {
     suspend fun setDocumentNotificationsEnabled(enabled: Boolean)
     suspend fun setThemeMode(themeMode: ThemeMode)
     suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int)
+    suspend fun setClassReminderLeadMinutes(minutes: Int)
+    suspend fun setDeadlineReminderLeadMinutes(minutes: Int)
     suspend fun lastFetchedAt(feature: SyncFeature): Instant?
     suspend fun markFeatureFetched(feature: SyncFeature)
     suspend fun markSynced()
@@ -87,4 +90,11 @@ interface NotificationScheduler {
     suspend fun showAgendaChange(event: AgendaEvent)
     suspend fun showProjectDeadline(project: Project)
     suspend fun showNewDocument(document: AcademicDocument)
+
+    /**
+     * (Re)schedules each target with the lead time matching its kind: [classLeadMinutes] for
+     * sessions, [deadlineLeadMinutes] for submissions. A 0 lead skips that kind. Always cancels
+     * previously scheduled reminders first.
+     */
+    suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int)
 }

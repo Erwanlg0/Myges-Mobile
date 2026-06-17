@@ -114,6 +114,14 @@ class SettingsViewModel @Inject constructor(
         rescheduleSyncUseCase()
     }
 
+    fun setClassReminderLead(minutes: Int) = launchSettingChange {
+        updateSettingsUseCase.classReminderLead(minutes)
+    }
+
+    fun setDeadlineReminderLead(minutes: Int) = launchSettingChange {
+        updateSettingsUseCase.deadlineReminderLead(minutes)
+    }
+
     fun clearCache() = launchSettingChange {
         clearCacheUseCase()
     }

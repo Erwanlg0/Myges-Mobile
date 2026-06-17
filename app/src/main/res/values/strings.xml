@@ -245,6 +245,16 @@
     <string name="settings_notify_documents">Documents</string>
     <string name="settings_notify_grades">Notes</string>
     <string name="settings_notify_projects">Projets</string>
+    <string name="settings_notify_caption">Notifications envoyées après chaque synchro en arrière-plan, quand du nouveau contenu apparaît.</string>
+    <string name="settings_reminder_class_title">Rappel avant un cours</string>
+    <string name="settings_reminder_class_desc">Délai avant le début de chaque cours et séance de TP.</string>
+    <string name="settings_reminder_deadline_title">Rappel avant un rendu</string>
+    <string name="settings_reminder_deadline_desc">Délai avant chaque échéance de projet et de TP.</string>
+    <string name="settings_reminder_lead_off">Désactivé</string>
+    <string name="notifications_event_reminder_title">Cours à venir</string>
+    <string name="notifications_event_reminder_body">%1$s commence à %2$s</string>
+    <string name="notifications_deadline_reminder_title">Rendu à venir</string>
+    <string name="notifications_deadline_reminder_body">%1$s — à rendre pour le %2$s</string>
     <string name="settings_session">Session et cache</string>
 
     <string name="calendar_event_marker_prefix" translatable="false">Studly:</string>

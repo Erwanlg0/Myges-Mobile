@@ -13,7 +13,9 @@ import com.elg.studly.domain.model.NotificationPreferences
 import com.elg.studly.domain.model.RefreshIntervals
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.ThemeMode
+import com.elg.studly.domain.model.NO_REMINDER_MINUTES
 import com.elg.studly.domain.model.UserSettings
+import com.elg.studly.domain.model.clampReminderLeadMinutes
 import com.elg.studly.domain.model.clampRefreshMinutes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -43,6 +45,8 @@ class AppSettingsRepository @Inject constructor(
             biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
             themeMode = preferences[THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
             refreshIntervals = preferences.toRefreshIntervals(),
+            classReminderLeadMinutes = clampReminderLeadMinutes(preferences[CLASS_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
+            deadlineReminderLeadMinutes = clampReminderLeadMinutes(preferences[DEADLINE_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
             lastSyncAt = preferences[LAST_SYNC]?.let(Instant::ofEpochMilli)
         )
     }
@@ -62,6 +66,18 @@ class AppSettingsRepository @Inject constructor(
     override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) {
         context.settingsDataStore.edit { preferences ->
             preferences[INTERVAL_KEYS.getValue(feature)] = clampRefreshMinutes(minutes)
+        }
+    }
+
+    override suspend fun setClassReminderLeadMinutes(minutes: Int) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[CLASS_REMINDER_LEAD] = clampReminderLeadMinutes(minutes)
+        }
+    }
+
+    override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) {
+        context.settingsDataStore.edit { preferences ->
+            preferences[DEADLINE_REMINDER_LEAD] = clampReminderLeadMinutes(minutes)
         }
     }
 
@@ -131,6 +147,8 @@ class AppSettingsRepository @Inject constructor(
         val NOTIFY_DOCUMENTS = booleanPreferencesKey("notify_documents")
         val NOTIFY_GRADES = booleanPreferencesKey("notify_grades")
         val NOTIFY_PROJECTS = booleanPreferencesKey("notify_projects")
+        val CLASS_REMINDER_LEAD = intPreferencesKey("class_reminder_lead_minutes")
+        val DEADLINE_REMINDER_LEAD = intPreferencesKey("deadline_reminder_lead_minutes")
         val THEME_MODE = stringPreferencesKey("theme_mode")
 
         val INTERVAL_KEYS = SyncFeature.entries.associateWith {

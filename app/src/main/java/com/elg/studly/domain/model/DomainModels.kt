@@ -190,7 +190,43 @@ data class UserSettings(
     val biometricEnabled: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.System,
     val refreshIntervals: RefreshIntervals = RefreshIntervals(),
+    /** Lead time (minutes) before a class/practical session starts. 0 = no reminder. */
+    val classReminderLeadMinutes: Int = NO_REMINDER_MINUTES,
+    /** Lead time (minutes) before a project/practical submission is due. 0 = no reminder. */
+    val deadlineReminderLeadMinutes: Int = NO_REMINDER_MINUTES,
     val lastSyncAt: Instant?
+) {
+    fun leadFor(kind: ReminderKind): Int = when (kind) {
+        ReminderKind.Class -> classReminderLeadMinutes
+        ReminderKind.Deadline -> deadlineReminderLeadMinutes
+    }
+}
+
+/** Allowed lead times for the "remind me before an event" notification. 0 = disabled. */
+const val NO_REMINDER_MINUTES = 0
+val REMINDER_LEAD_CHOICES = listOf(0, 15, 30, 60, 120, 24 * 60)
+
+fun clampReminderLeadMinutes(minutes: Int): Int =
+    if (minutes in REMINDER_LEAD_CHOICES) minutes else NO_REMINDER_MINUTES
+
+/** What a reminder is about — drives the notification wording. */
+enum class ReminderKind {
+    /** A scheduled session that is about to start (agenda course, practical session). */
+    Class,
+    /** A submission that is due (project deadline, practical step). */
+    Deadline
+}
+
+/**
+ * A single thing the user wants to be reminded about [reminderLeadMinutes] before [dueAt].
+ * [route] is the in-app navigation target (e.g. "agenda", "projects", "practicals").
+ */
+data class ReminderTarget(
+    val id: String,
+    val title: String,
+    val dueAt: Instant,
+    val kind: ReminderKind,
+    val route: String
 )
 
 /** Bounds for per-feature background refresh intervals, in minutes. */

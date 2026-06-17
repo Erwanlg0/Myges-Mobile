@@ -34,7 +34,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-
+    
         buildConfigField(
             "String",
             "MYGES_API_BASE_URL",
