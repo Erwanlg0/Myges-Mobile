@@ -118,7 +118,7 @@ class StudentViewModelTest {
     }
 
     @Test
-    fun joinGroupTriggersUseCaseAndRefreshes() = runTest(dispatcher) {
+    fun joinGroupTriggersUseCaseWithoutFullRefresh() = runTest(dispatcher) {
         val viewModel = createViewModel()
         coEvery { joinGroupUseCase("courseId", "projectId", "groupId") } returns Unit
 
@@ -126,7 +126,6 @@ class StudentViewModelTest {
         advanceUntilIdle()
 
         io.mockk.coVerify { joinGroupUseCase("courseId", "projectId", "groupId") }
-        io.mockk.coVerify { refreshStudentDataUseCase(true) }
     }
 
     @Test
@@ -141,7 +140,7 @@ class StudentViewModelTest {
 
 
     @Test
-    fun leaveGroupTriggersUseCaseAndRefreshes() = runTest(dispatcher) {
+    fun leaveGroupTriggersUseCaseWithoutFullRefresh() = runTest(dispatcher) {
         val viewModel = createViewModel()
         coEvery { leaveGroupUseCase("courseId", "projectId", "groupId") } returns Unit
 
@@ -149,7 +148,6 @@ class StudentViewModelTest {
         advanceUntilIdle()
 
         io.mockk.coVerify { leaveGroupUseCase("courseId", "projectId", "groupId") }
-        io.mockk.coVerify { refreshStudentDataUseCase(true) }
     }
 
 

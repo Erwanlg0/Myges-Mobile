@@ -120,6 +120,15 @@ abstract class StudentDao {
     @Upsert
     abstract suspend fun upsertProjectGroups(groups: List<ProjectGroupEntity>)
 
+    @Query("DELETE FROM project_groups WHERE projectId = :projectId")
+    abstract suspend fun deleteGroupsForProject(projectId: String)
+
+    @Transaction
+    open suspend fun replaceGroupsForProject(projectId: String, groups: List<ProjectGroupEntity>) {
+        deleteGroupsForProject(projectId)
+        upsertProjectGroups(groups)
+    }
+
     @Upsert
     abstract suspend fun upsertPracticals(practicals: List<PracticalEntity>)
 

@@ -344,6 +344,9 @@ private class RepositoryDao : StudentDao() {
     override suspend fun upsertProjectGroups(groups: List<ProjectGroupEntity>) {
         projectGroupState.value = groups
     }
+    override suspend fun deleteGroupsForProject(projectId: String) {
+        projectGroupState.value = projectGroupState.value.filterNot { it.projectId == projectId }
+    }
     override suspend fun upsertProjectSteps(steps: List<ProjectStepEntity>) {
         projectStepState.value = steps
     }

@@ -77,7 +77,8 @@ data class ProjectEntity(
     val fileCount: Int,
     val year: String?,
     val courseId: String?,
-    val startsAtEpochMillis: Long? = null
+    val startsAtEpochMillis: Long? = null,
+    val groupMode: String? = null
 )
 
 @Entity(tableName = "project_groups", primaryKeys = ["projectId", "id"])

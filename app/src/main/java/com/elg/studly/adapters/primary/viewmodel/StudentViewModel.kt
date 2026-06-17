@@ -219,11 +219,9 @@ class StudentViewModel @Inject constructor(
             if (refreshing.value) return@launch
             refreshing.value = true
             error.value = null
-            val result = runCatching { action() }
-            refreshing.value = false
-            result
-                .onSuccess { refresh() }
+            runCatching { action() }
                 .onFailure { handleFailure(it) }
+            refreshing.value = false
         }
     }
 

@@ -87,7 +87,8 @@ data class Project(
     val year: String? = null,
     val courseId: String? = null,
     val groups: List<ProjectGroup> = emptyList(),
-    val startsAt: Instant? = null
+    val startsAt: Instant? = null,
+    val groupMode: String? = null
 )
 
 data class Practical(

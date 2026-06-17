@@ -1377,7 +1377,8 @@ fun ProjectsScreen(
             .filter { selectedYear == null || it.year == selectedYear }
             .sortedWith(compareByDescending<Project> { it.year }.thenByDescending { it.startsAt ?: it.deadline }.thenBy { it.name })
     }
-    selectedProject?.let { project ->
+    selectedProject?.let { selected ->
+        val project = state.data.firstOrNull { it.id == selected.id } ?: selected
         ProjectDetailsDialog(
             project = project,
             documents = documentsState.data.filter { it.ownerId == project.id },
@@ -1433,7 +1434,8 @@ fun PracticalsScreen(viewModel: StudentViewModel) {
             .filter { selectedYear == null || it.year == selectedYear }
             .sortedWith(compareByDescending<Practical> { it.year }.thenByDescending { it.startsAt }.thenBy { it.name })
     }
-    selectedPractical?.let { practical ->
+    selectedPractical?.let { selected ->
+        val practical = state.data.firstOrNull { it.id == selected.id } ?: selected
         PracticalDetailsDialog(
             practical = practical,
             documents = documentsState.data.filter { it.ownerId == practical.id },
@@ -3126,6 +3128,9 @@ private fun ProjectDetailsDialog(
                 )
                 LabelValue(R.string.projects_course, project.courseName.orEmpty())
                 LabelValue(R.string.projects_group, project.groupName.orEmpty())
+                project.groupMode?.takeIf { it.isNotBlank() }?.let {
+                    LabelValue(R.string.projects_group_mode, it)
+                }
                 LabelValue(R.string.projects_status, project.status.orEmpty())
                 LabelValue(R.string.projects_deadline, formatInstant(project.deadline))
                 LabelValue(R.string.projects_files, project.fileCount.toString())

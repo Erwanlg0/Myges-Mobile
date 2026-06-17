@@ -335,6 +335,23 @@ class JsonParsingTest {
     }
 
     @Test
+    fun absencesUseApiYearAndTrimesterNotDateHeuristic() {
+        val payload = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                { "date": 1768546800000, "course_name": "Compil", "justified": false, "trimester": 22, "trimester_name": "Semestre 2", "year": 2025 }
+              ]
+            }
+            """.trimIndent()
+        )
+
+        val absence = payload.toAbsences().first()
+
+        assertEquals("2025-2026 - Semestre 2", absence.period)
+    }
+
+    @Test
     fun documentsParseKordisAnnualDocumentPayload() {
         val documents = json.parseToJsonElement(
             """

@@ -142,7 +142,8 @@ fun Project.toEntity() = ProjectEntity(
     fileCount = fileCount,
     year = year,
     courseId = courseId,
-    startsAtEpochMillis = startsAt?.toEpochMilli()
+    startsAtEpochMillis = startsAt?.toEpochMilli(),
+    groupMode = groupMode
 )
 
 fun Project.toGroupEntities() = groups.map { group ->
@@ -180,7 +181,8 @@ fun ProjectEntity.toDomain(
     year = year,
     courseId = courseId,
     groups = groups.map { it.toDomain() },
-    startsAt = startsAtEpochMillis?.let { Instant.ofEpochMilli(it) }
+    startsAt = startsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
+    groupMode = groupMode
 )
 
 fun ProjectGroupEntity.toDomain() = ProjectGroup(

@@ -47,6 +47,7 @@ import com.elg.studly.domain.model.StudentProfile
 import com.elg.studly.domain.model.SyncFeature
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -219,7 +220,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
                 val fetched = coroutineScope {
                     val agendaDeferred = if (needAgenda) async { fetchAgendaEvents() } else null
-                    val gradesDeferred = if (needGrades) async { fetchGrades(finalSyncYears) } else null
+                    val gradesDeferred = if (needGrades) async { fetchGrades(years) } else null
                     val academicDeferred = if (academicDue) {
                         async { fetchAcademicData(finalSyncYears, updatedProfile!!.id, nextProjectStepProjects) }
                     } else {
@@ -234,7 +235,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     val directory = directoryDeferred?.await()
                     val news = newsDeferred?.await()
                     val absences = if (needAbsences) {
-                        fetchAbsences(finalSyncYears, absencePeriods(grades, academic?.courses))
+                        fetchAbsences(years, absencePeriods(grades, academic?.courses))
                     } else {
                         null
                     }
@@ -428,6 +429,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             try {
                 val response = api.joinGroup(courseId, projectId, groupId)
                 if (!response.isSuccessful) throw HttpException(response)
+                refreshProjectGroups(courseId, projectId)
             } catch (throwable: Throwable) {
                 throw throwable.toRepositoryException()
             }
@@ -439,8 +441,23 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             try {
                 val response = api.leaveGroup(courseId, projectId, groupId)
                 if (!response.isSuccessful) throw HttpException(response)
+                refreshProjectGroups(courseId, projectId)
             } catch (throwable: Throwable) {
                 throw throwable.toRepositoryException()
+            }
+        }
+    }
+
+    private suspend fun refreshProjectGroups(courseId: String, projectId: String) {
+        runCatching {
+            delay(2_000)
+            val currentUserId = dao.profile()?.id
+            val year = dao.projects().firstOrNull { it.id == projectId }?.year
+            val payload = if (year != null) api.projects(year) else api.courseProjects(courseId)
+            val project = payload?.toProjects(currentUserId)?.firstOrNull { it.id == projectId }
+                ?: return@runCatching
+            if (project.groups.isNotEmpty()) {
+                dao.replaceGroupsForProject(projectId, project.toGroupEntities())
             }
         }
     }
@@ -670,7 +687,8 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     fileCount = max(current.fileCount, next.fileCount),
                     year = current.year ?: next.year,
                     courseId = current.courseId ?: next.courseId,
-                    groups = mergeGroups(current.groups, next.groups)
+                    groups = mergeGroups(current.groups, next.groups),
+                    groupMode = current.groupMode ?: next.groupMode
                 )
             }
         }

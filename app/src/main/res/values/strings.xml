@@ -157,6 +157,7 @@
     <string name="projects_deadline">Échéance</string>
     <string name="projects_files">Fichiers</string>
     <string name="projects_group">Groupe</string>
+    <string name="projects_group_mode">Création des groupes</string>
     <string name="projects_group_empty">Aucun etudiant liste</string>
     <string name="projects_groups_title">Groupes</string>
     <string name="projects_files_title">Fichiers du projet</string>

@@ -274,22 +274,19 @@ fun JsonElement.toAbsences(year: String? = null, availablePeriods: List<String> 
 
         val startsAtLdt = java.time.LocalDateTime.ofInstant(startsAt, java.time.ZoneOffset.UTC)
         val month = startsAtLdt.monthValue
-        val isSem2 = month in 2..8
-        val targetSemesterName = if (isSem2) "Semestre 2" else "Semestre 1"
 
-        
-        val startYearNum = if (month >= 9) startsAtLdt.year else startsAtLdt.year - 1
+        val startYearNum = root.number("year", "academicYear")?.toInt()
+            ?: if (month >= 9) startsAtLdt.year else startsAtLdt.year - 1
         val yearLabel = "$startYearNum-${startYearNum + 1}"
 
-        
-        
-        var resolvedPeriod = availablePeriods.firstOrNull {
-            it.contains(yearLabel) && it.contains(targetSemesterName, ignoreCase = true)
-        }
+        val semesterNumber = Regex("\\d").find(root.text("trimester_name", "semester").orEmpty())?.value?.toIntOrNull()
+            ?: root.number("trimester")?.toInt()?.rem(10)?.takeIf { it in 1..2 }
+            ?: if (month in 2..8) 2 else 1
+        val targetSemesterName = "Semestre $semesterNumber"
 
-        if (resolvedPeriod == null) {
-            resolvedPeriod = "$yearLabel - Semestre ${if (isSem2) 2 else 1}"
-        }
+        val resolvedPeriod = availablePeriods.firstOrNull {
+            it.contains(yearLabel) && it.contains(targetSemesterName, ignoreCase = true)
+        } ?: "$yearLabel - $targetSemesterName"
 
         Absence(
             id = root.text("id", "absenceId", "uid") ?: stableId(root),
@@ -399,7 +396,8 @@ fun JsonElement.toProjects(currentUserId: String? = null, fallbackYear: String? 
             year = year,
             courseId = root.text("rc_id", "rcId", "courseId"),
             groups = groups,
-            startsAt = startsAt
+            startsAt = startsAt,
+            groupMode = root.text("project_type_group", "type_group", "groupMode")
         )
     }
 }
