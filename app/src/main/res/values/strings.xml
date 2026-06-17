@@ -199,7 +199,7 @@
     <string name="directory_teacher">Intervenant</string>
     <string name="directory_teachers">Intervenants</string>
 
-    <string name="notifications_title">Notifications</string>
+    <string name="notifications_title">Actualités</string>
     <string name="notifications_action_open">Ouvrir</string>
     <string name="notifications_empty_title">Aucune actualité</string>
     <string name="notifications_empty_body">Les actualités et alertes synchronisées apparaîtront ici.</string>

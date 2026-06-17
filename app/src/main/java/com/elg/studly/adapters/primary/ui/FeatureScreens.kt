@@ -6,8 +6,11 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -1776,13 +1779,16 @@ private fun AcademicDocument.filterYear(): String? {
 
 @Composable
 fun NotificationsScreen(
-    studentViewModel: StudentViewModel,
-    settingsViewModel: SettingsViewModel
+    studentViewModel: StudentViewModel
 ) {
     val newsState by studentViewModel.news.collectAsStateWithLifecycle()
-    val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    var selectedNews by remember { mutableStateOf<NewsItem?>(null) }
+
+    selectedNews?.let { item ->
+        NewsDetailScreen(item, onBack = { selectedNews = null })
+        return
+    }
+
     FeatureStateContent(
         state = newsState,
         empty = List<NewsItem>::isEmpty,
@@ -1790,21 +1796,9 @@ fun NotificationsScreen(
         emptyBody = R.string.notifications_empty_body,
         onRetry = studentViewModel::refresh
     ) { news ->
-        item {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-            ) {
-                OutlinedButton(onClick = { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
-                    Icon(Icons.Rounded.Notifications, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.notifications_grant_permission))
-                }
-            }
+        items(news, key = { it.id }) { item ->
+            NewsCard(item, onOpen = { selectedNews = item })
         }
-        settingsState.settings?.let { settings ->
-            item { NotificationPreferences(settings, settingsViewModel) }
-        }
-        items(news, key = { it.id }) { item -> NewsCard(item) }
     }
 }
 
@@ -1899,6 +1893,18 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+                val notificationLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) {}
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    OutlinedButton(onClick = { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
+                        Icon(Icons.Rounded.Notifications, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.notifications_grant_permission))
+                    }
+                }
                 NotificationPreferences(settings, settingsViewModel)
             }
         }
@@ -3402,8 +3408,22 @@ internal fun DocumentCard(
 }
 
 @Composable
-internal fun NewsCard(newsItem: NewsItem) {
-    CompactCard {
+internal fun NewsCard(newsItem: NewsItem, onOpen: () -> Unit = {}) {
+    val hasDetail = !newsItem.html.isNullOrBlank() || !newsItem.body.isNullOrBlank()
+    CompactCard(
+        modifier = if (hasDetail) Modifier.clickable(onClick = onOpen) else Modifier
+    ) {
+        if (!newsItem.imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = newsItem.imageUrl,
+                contentDescription = newsItem.title,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 200.dp)
+                    .clip(MaterialTheme.shapes.medium)
+            )
+        }
         Text(
             text = newsItem.title.orUntitled(),
             style = MaterialTheme.typography.titleMedium,
@@ -3411,9 +3431,82 @@ internal fun NewsCard(newsItem: NewsItem) {
         )
         LabelValue(R.string.common_date, formatInstant(newsItem.publishedAt))
         if (!newsItem.body.isNullOrBlank()) {
-            Text(newsItem.body)
+            Text(
+                text = newsItem.body,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
+}
+
+@Composable
+fun NewsDetailScreen(newsItem: NewsItem, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val document = remember(newsItem.html, newsItem.body, isDark) {
+        wrapNewsHtml(newsItem.html ?: ("<p>" + (newsItem.body.orEmpty()) + "</p>"), isDark)
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Rounded.ArrowBack, contentDescription = stringResource(R.string.action_close))
+            }
+            Text(
+                text = newsItem.title.orUntitled(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                android.webkit.WebView(ctx).apply {
+                    settings.javaScriptEnabled = false
+                    settings.loadWithOverviewMode = true
+                    settings.useWideViewPort = true
+                    settings.loadsImagesAutomatically = true
+                    settings.blockNetworkImage = false
+                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                    setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    isNestedScrollingEnabled = true
+                    // Prevent the navigation drawer from stealing scroll/swipe gestures over the article.
+                    setOnTouchListener { v, event ->
+                        v.parent?.requestDisallowInterceptTouchEvent(true)
+                        false
+                    }
+                }
+            },
+            update = { webView ->
+                webView.loadDataWithBaseURL("https://myges.fr/", document, "text/html", "utf-8", null)
+            }
+        )
+    }
+}
+
+/** Wraps raw article HTML with a responsive viewport + theme-aware styling for the news detail WebView. */
+private fun wrapNewsHtml(bodyHtml: String, dark: Boolean): String {
+    val bg = if (dark) "#1c1b1f" else "#ffffff"
+    val fg = if (dark) "#e6e1e5" else "#1c1b1f"
+    return """
+        <!DOCTYPE html><html><head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          html,body{margin:0;padding:16px;background:$bg;color:$fg;
+            font-family:-apple-system,Roboto,sans-serif;font-size:16px;line-height:1.5;
+            word-wrap:break-word;overflow-wrap:break-word;}
+          img{max-width:100%;height:auto;}
+          a{color:#3478f6;}
+          table{max-width:100%;}
+        </style></head><body>$bodyHtml</body></html>
+    """.trimIndent()
 }
 
 @Composable

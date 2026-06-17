@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
@@ -77,7 +78,8 @@ fun DepositWebViewScreen(
                 IconButton(onClick = onBack) {
                     Icon(Icons.Rounded.ArrowBack, contentDescription = stringResource(R.string.action_close))
                 }
-            }
+            },
+            windowInsets = WindowInsets(0)
         )
         if (loadProgress in 1..99) {
             LinearProgressIndicator(

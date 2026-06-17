@@ -337,7 +337,7 @@ private fun StudentScaffold(
                 )
             }
             composable("directory") { DirectoryScreen(studentViewModel) }
-            composable("notifications") { NotificationsScreen(studentViewModel, settingsViewModel) }
+            composable("notifications") { NotificationsScreen(studentViewModel) }
             composable("settings") { SettingsScreen(settingsViewModel, studentViewModel) }
         }
     }

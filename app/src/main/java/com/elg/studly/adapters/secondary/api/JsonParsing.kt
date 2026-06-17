@@ -586,11 +586,23 @@ fun JsonElement.toNews(): List<NewsItem> {
     val items = arrayResult.ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }
     return items.map { element ->
         val root = element.objectOrData()
+        val html = root.text("html", "content", "body")
+        val preview = (root.text("summary", "text", "description", "value")
+            ?: html?.htmlToPlainText())
+            ?.takeIf { it.isNotBlank() }
+            ?: root.newsFallbackBody()
         NewsItem(
             id = root.text("id", "newsId", "ne_id", "partner_id", "ss_id", "type", "uid") ?: stableId(root),
             title = root.text("title", "name", "label") ?: "",
-            body = root.text("body", "content", "summary", "text", "html", "description", "value") ?: root.newsFallbackBody(),
-            publishedAt = root.instant("publishedAt", "date", "createdAt", "update_date", "appointment_start")
+            body = preview,
+            publishedAt = root.instant(
+                "publishedAt", "date", "createdAt", "update_date", "appointment_start",
+                "start_date", "creation_date", "publication_date", "publish_date", "begin_date"
+            ),
+            html = html?.takeIf { it.contains('<') },
+            imageUrl = (root.namedLinkHref("photo")
+                ?: root.text("image", "photo", "picture", "banner", "imageUrl"))
+                ?.takeUnless { it.isBlank() || it.isDefaultLogoAsset() }
         )
     }
 }
@@ -785,6 +797,46 @@ private fun JsonObject.namedLinkHref(key: String): String? {
         ?.get(key)
         ?.let { (it as? JsonObject)?.text("href", "url") }
         ?: linkHref(key)
+}
+
+private val HTML_TAG_REGEX = Regex("<[^>]+>")
+private val NAMED_ENTITIES = mapOf(
+    "nbsp" to " ", "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'",
+    "rsquo" to "’", "lsquo" to "‘", "ldquo" to "“", "rdquo" to "”", "hellip" to "…",
+    "ndash" to "–", "mdash" to "—", "laquo" to "«", "raquo" to "»", "deg" to "°", "euro" to "€",
+    "eacute" to "é", "egrave" to "è", "ecirc" to "ê", "euml" to "ë",
+    "agrave" to "à", "acirc" to "â", "ccedil" to "ç", "icirc" to "î", "iuml" to "ï",
+    "ocirc" to "ô", "ouml" to "ö", "ugrave" to "ù", "ucirc" to "û", "uuml" to "ü",
+    "oelig" to "œ"
+)
+
+/** Best-effort HTML → plain text for list previews. WebView handles full rendering in the detail view. */
+internal fun String.htmlToPlainText(): String {
+    val withBreaks = replace(Regex("(?i)<br\\s*/?>"), "\n")
+        .replace(Regex("(?i)</(p|div|h[1-6]|li)>"), "\n")
+    val stripped = withBreaks.replace(HTML_TAG_REGEX, "")
+    val decoded = Regex("&(#x?[0-9a-fA-F]+|[a-zA-Z]+);").replace(stripped) { match ->
+        val entity = match.groupValues[1]
+        when {
+            entity.startsWith("#x") || entity.startsWith("#X") ->
+                entity.drop(2).toIntOrNull(16)?.let { String(Character.toChars(it)) } ?: match.value
+            entity.startsWith("#") ->
+                entity.drop(1).toIntOrNull()?.let { String(Character.toChars(it)) } ?: match.value
+            else -> NAMED_ENTITIES[entity] ?: match.value
+        }
+    }
+    return decoded
+        .replace(Regex("[ \\t]+"), " ")
+        .replace(Regex(" *\\n *"), "\n")
+        .replace(Regex("\\n{3,}"), "\n\n")
+        .trim()
+}
+
+/** Generic school/app logo placeholders returned for items without a real banner — not worth showing. */
+private fun String.isDefaultLogoAsset(): Boolean {
+    val lower = lowercase()
+    return listOf("logo", "default", "placeholder", "no-image", "noimage", "no_photo", "avatar-default")
+        .any { it in lower }
 }
 
 private fun JsonObject.newsFallbackBody(): String? {

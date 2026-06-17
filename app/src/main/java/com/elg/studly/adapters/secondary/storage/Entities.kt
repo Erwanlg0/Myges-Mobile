@@ -142,5 +142,7 @@ data class NewsEntity(
     @PrimaryKey val id: String,
     val title: String,
     val body: String?,
-    val publishedAtEpochMillis: Long?
+    val publishedAtEpochMillis: Long?,
+    val html: String? = null,
+    val imageUrl: String? = null
 )

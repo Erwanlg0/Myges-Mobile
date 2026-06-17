@@ -137,7 +137,11 @@ data class NewsItem(
     val id: String,
     val title: String,
     val body: String?,
-    val publishedAt: Instant?
+    val publishedAt: Instant?,
+    /** Full rich-text article (HTML, may embed images). Rendered in the news detail view. */
+    val html: String? = null,
+    /** Banner/illustration image URL (from `_links.photo.href`). */
+    val imageUrl: String? = null
 )
 
 data class DashboardSummary(

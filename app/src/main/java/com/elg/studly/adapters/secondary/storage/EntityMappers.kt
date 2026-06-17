@@ -298,12 +298,16 @@ fun NewsItem.toEntity() = NewsEntity(
     id = id,
     title = title,
     body = body,
-    publishedAtEpochMillis = publishedAt?.toEpochMilli()
+    publishedAtEpochMillis = publishedAt?.toEpochMilli(),
+    html = html,
+    imageUrl = imageUrl
 )
 
 fun NewsEntity.toDomain() = NewsItem(
     id = id,
     title = title,
     body = body,
-    publishedAt = publishedAtEpochMillis?.let { Instant.ofEpochMilli(it) }
+    publishedAt = publishedAtEpochMillis?.let { Instant.ofEpochMilli(it) },
+    html = html,
+    imageUrl = imageUrl
 )

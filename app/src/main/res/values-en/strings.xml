@@ -199,7 +199,7 @@
     <string name="directory_teacher">Faculty</string>
     <string name="directory_teachers">Faculty</string>
 
-    <string name="notifications_title">Notifications</string>
+    <string name="notifications_title">News</string>
     <string name="notifications_action_open">Open</string>
     <string name="notifications_empty_title">No news</string>
     <string name="notifications_empty_body">Synced news and alerts will appear here.</string>
