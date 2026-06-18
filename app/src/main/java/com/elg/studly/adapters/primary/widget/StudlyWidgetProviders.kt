@@ -22,12 +22,12 @@ abstract class BaseStudlyWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            val snapshot = runCatching { WidgetData.load(context) }.getOrNull()
+            val snapshot = runCatching { WidgetData.load(context) }.getOrDefault(WidgetData.EMPTY)
             try {
                 ids.forEach { id ->
                     val views = RemoteViews(context.packageName, layout())
                     views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(context))
-                    if (snapshot != null) build(context, views, snapshot)
+                    build(context, views, snapshot)
                     manager.updateAppWidget(id, views)
                 }
             } finally {
@@ -99,28 +99,52 @@ class DeadlineWidget : BaseStudlyWidget() {
     }
 }
 
+class AbsencesWidget : BaseStudlyWidget() {
+    override val route = "absences"
+    override fun layout() = R.layout.widget_absences
+    override fun build(context: Context, views: RemoteViews, snapshot: WidgetSnapshot) {
+        views.setTextViewText(R.id.widget_primary, snapshot.unjustifiedAbsences.toString())
+        views.setTextViewText(
+            R.id.widget_secondary,
+            context.resources.getQuantityString(
+                R.plurals.widget_absences_count,
+                snapshot.unjustifiedAbsences,
+                snapshot.unjustifiedAbsences
+            )
+        )
+    }
+}
+
+class NewsWidget : BaseStudlyWidget() {
+    override val route = "dashboard"
+    override fun layout() = R.layout.widget_news
+    override fun build(context: Context, views: RemoteViews, snapshot: WidgetSnapshot) {
+        views.setTextOrFallback(R.id.widget_primary, snapshot.newsTitle, context.getString(R.string.widget_no_news))
+        views.setOptionalLine(R.id.widget_secondary, snapshot.newsWhen)
+    }
+}
+
 class SummaryWidget : BaseStudlyWidget() {
     override val route = "dashboard"
     override fun layout() = R.layout.widget_summary
     override fun build(context: Context, views: RemoteViews, snapshot: WidgetSnapshot) {
-        views.setTextOrFallback(R.id.widget_course_value, courseLine(snapshot), context.getString(R.string.widget_no_course))
+        views.setTextOrFallback(
+            R.id.widget_course_value,
+            line(context, snapshot.nextCourseWhen, snapshot.nextCourseTitle),
+            context.getString(R.string.widget_no_course)
+        )
         val average = snapshot.averageValue
             ?.let { context.getString(R.string.widget_average_value, it) }
         views.setTextOrFallback(R.id.widget_average_value, average, context.getString(R.string.widget_no_grades))
         views.setTextOrFallback(
             R.id.widget_deadline_value,
-            deadlineLine(snapshot),
+            line(context, snapshot.deadlineWhen, snapshot.deadlineTitle),
             context.getString(R.string.widget_no_deadline)
         )
     }
 
-    private fun courseLine(snapshot: WidgetSnapshot): String? {
-        val title = snapshot.nextCourseTitle ?: return null
-        return listOfNotNull(snapshot.nextCourseWhen, title).joinToString(" · ")
-    }
-
-    private fun deadlineLine(snapshot: WidgetSnapshot): String? {
-        val title = snapshot.deadlineTitle ?: return null
-        return listOfNotNull(snapshot.deadlineWhen, title).joinToString(" · ")
+    private fun line(context: Context, prefix: String?, title: String?): String? {
+        if (title == null) return null
+        return if (prefix == null) title else context.getString(R.string.widget_summary_line, prefix, title)
     }
 }

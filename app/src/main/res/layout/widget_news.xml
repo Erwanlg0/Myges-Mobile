@@ -4,7 +4,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:gravity="center_vertical"
     android:orientation="vertical"
     android:padding="16dp">
 
@@ -12,7 +11,7 @@
         android:id="@+id/widget_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/widget_average_label"
+        android:text="@string/widget_news_label"
         android:textColor="@color/widget_accent"
         android:textSize="12sp"
         android:textStyle="bold" />
@@ -22,25 +21,19 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:text="@string/widget_preview_average"
+        android:ellipsize="end"
+        android:maxLines="4"
+        android:text="@string/widget_preview_news"
         android:textColor="@color/widget_text_primary"
-        android:textSize="26sp"
+        android:textSize="16sp"
         android:textStyle="bold" />
 
     <TextView
         android:id="@+id/widget_secondary"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:text="@string/widget_preview_grades"
+        android:layout_marginTop="4dp"
+        android:text="@string/widget_preview_news_when"
         android:textColor="@color/widget_text_secondary"
         android:textSize="13sp" />
-
-    <TextView
-        android:id="@+id/widget_tertiary"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/widget_preview_period"
-        android:textColor="@color/widget_text_secondary"
-        android:textSize="12sp" />
 </LinearLayout>

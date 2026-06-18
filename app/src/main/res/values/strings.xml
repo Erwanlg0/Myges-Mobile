@@ -307,4 +307,31 @@
         <item quantity="one">%1$d note</item>
         <item quantity="other">%1$d notes</item>
     </plurals>
+    <string name="widget_preview_course">Sécurité du code</string>
+    <string name="widget_preview_course_when">lun. 23/06 11:30</string>
+    <string name="widget_preview_room">Salle 204</string>
+    <string name="widget_preview_average">15,40/20</string>
+    <string name="widget_preview_grades">8 notes</string>
+    <string name="widget_preview_period">Trimestre 3</string>
+    <string name="widget_preview_deadline">Connected Neighbours</string>
+    <string name="widget_preview_deadline_when">28/06 23:59</string>
+    <string name="widget_preview_summary_course">lun. 11:30 · Sécurité du code</string>
+    <string name="widget_preview_summary_deadline">28/06 · Connected Neighbours</string>
+    <string name="widget_absences_label">Absences non justifiées</string>
+    <string name="widget_absences_description">Affiche le nombre d\'absences non justifiées</string>
+    <plurals name="widget_absences_count">
+        <item quantity="one">%1$d absence non justifiée</item>
+        <item quantity="other">%1$d absences non justifiées</item>
+    </plurals>
+    <string name="widget_preview_absences">2</string>
+    <string name="widget_preview_absences_count">2 absences non justifiées</string>
+    <string name="widget_news_label">Dernière actualité</string>
+    <string name="widget_news_description">Affiche la dernière actualité</string>
+    <string name="widget_no_news">Aucune actualité</string>
+    <string name="widget_preview_news">Réunion de rentrée le 15 septembre</string>
+    <string name="widget_preview_news_when">12/09</string>
+    <string name="widget_agenda_label">Agenda du jour</string>
+    <string name="widget_agenda_description">Affiche les cours du jour</string>
+    <string name="widget_no_courses_today">Aucun cours aujourd\'hui</string>
+    <string name="widget_summary_line">%1$s · %2$s</string>
 </resources>

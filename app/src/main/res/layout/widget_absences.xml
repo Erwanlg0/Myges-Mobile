@@ -12,7 +12,7 @@
         android:id="@+id/widget_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/widget_average_label"
+        android:text="@string/widget_absences_label"
         android:textColor="@color/widget_accent"
         android:textSize="12sp"
         android:textStyle="bold" />
@@ -22,7 +22,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:text="@string/widget_preview_average"
+        android:text="@string/widget_preview_absences"
         android:textColor="@color/widget_text_primary"
         android:textSize="26sp"
         android:textStyle="bold" />
@@ -32,15 +32,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:text="@string/widget_preview_grades"
+        android:text="@string/widget_preview_absences_count"
         android:textColor="@color/widget_text_secondary"
         android:textSize="13sp" />
-
-    <TextView
-        android:id="@+id/widget_tertiary"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/widget_preview_period"
-        android:textColor="@color/widget_text_secondary"
-        android:textSize="12sp" />
 </LinearLayout>

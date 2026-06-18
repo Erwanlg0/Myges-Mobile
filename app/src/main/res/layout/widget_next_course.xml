@@ -23,6 +23,7 @@
         android:layout_marginTop="6dp"
         android:ellipsize="end"
         android:maxLines="2"
+        android:text="@string/widget_preview_course"
         android:textColor="@color/widget_text_primary"
         android:textSize="18sp"
         android:textStyle="bold" />
@@ -32,6 +33,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
+        android:text="@string/widget_preview_course_when"
         android:textColor="@color/widget_text_secondary"
         android:textSize="13sp" />
 
@@ -39,6 +41,7 @@
         android:id="@+id/widget_tertiary"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:text="@string/widget_preview_room"
         android:textColor="@color/widget_text_secondary"
         android:textSize="13sp" />
 </LinearLayout>

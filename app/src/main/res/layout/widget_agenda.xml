@@ -8,32 +8,28 @@
     android:padding="16dp">
 
     <TextView
-        android:id="@+id/widget_label"
-        android:layout_width="wrap_content"
+        android:id="@+id/widget_agenda_header"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/widget_deadline_label"
+        android:text="@string/widget_agenda_label"
         android:textColor="@color/widget_accent"
         android:textSize="12sp"
         android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/widget_primary"
+        android:id="@+id/widget_agenda_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:ellipsize="end"
-        android:maxLines="4"
-        android:text="@string/widget_preview_deadline"
-        android:textColor="@color/widget_text_primary"
-        android:textSize="16sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/widget_secondary"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="@string/widget_preview_deadline_when"
+        android:layout_marginTop="8dp"
+        android:text="@string/widget_no_courses_today"
         android:textColor="@color/widget_text_secondary"
         android:textSize="13sp" />
+
+    <ListView
+        android:id="@+id/widget_agenda_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="6dp"
+        android:divider="@null"
+        android:dividerHeight="0dp" />
 </LinearLayout>
