@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.GroupAdd
 import androidx.compose.material.icons.rounded.Logout
@@ -77,6 +78,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -3240,14 +3242,19 @@ private fun ProjectDetailsDialog(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    visibleDocuments.forEach { document ->
-                        DocumentCard(
-                            document = document,
-                            downloading = document.id in downloadingDocumentIds,
-                            progress = documentDownloadProgress[document.id],
+                    val groupedDocuments = remember(visibleDocuments) {
+                        visibleDocuments.groupBy { it.category?.trim()?.takeIf(String::isNotBlank) }
+                    }
+                    val uncategorizedLabel = stringResource(R.string.documents_uncategorized)
+                    groupedDocuments.forEach { (category, docs) ->
+                        DocumentGroupSection(
+                            title = category ?: uncategorizedLabel,
+                            documents = docs,
+                            downloadingDocumentIds = downloadingDocumentIds,
+                            documentDownloadProgress = documentDownloadProgress,
                             showDownloadButton = true,
-                            onDownload = { onDownloadDocument(document) },
-                            onOpen = { onOpenDocument(document) }
+                            onOpenDocument = onOpenDocument,
+                            onDownloadDocument = onDownloadDocument
                         )
                     }
                 }
@@ -3310,21 +3317,15 @@ private fun AllGroupsDialog(
                         val groupDocs = documents.filter { it.groupId == group.id }
                         if (groupDocs.isNotEmpty()) {
                             Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.projects_deliverables_label),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold
+                            DocumentGroupSection(
+                                title = stringResource(R.string.projects_deliverables_label),
+                                documents = groupDocs,
+                                downloadingDocumentIds = downloadingDocumentIds,
+                                documentDownloadProgress = documentDownloadProgress,
+                                showDownloadButton = group.isMine,
+                                onOpenDocument = onOpenDocument,
+                                onDownloadDocument = onDownloadDocument
                             )
-                            groupDocs.forEach { document ->
-                                DocumentCard(
-                                    document = document,
-                                    downloading = document.id in downloadingDocumentIds,
-                                    progress = documentDownloadProgress[document.id],
-                                    showDownloadButton = group.isMine,
-                                    onDownload = { onDownloadDocument(document) },
-                                    onOpen = { onOpenDocument(document) }
-                                )
-                            }
                         }
 
                         if (group.isMine && onLeaveGroup != null) {
@@ -3427,6 +3428,59 @@ internal fun PracticalCard(
 }
 
 @Composable
+private fun DocumentGroupSection(
+    title: String,
+    documents: List<AcademicDocument>,
+    downloadingDocumentIds: Set<String>,
+    documentDownloadProgress: Map<String, Float?>,
+    showDownloadButton: Boolean,
+    onOpenDocument: (AcademicDocument) -> Unit,
+    onDownloadDocument: (AcademicDocument) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .clickable { expanded = !expanded }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                contentDescription = null
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = documents.size.toString(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (expanded) {
+            documents.forEach { document ->
+                DocumentCard(
+                    document = document,
+                    downloading = document.id in downloadingDocumentIds,
+                    progress = documentDownloadProgress[document.id],
+                    showDownloadButton = showDownloadButton,
+                    showCategory = false,
+                    onDownload = { onDownloadDocument(document) },
+                    onOpen = { onOpenDocument(document) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 internal fun DocumentCard(
     document: AcademicDocument,
     downloading: Boolean,
@@ -3447,13 +3501,17 @@ internal fun DocumentCard(
         LabelValue(R.string.profile_year, document.year.orEmpty())
         LabelValue(R.string.documents_updated_at, formatInstant(document.updatedAt))
         if (showDownloadButton) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 OutlinedButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onOpen()
                     },
-                    enabled = !downloading
+                    enabled = !downloading,
+                    modifier = Modifier.weight(1f)
                 ) {
                     if (downloading) {
                         CircularProgressIndicator(
@@ -3461,22 +3519,23 @@ internal fun DocumentCard(
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Icon(Icons.Rounded.Download, contentDescription = null)
+                        Icon(Icons.Rounded.OpenInNew, contentDescription = null)
                     }
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(if (downloading) R.string.documents_downloading else R.string.documents_open))
                 }
                 if (onDownload != null) {
-                    OutlinedButton(
+                    OutlinedIconButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onDownload()
                         },
                         enabled = !downloading
                     ) {
-                        Icon(Icons.Rounded.Download, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.documents_download_only))
+                        Icon(
+                            Icons.Rounded.Download,
+                            contentDescription = stringResource(R.string.documents_download_only)
+                        )
                     }
                 }
             }
@@ -4288,14 +4347,19 @@ private fun PracticalDetailsDialog(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    visibleDocuments.forEach { document ->
-                        DocumentCard(
-                            document = document,
-                            downloading = document.id in downloadingDocumentIds,
-                            progress = documentDownloadProgress[document.id],
+                    val groupedDocuments = remember(visibleDocuments) {
+                        visibleDocuments.groupBy { it.category?.trim()?.takeIf(String::isNotBlank) }
+                    }
+                    val uncategorizedLabel = stringResource(R.string.documents_uncategorized)
+                    groupedDocuments.forEach { (category, docs) ->
+                        DocumentGroupSection(
+                            title = category ?: uncategorizedLabel,
+                            documents = docs,
+                            downloadingDocumentIds = downloadingDocumentIds,
+                            documentDownloadProgress = documentDownloadProgress,
                             showDownloadButton = true,
-                            onDownload = { onDownloadDocument(document) },
-                            onOpen = { onOpenDocument(document) }
+                            onOpenDocument = onOpenDocument,
+                            onDownloadDocument = onDownloadDocument
                         )
                     }
                 }

@@ -186,6 +186,7 @@
     <string name="documents_empty_title">Aucun document</string>
     <string name="documents_empty_body">Les documents annuels et fichiers téléchargés apparaîtront ici.</string>
     <string name="documents_category">Catégorie</string>
+    <string name="documents_uncategorized">Autres fichiers</string>
     <string name="documents_downloading">Téléchargement</string>
     <string name="documents_open">Télécharger et ouvrir</string>
     <string name="documents_saved_to_downloads">Fichier enregistré dans Téléchargements</string>

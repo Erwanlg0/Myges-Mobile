@@ -186,6 +186,7 @@
     <string name="documents_empty_title">No documents</string>
     <string name="documents_empty_body">Annual documents and downloaded files will appear here.</string>
     <string name="documents_category">Category</string>
+    <string name="documents_uncategorized">Other files</string>
     <string name="documents_downloading">Downloading</string>
     <string name="documents_open">Download and open</string>
     <string name="documents_saved_to_downloads">File saved to Downloads</string>
