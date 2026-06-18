@@ -40,6 +40,7 @@ import com.elg.studly.domain.model.DashboardSummary
 import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.DirectoryRole
 import com.elg.studly.domain.model.Grade
+import com.elg.studly.domain.model.mainGrades
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
@@ -49,7 +50,10 @@ import com.elg.studly.domain.model.SyncFeature
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -84,6 +88,8 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val notificationScheduler: NotificationScheduler
 ) : StudentDataRepository {
+    private val fetchSemaphore = Semaphore(MAX_CONCURRENT_FETCHES)
+
     override fun observeDashboard(): Flow<DashboardSummary> {
         return combine(
             dao.observeProfile(),
@@ -98,21 +104,8 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             DashboardSummary(
                 profile = localData.profile?.toDomain(),
                 nextEvent = localData.agenda.firstOrNull { it.endsAt.isAfter(now) },
-                latestGrades = run {
-                    val allGrades = localData.grades.filter { it.value != null }
-                    val structuredMainKeys = allGrades
-                        .filter { it.subject.isBlank() && !it.id.contains("-cc-") && !it.id.contains("-exam") }
-                        .map { it.courseName to it.period }
-                        .toSet()
-                    val ccRegex = Regex("^(cc|contrôle continu)\\s*\\d*$", RegexOption.IGNORE_CASE)
-                    allGrades.filter { grade ->
-                        !grade.id.contains("-cc-") &&
-                        !grade.id.contains("-exam") &&
-                        !((grade.courseName to grade.period) in structuredMainKeys &&
-                            (grade.subject.matches(ccRegex) ||
-                             grade.subject.trim().equals("examen", ignoreCase = true)))
-                    }.sortedWith(compareByDescending<Grade> { it.date }.thenByDescending { it.id }).take(3)
-                },
+                latestGrades = localData.grades.filter { it.value != null }.mainGrades()
+                    .sortedWith(compareByDescending<Grade> { it.date }.thenByDescending { it.id }).take(3),
                 recentAbsences = localData.absences.sortedByDescending { it.startsAt }.take(1),
                 dueProjects = localData.projects
                     .filter { project ->
@@ -339,12 +332,14 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return years.flatMap { directoryPeople(it) }.distinctBy { it.id }
     }
 
-    private suspend fun fetchNews(): List<NewsItem> {
-        return runCatching { api.minimumVersion()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
-            api.news()?.toNews().orEmpty() +
-            runCatching { api.newsBanners()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
-            runCatching { api.partners()?.toNews().orEmpty() }.getOrDefault(emptyList()) +
-            runCatching { api.speedMeetingAppointments()?.toNews().orEmpty() }.getOrDefault(emptyList())
+    private suspend fun fetchNews(): List<NewsItem> = coroutineScope {
+        listOf(
+            async { runCatching { api.minimumVersion()?.toNews().orEmpty() }.getOrDefault(emptyList()) },
+            async { api.news()?.toNews().orEmpty() },
+            async { runCatching { api.newsBanners()?.toNews().orEmpty() }.getOrDefault(emptyList()) },
+            async { runCatching { api.partners()?.toNews().orEmpty() }.getOrDefault(emptyList()) },
+            async { runCatching { api.speedMeetingAppointments()?.toNews().orEmpty() }.getOrDefault(emptyList()) }
+        ).awaitAll().flatten()
     }
 
     
@@ -368,7 +363,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             try {
                 val directory = File(context.cacheDir, DOCUMENT_CACHE).apply { mkdirs() }
                 purgeExpiredDocumentCache(directory)
-                val inlineContent = document.inlineContent
+                val inlineContent = document.inlineContent ?: dao.documentInlineContent(document.id)
                 val target = if (inlineContent != null) {
                     val file = File(directory, document.fileName.sanitizedFileName())
                     onProgress(0f)
@@ -577,16 +572,20 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
             val newCourses = courses.filter { it.id !in fetchedCourseDocIds }
             fetchedCourseDocIds.addAll(newCourses.map { it.id })
-            val courseProjectPayloads = newCourses.mapNotNull { course ->
-                runCatching { api.courseProjects(course.id) }.getOrNull()
-            }
+            val courseProjectPayloads = coroutineScope {
+                newCourses.map { course ->
+                    async { fetchSemaphore.withPermit { runCatching { api.courseProjects(course.id) }.getOrNull() } }
+                }.awaitAll()
+            }.filterNotNull()
             val projectPayloads = listOfNotNull(projectsJson) + courseProjectPayloads
             val projects = projectPayloads.flatMap { it.toProjects(currentUserId, year) }.mergeProjects()
 
             val practicalsJson = runCatching { api.practicals(year) }.getOrNull()
-            val coursePracticalPayloads = newCourses.mapNotNull { course ->
-                runCatching { api.coursePracticals(course.id) }.getOrNull()
-            }
+            val coursePracticalPayloads = coroutineScope {
+                newCourses.map { course ->
+                    async { fetchSemaphore.withPermit { runCatching { api.coursePracticals(course.id) }.getOrNull() } }
+                }.awaitAll()
+            }.filterNotNull()
             val practicalPayloads = listOfNotNull(practicalsJson) + coursePracticalPayloads
             val practicals = practicalPayloads.flatMap { it.toPracticals(currentUserId, year) }.distinctBy { it.id }
 
@@ -719,15 +718,19 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         }
     }
 
-    private suspend fun List<Course>.withRemoteSyllabus(): List<Course> {
-        return map { course ->
-            if (!course.syllabus.isNullOrBlank()) {
-                course
-            } else {
-                val syllabus = runCatching { api.syllabus(course.id)?.toCourseSyllabus() }.getOrNull()
-                if (syllabus.isNullOrBlank()) course else course.copy(syllabus = syllabus)
+    private suspend fun List<Course>.withRemoteSyllabus(): List<Course> = coroutineScope {
+        map { course ->
+            async {
+                if (!course.syllabus.isNullOrBlank()) {
+                    course
+                } else {
+                    fetchSemaphore.withPermit {
+                        val syllabus = runCatching { api.syllabus(course.id)?.toCourseSyllabus() }.getOrNull()
+                        if (syllabus.isNullOrBlank()) course else course.copy(syllabus = syllabus)
+                    }
+                }
             }
-        }
+        }.awaitAll()
     }
 
     private suspend fun notifyAboutChanges(
@@ -765,6 +768,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
     private companion object {
         const val DOCUMENT_CACHE = "documents"
+        const val MAX_CONCURRENT_FETCHES = 5
     }
 }
 

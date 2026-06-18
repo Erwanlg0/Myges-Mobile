@@ -92,7 +92,7 @@ object DependencyModule {
         }
         return OkHttpClient.Builder()
             .cookieJar(InMemoryCookieJar())
-            .addInterceptor(MygesAuthInterceptor(appConfig.userAgent, sessionRepository))
+            .addInterceptor(MygesAuthInterceptor(appConfig.userAgent, appConfig.apiBaseUrl, sessionRepository))
             .addInterceptor(ApiRetryInterceptor())
             .addInterceptor(NoContentAsEmptyJsonInterceptor())
             .addInterceptor(logging)

@@ -1,103 +1,116 @@
-**Privacy Policy**
+# Privacy Policy — Studly
 
-This privacy policy applies to the Studly app for mobile devices, together with any related services operated by Charlouw (collectively, the "Application"). Charlouw is hereby referred to as the "Service Provider".
+_Effective date: 2026-06-18_
 
-**Information Collection and Use**
+Studly ("the app") is an **independent, unofficial** Android client for MyGES.
+It is **not affiliated with, endorsed by, or operated by** Réseau GES, MyGES,
+Kordis, or Skolae. This policy describes exactly what the app does with your
+data. It is intentionally specific: where this policy and the app disagree, the
+app's actual behaviour (visible in the open-source code) prevails.
 
-The Application collects information when you download and use it. This information may include information such as
+**Data controller:** Erwan (project author) — erwan.luce.guedon@gmail.com
+**Source code:** https://github.com/Erwanlg0/Myges-Mobile
 
-- Your device's Internet Protocol address
-- The pages of the Application that you visit, the time and date of your visit, the time spent on those pages
-- The time spent on the Application
-- your mobile operating system you use
+## Short version
 
-**Cookies and tracking technologies**
+- The app shows **your own MyGES data** by talking directly to the Kordis API
+  with your account.
+- That data is stored **only on your device**, in an **encrypted** database, and
+  your session token is stored **encrypted** via the Android Keystore.
+- **No analytics, no advertising, no tracking, no profiling, no AI**, and **no
+  developer-operated server.** Your academic data is never sent to the author or
+  to any third party.
 
-The Application or its third-party SDKs may use cookies, SDKs, pixels, and similar technologies to support functionality, analytics, or service delivery. Where required by applicable law, the Service Provider will obtain consent before using non-essential tracking technologies.
+## What the app accesses
 
-**Your Rights**
+When you sign in, the app reads the following from your MyGES/Kordis account, to
+display it to you:
 
-You may request access to, correction of, or deletion of your personal data held by the Service Provider. To exercise these rights, or to withdraw consent where processing is based on consent, contact the Service Provider at erwan.luce.guedon@gmail.com.
+- Profile: name, email, school, programme, academic year, avatar.
+- Schedule, grades, absences, courses, syllabi and documents, projects and
+  practicals, news.
 
-**Your California privacy rights (CCPA/CPRA)**
+It also processes, only on your device:
 
-If you are a California resident, you have the right to know what personal information is collected, the right to delete personal information, the right to opt out of the sale or sharing of personal information, and the right to non-discrimination for exercising these rights. To exercise your CCPA/CPRA rights, contact the Service Provider at erwan.luce.guedon@gmail.com.
+- Your authentication token (to call the API on your behalf).
+- Optional, locally-stored preferences such as grade simulations and settings.
 
-**Artificial Intelligence**
+## Where your data is stored
 
-The Application uses Artificial Intelligence (AI) technologies to enhance user experience and provide certain features. The AI components may process user data to deliver personalized content, recommendations, or automated functionalities. All AI processing is performed in accordance with this privacy policy and applicable laws. If you have questions about the AI features or data processing, please contact the Service Provider.
+- **On your device only.** Academic data is cached in a local database
+  encrypted with SQLCipher (AES-256). The key is generated on-device and
+  protected by the Android Keystore.
+- **Session token** is stored encrypted (AES/GCM via the Android Keystore) in
+  private app storage.
+- **Backups are disabled** (`allowBackup=false`); the database and preferences
+  are excluded from Android cloud backup and device-to-device transfer.
+- Downloaded documents are kept in the app's private cache and purged
+  automatically.
 
-The Service Provider may use the information you provide to send important information, required notices, and, where permitted by law, marketing communications.
+## Network connections
 
-For a better experience while using the Application, the Service Provider may require you to provide certain personally identifiable information. The information the Service Provider requests will be retained and used as described in this privacy policy.
+The app connects only to:
 
-**Third Party Access**
+- `api.kordis.fr` and `authentication.kordis.fr` — to authenticate and fetch
+  **your** data. Traffic is TLS-only (cleartext disabled) with certificate
+  pinning.
+- Google Play services — only for the optional "in-app update" and "rate the
+  app" features.
 
-Only aggregated, anonymized data is periodically transmitted to external services to aid the Service Provider in improving the Application and their service. The Service Provider may share your information with third parties in the ways that are described in this privacy statement.
+Calendar export and document opening happen locally through Android; no data is
+sent to the author.
 
-**International Data Transfers**
+## Authentication
 
-The Service Provider or its third-party service providers may transfer personal data to countries outside your country of residence, including outside the European Economic Area (EEA). Where applicable law requires safeguards for international transfers, the Service Provider will use appropriate mechanisms.
+Sign-in uses MyGES/Kordis OAuth in your browser. The app never sees your MyGES
+password — it only receives and stores an access token.
 
-- Standard Contractual Clauses (SCCs) approved by the European Commission
-- Adequacy decisions or other legally recognized transfer mechanisms
-- Your consent, where required and legally permitted
+## Permissions
 
-Data protection laws in other countries may differ from those in your jurisdiction. Where required by law, the Service Provider will apply appropriate safeguards and obtain any consent required for the transfer.
+- **Calendar (read/write):** only to optionally sync your schedule to your
+  device calendar, at your request.
+- **Notifications:** to alert you about new grades, absences, schedule changes,
+  documents, and deadline reminders.
+- **Biometric:** to optionally lock/unlock the app.
 
-The Service Provider may disclose User Provided and Automatically Collected Information:
+You can deny or revoke any of these in Android settings; the related feature is
+simply disabled.
 
-- as required by law, such as to comply with a subpoena, or similar legal process;
-- when they believe in good faith that disclosure is necessary to protect their rights, protect your safety or the safety of others, investigate fraud, or respond to a government request;
-- with their trusted services providers who work on their behalf, do not have an independent use of the information the Service Provider discloses to them, and have agreed to adhere to the rules set forth in this privacy statement.
+## Crash diagnostics (optional, off by default)
 
-**Opt-Out Rights**
+The app includes an optional integration with the Sentry crash-reporting SDK.
+It is **disabled unless a Sentry DSN is configured at build time** (it is empty
+by default). When enabled by the publisher, crash diagnostics (stack traces,
+device model, OS version, app version) are sent to Sentry to fix bugs; no
+academic data is included. If you obtained the app from a store listing that
+declares crash reporting, this is the feature concerned.
 
-You can stop further collection of information from your mobile device by uninstalling the Application. Uninstalling will stop the Application from collecting data from your device, but it does not automatically delete information that has already been transmitted to the Service Provider or to third parties.
+## Data retention and deletion
 
-To request deletion of your personal data, to withdraw consent, or to exercise any of your rights, contact the Service Provider at erwan.luce.guedon@gmail.com.
+Because your data lives only on your device:
 
-**Data Retention Policy**
+- **Sign out** or use **Clear cache** in the app to remove the local copy.
+- **Uninstalling** the app removes all local data.
+- The app does not control data held by MyGES/Kordis; to access, correct, or
+  delete your data **at the source**, use MyGES or contact Réseau GES.
 
-The Service Provider retains personal data based on its necessity for the stated purposes:
+## Children
 
-- User Provided Data: Retained for the duration of your use of the Application plus 12 months thereafter, unless longer retention is required by law
-- Automatically Collected Data: Retained for up to 24 months from collection, unless longer retention is required for legal compliance
-- Aggregated and Anonymized Data: Retained indefinitely as it no longer identifies you
-- Data required for legal compliance: Retained as long as required by applicable law
+The app is not directed at children under 16. It does not knowingly collect data
+from children.
 
-You may request deletion of your personal data, subject to any legal obligation to retain it. If you want the Service Provider to delete User Provided Data submitted through the Application, please contact them at erwan.luce.guedon@gmail.com. Please note that some User Provided Data may be required for the Application to function properly.
+## Your rights (GDPR / RGPD)
 
-**Children**
+You may request access to, correction of, or deletion of any personal data the
+author holds — in practice the author holds **none**, since all processing is
+local and sourced live from Kordis. For source data, contact your school /
+Réseau GES. For questions about the app, contact erwan.luce.guedon@gmail.com.
 
-The Application is not intended for children under 16 years of age, or such higher age as required by applicable law. The Service Provider does not knowingly solicit data from children or market the Application to them.
+## Changes
 
-The Service Provider does not knowingly collect personally identifiable information from children. The Service Provider encourages all children to never submit any personally identifiable information through the Application and/or Services. The Service Provider encourages parents and legal guardians to monitor their children's Internet usage and to help enforce this Policy by instructing their children never to provide personally identifiable information through the Application and/or Services without their permission. If you have reason to believe that a child has provided personally identifiable information to the Service Provider through the Application and/or Services, please contact the Service Provider <span>(erwan.luce.guedon@gmail.com)</span> so that they will be able to take the necessary actions. If you are under 16 years of age, your parent or guardian must provide consent on your behalf where permitted by law.
+This policy may be updated; the effective date above will change and the updated
+version will be published in the project repository.
 
-**Security**
+## Contact
 
-The Service Provider is concerned about safeguarding the confidentiality of your information. The Service Provider provides physical, electronic, and procedural safeguards to protect information the Service Provider processes and maintains.
-
-**Data Breach Notification**
-
-If a data breach occurs that affects your personal data, the Service Provider will notify you in accordance with applicable legal requirements, including, where required, providing information about the nature of the breach and the steps being taken to address it.
-
-**Changes**
-
-The Service Provider may update this Privacy Policy from time to time. The Service Provider will notify you of material changes by posting the updated Privacy Policy with an effective date. Where required by law, the Service Provider will seek your consent to material changes before they take effect.
-
-Previous versions of this Privacy Policy will be maintained and made available upon request by contacting the Service Provider at erwan.luce.guedon@gmail.com.
-
-This privacy policy is effective as of 2026-06-16
-
-**Your Consent**
-
-Where processing is based on consent, you provide that consent by affirmatively opting in to the relevant feature or action. You may withdraw consent at any time without affecting processing carried out before withdrawal. Processing based on other lawful bases is carried out as described above.
-
-**Contact Us**
-
-If you have any questions regarding privacy while using the Application, or have questions about the practices, please contact the Service Provider via email at erwan.luce.guedon@gmail.com.
-
----
-
-This privacy policy page was generated by [App Privacy Policy Generator](https://app-privacy-policy-generator.nisrulz.com/)
+erwan.luce.guedon@gmail.com

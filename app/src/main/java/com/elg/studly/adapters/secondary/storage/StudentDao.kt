@@ -36,8 +36,11 @@ abstract class StudentDao {
     @Query("SELECT * FROM practicals ORDER BY startsAtEpochMillis ASC, name ASC")
     abstract fun observePracticals(): Flow<List<PracticalEntity>>
 
-    @Query("SELECT * FROM documents ORDER BY updatedAtEpochMillis DESC, title ASC")
+    @Query("SELECT id, title, category, year, mimeType, fileName, downloadUrl, updatedAtEpochMillis, ownerId, groupId, NULL AS inlineContent FROM documents ORDER BY updatedAtEpochMillis DESC, title ASC")
     abstract fun observeDocuments(): Flow<List<AcademicDocumentEntity>>
+
+    @Query("SELECT inlineContent FROM documents WHERE id = :id")
+    abstract suspend fun documentInlineContent(id: String): String?
 
     @Query("SELECT * FROM directory_people ORDER BY role ASC, displayName ASC")
     abstract fun observeDirectory(): Flow<List<DirectoryPersonEntity>>

@@ -245,6 +245,12 @@
     <string name="settings_logout">Sign out</string>
     <string name="settings_about">About</string>
     <string name="settings_rate_play_store">Rate on Google Play</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_unofficial_disclaimer">Unofficial app, not affiliated with MyGES, Réseau GES or Kordis. Independent open-source project.</string>
+    <string name="about_privacy_policy">Privacy policy</string>
+    <string name="about_licenses">Open-source licenses</string>
+    <string name="about_source_code">Source code</string>
+    <string name="about_contact">Contact the developer</string>
     <string name="settings_notifications">Notification preferences</string>
     <string name="settings_notify_absences">Absences</string>
     <string name="settings_notify_agenda">Agenda</string>

@@ -71,6 +71,10 @@
             android:authorities="${applicationId}.androidx-startup"
             tools:node="remove" />
 
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+
         <receiver
             android:name=".adapters.primary.widget.NextCourseWidget"
             android:exported="false">

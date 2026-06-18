@@ -88,10 +88,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == Intent.ACTION_VIEW) {
-            oauthCallbackUri = intent.data
+            if (intent.data.isOAuthCallback()) oauthCallbackUri = intent.data
         } else {
             notificationRoute = intent?.getStringExtra(EXTRA_NOTIFICATION_ROUTE)
         }
+    }
+
+    private fun Uri?.isOAuthCallback(): Boolean {
+        if (this == null) return false
+        val redirect = Uri.parse(BuildConfig.KORDIS_OAUTH_REDIRECT_URI)
+        return scheme.equals(redirect.scheme, ignoreCase = true) &&
+            (redirect.path.isNullOrEmpty() || path == redirect.path)
     }
 
     companion object {

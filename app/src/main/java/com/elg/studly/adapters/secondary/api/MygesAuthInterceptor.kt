@@ -1,6 +1,7 @@
 package com.elg.studly.adapters.secondary.api
 
 import com.elg.studly.application.ports.SessionRepository
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Protocol
 import okhttp3.Response
@@ -8,14 +9,20 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 
 class MygesAuthInterceptor(
     private val userAgent: String,
+    apiBaseUrl: String,
     private val sessionRepository: SessionRepository
 ) : Interceptor {
+    private val apiHost = apiBaseUrl.toHttpUrlOrNull()?.host
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val requestBuilder = request.newBuilder()
             .header("User-Agent", userAgent)
         if (request.header("Accept") == null) {
             requestBuilder.header("Accept", "application/json")
+        }
+        if (request.url.host != apiHost) {
+            return chain.proceed(requestBuilder.build())
         }
         val session = sessionRepository.currentSession()
         if (session?.isExpired == true || session?.requiresRefresh == true) {

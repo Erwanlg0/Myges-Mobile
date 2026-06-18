@@ -1,6 +1,7 @@
 package com.elg.studly.adapters.primary.ui
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.net.Uri
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -89,15 +90,19 @@ fun DepositWebViewScreen(
                     WebView(ctx).apply {
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
-                        settings.allowFileAccess = true
-                        settings.allowContentAccess = true
+                        settings.allowFileAccess = false
+                        settings.allowContentAccess = false
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(
                                 view: WebView,
                                 request: WebResourceRequest
                             ): Boolean {
-                                
-                                return false
+                                val host = request.url.host ?: return false
+                                if (host == "myges.fr" || host.endsWith(".myges.fr")) return false
+                                return runCatching {
+                                    view.context.startActivity(Intent(Intent.ACTION_VIEW, request.url))
+                                    true
+                                }.getOrDefault(false)
                             }
                         }
                         webChromeClient = object : WebChromeClient() {

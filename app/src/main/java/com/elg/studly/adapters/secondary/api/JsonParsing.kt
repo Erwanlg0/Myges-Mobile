@@ -7,6 +7,7 @@ import com.elg.studly.domain.model.Course
 import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.DirectoryRole
 import com.elg.studly.domain.model.Grade
+import com.elg.studly.domain.model.combineCcExam
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
@@ -209,12 +210,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
 
         
         val ccAverage = if (ccGrades.isNotEmpty()) ccGrades.map { it.first }.average() else null
-        val calculatedAverage = when {
-            ccAverage != null && examValue != null -> 0.5 * ccAverage + 0.5 * examValue
-            ccAverage != null -> ccAverage
-            examValue != null -> examValue
-            else -> null
-        }
+        val calculatedAverage = combineCcExam(ccAverage, examValue)
 
         val finalAverage = calculatedAverage ?: root.number("average", "moyenne")?.takeIf { it != 0.0 }
 

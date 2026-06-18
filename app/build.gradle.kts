@@ -55,6 +55,11 @@ android {
             "MYGES_USER_AGENT",
             buildConfigString(projectValue("MYGES_USER_AGENT", "MyGES Android"))
         )
+        buildConfigField(
+            "String",
+            "SENTRY_DSN",
+            buildConfigString(projectValue("MYGES_SENTRY_DSN", ""))
+        )
     }
 
     signingConfigs {
@@ -148,6 +153,7 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.play.app.update)
     implementation(libs.play.review)
+    implementation(libs.sentry.android)
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.sqlcipher.android)

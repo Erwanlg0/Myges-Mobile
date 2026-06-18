@@ -321,6 +321,8 @@ private class RepositoryDao : StudentDao() {
     override suspend fun projectSteps(): List<ProjectStepEntity> = projectStepState.value
     override suspend fun practicals(): List<PracticalEntity> = practicalState.value
     override suspend fun documents(): List<AcademicDocumentEntity> = documentState.value
+    override suspend fun documentInlineContent(id: String): String? =
+        documentState.value.firstOrNull { it.id == id }?.inlineContent
     override suspend fun directoryPeople(): List<DirectoryPersonEntity> = directoryState.value
     override suspend fun news(): List<NewsEntity> = newsState.value
     override suspend fun upsertProfile(profile: StudentProfileEntity) {

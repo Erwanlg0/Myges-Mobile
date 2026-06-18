@@ -14,6 +14,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.Instant
 
@@ -21,7 +22,7 @@ class MygesAuthInterceptorTest {
     @Test
     fun interceptorAddsBearerSchemeForRawToken() {
         val sessionRepository = RecordingSessionRepository(sampleSession("raw-token"))
-        val interceptor = MygesAuthInterceptor("agent", sessionRepository)
+        val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)
         val chain = mockChain(200)
 
         interceptor.intercept(chain)
@@ -38,7 +39,7 @@ class MygesAuthInterceptorTest {
     @Test
     fun interceptorKeepsExistingAuthorizationScheme() {
         val sessionRepository = RecordingSessionRepository(sampleSession("bearer token"))
-        val interceptor = MygesAuthInterceptor("agent", sessionRepository)
+        val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)
         val chain = mockChain(200)
 
         interceptor.intercept(chain)
@@ -57,7 +58,7 @@ class MygesAuthInterceptorTest {
             refreshAfter = Instant.now().minusSeconds(1)
         )
         val sessionRepository = RecordingSessionRepository(session)
-        val interceptor = MygesAuthInterceptor("agent", sessionRepository)
+        val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)
         val chain = mockChain(200)
 
         val response = interceptor.intercept(chain)
@@ -68,9 +69,31 @@ class MygesAuthInterceptorTest {
     }
 
     @Test
+    fun interceptorDoesNotAttachTokenForForeignHost() {
+        val session = sampleSession(
+            token = "token",
+            refreshAfter = Instant.now().minusSeconds(1)
+        )
+        val sessionRepository = RecordingSessionRepository(session)
+        val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)
+        val chain = mockChain(200, url = "https://files.example.com/document.pdf")
+
+        val response = interceptor.intercept(chain)
+
+        assertEquals(200, response.code)
+        assertEquals(0, sessionRepository.invalidations)
+        verify {
+            chain.proceed(withArg { request ->
+                assertNull(request.header("Authorization"))
+                assertEquals("agent", request.header("User-Agent"))
+            })
+        }
+    }
+
+    @Test
     fun interceptorInvalidatesSessionOnRemoteUnauthorized() {
         val sessionRepository = RecordingSessionRepository(sampleSession("token"))
-        val interceptor = MygesAuthInterceptor("agent", sessionRepository)
+        val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)
         val chain = mockChain(401)
 
         interceptor.intercept(chain)
@@ -79,10 +102,10 @@ class MygesAuthInterceptorTest {
     }
 }
 
-private fun mockChain(statusCode: Int): Interceptor.Chain {
+private fun mockChain(statusCode: Int, url: String = "https://api.kordis.fr/me/profile"): Interceptor.Chain {
     val chain = mockk<Interceptor.Chain>()
     val request = Request.Builder()
-        .url("https://api.kordis.fr/me/profile")
+        .url(url)
         .build()
     val requestSlot = slot<Request>()
     every { chain.request() } returns request

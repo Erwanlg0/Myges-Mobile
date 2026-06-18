@@ -39,6 +39,11 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.Description
+import com.elg.studly.BuildConfig
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.UploadFile
@@ -127,6 +132,8 @@ import com.elg.studly.domain.model.DashboardSummary
 import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.DirectoryRole
 import com.elg.studly.domain.model.Grade
+import com.elg.studly.domain.model.combineCcExam
+import com.elg.studly.domain.model.mainGrades
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
@@ -693,22 +700,17 @@ fun AgendaScreen(
     }
 }
 
-private val CC_SUBJECT_REGEX = Regex("^(cc|contrôle continu)\\s*\\d*$", RegexOption.IGNORE_CASE)
+private const val PRIVACY_POLICY_URL = "https://github.com/Erwanlg0/Myges-Mobile/blob/main/PRIVACY.MD"
+private const val SOURCE_CODE_URL = "https://github.com/Erwanlg0/Myges-Mobile"
+private const val LICENSES_URL = "https://github.com/Erwanlg0/Myges-Mobile/blob/main/THIRD_PARTY_LICENSES.md"
+private const val SUPPORT_EMAIL = "erwan.luce.guedon@gmail.com"
 
+private val ACADEMIC_YEAR_REGEX = Regex("\\d{4}\\s*-\\s*\\d{4}")
+private val SEMESTER_REGEX = Regex("Semestre\\s*\\d+", RegexOption.IGNORE_CASE)
+private val FOUR_DIGITS_REGEX = Regex("\\d{4}")
+private val DIGITS_REGEX = Regex("\\d+")
 
-private fun deriveMainGrades(source: List<Grade>): List<Grade> {
-    val structuredKeys = source
-        .filter { it.subject.isBlank() && !it.id.contains("-cc-") && !it.id.contains("-exam") }
-        .map { it.courseName to it.period }
-        .toSet()
-    return source.filter { grade ->
-        !grade.id.contains("-cc-") &&
-        !grade.id.contains("-exam") &&
-        !((grade.courseName to grade.period) in structuredKeys &&
-            (grade.subject.matches(CC_SUBJECT_REGEX) ||
-             grade.subject.trim().equals("examen", ignoreCase = true)))
-    }
-}
+private fun deriveMainGrades(source: List<Grade>): List<Grade> = source.mainGrades()
 
 @Composable
 fun GradesScreen(
@@ -1759,7 +1761,7 @@ fun DocumentsScreen(
 private fun AcademicDocument.filterYear(): String? {
     year?.takeIf { it.isNotBlank() }?.let { raw ->
         
-        Regex("\\d{4}\\s*-\\s*\\d{4}").find(raw)?.value?.replace(" ", "")?.let { return it }
+        ACADEMIC_YEAR_REGEX.find(raw)?.value?.replace(" ", "")?.let { return it }
         raw.trim().toIntOrNull()?.let { return "$it-${it + 1}" }
         return raw
     }
@@ -2003,6 +2005,68 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+                Text(
+                    text = stringResource(R.string.about_version, BuildConfig.VERSION_NAME),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = stringResource(R.string.about_unofficial_disclaimer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL)))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.Shield, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.about_privacy_policy))
+                }
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(LICENSES_URL)))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.Description, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.about_licenses))
+                }
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_CODE_URL)))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.Code, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.about_source_code))
+                }
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$SUPPORT_EMAIL")))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.Email, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.about_contact))
+                }
                 OutlinedButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -2021,7 +2085,8 @@ fun SettingsScreen(
                                 )
                             )
                         }
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Rounded.Star, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -3284,7 +3349,7 @@ private fun AllGroupsDialog(
     val sortedGroups = remember(groups) {
         groups.sortedWith(
             compareBy<ProjectGroup> { !it.isMine }
-                .thenBy { group -> Regex("\\d+").find(group.name)?.value?.toIntOrNull() ?: Int.MAX_VALUE }
+                .thenBy { group -> DIGITS_REGEX.find(group.name)?.value?.toIntOrNull() ?: Int.MAX_VALUE }
                 .thenBy { group -> group.name }
         )
     }
@@ -4028,37 +4093,57 @@ private fun MonthCalendarGrid(
 
 private fun List<AgendaEvent>.toIcsString(): String {
     val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC)
-    val sb = java.lang.StringBuilder()
-    sb.append("BEGIN:VCALENDAR\n")
-    sb.append("VERSION:2.0\n")
-    sb.append("PRODID:-//MyGES Mobile//Calendar Export//EN\n")
-    sb.append("CALSCALE:GREGORIAN\n")
+    val lines = mutableListOf(
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//MyGES Mobile//Calendar Export//EN",
+        "CALSCALE:GREGORIAN"
+    )
     forEach { event ->
-        sb.append("BEGIN:VEVENT\n")
-        sb.append("UID:").append(event.id).append("\n")
-        sb.append("DTSTART:").append(formatter.format(event.startsAt)).append("\n")
-        sb.append("DTEND:").append(formatter.format(event.endsAt)).append("\n")
-        sb.append("SUMMARY:").append(event.title).append("\n")
         val desc = listOfNotNull(event.teacher, event.type, event.modality).joinToString(" - ")
-        sb.append("DESCRIPTION:").append(desc).append("\n")
-        sb.append("LOCATION:").append(event.room.orEmpty()).append("\n")
-        sb.append("END:VEVENT\n")
+        lines += "BEGIN:VEVENT"
+        lines += "UID:${event.id.escapeIcsText()}"
+        lines += "DTSTART:${formatter.format(event.startsAt)}"
+        lines += "DTEND:${formatter.format(event.endsAt)}"
+        lines += "SUMMARY:${event.title.escapeIcsText()}"
+        lines += "DESCRIPTION:${desc.escapeIcsText()}"
+        lines += "LOCATION:${event.room.orEmpty().escapeIcsText()}"
+        lines += "END:VEVENT"
     }
-    sb.append("END:VCALENDAR\n")
-    return sb.toString()
+    lines += "END:VCALENDAR"
+    return lines.joinToString("\r\n", postfix = "\r\n") { it.foldIcsLine() }
+}
+
+private fun String.escapeIcsText(): String {
+    return replace("\\", "\\\\")
+        .replace(";", "\\;")
+        .replace(",", "\\,")
+        .replace("\r\n", "\\n")
+        .replace("\n", "\\n")
+        .replace("\r", "\\n")
+}
+
+private fun String.foldIcsLine(): String {
+    if (length <= 75) return this
+    val builder = StringBuilder()
+    var index = 0
+    while (index < length) {
+        val end = minOf(index + 75, length)
+        if (index > 0) builder.append("\r\n ")
+        builder.append(this, index, end)
+        index = end
+    }
+    return builder.toString()
 }
 
 private fun comparePeriods(p1: String, p2: String): Int {
-    val yearRegex = Regex("\\d{4}")
-    val year1 = yearRegex.find(p1)?.value?.toIntOrNull() ?: 0
-    val year2 = yearRegex.find(p2)?.value?.toIntOrNull() ?: 0
+    val year1 = FOUR_DIGITS_REGEX.find(p1)?.value?.toIntOrNull() ?: 0
+    val year2 = FOUR_DIGITS_REGEX.find(p2)?.value?.toIntOrNull() ?: 0
     if (year1 != year2) {
         return year1.compareTo(year2)
     }
-    
-    val numRegex = Regex("\\d+")
-    val num1 = numRegex.findAll(p1).mapNotNull { it.value.toIntOrNull() }.lastOrNull() ?: 0
-    val num2 = numRegex.findAll(p2).mapNotNull { it.value.toIntOrNull() }.lastOrNull() ?: 0
+    val num1 = DIGITS_REGEX.findAll(p1).mapNotNull { it.value.toIntOrNull() }.lastOrNull() ?: 0
+    val num2 = DIGITS_REGEX.findAll(p2).mapNotNull { it.value.toIntOrNull() }.lastOrNull() ?: 0
     return num1.compareTo(num2)
 }
 
@@ -4107,21 +4192,16 @@ private fun List<Grade>.withSimulatedValues(values: Map<String, Double>): List<G
 }
 
 private fun List<Grade>.withRecomputedMainGrades(mainOverrides: Set<String>): List<Grade> {
+    val componentsByCourse = groupBy { it.courseName to it.period }
     return map { grade ->
         if (grade.id.contains("-cc-") || grade.id.contains("-exam") || grade.id in mainOverrides) {
             grade
         } else {
-            val components = filter { it.courseName == grade.courseName && it.period == grade.period }
+            val components = componentsByCourse[grade.courseName to grade.period].orEmpty()
             val ccValues = components.filter { it.id.contains("-cc-") }.mapNotNull { it.value }
             val examValue = components.firstOrNull { it.id.contains("-exam") }?.value
             val ccAverage = ccValues.takeIf { it.isNotEmpty() }?.average()
-            val recomputedValue = when {
-                ccAverage != null && examValue != null -> 0.5 * ccAverage + 0.5 * examValue
-                ccAverage != null -> ccAverage
-                examValue != null -> examValue
-                else -> grade.value
-            }
-            grade.copy(value = recomputedValue)
+            grade.copy(value = combineCcExam(ccAverage, examValue) ?: grade.value)
         }
     }
 }
@@ -4191,7 +4271,7 @@ private fun Grade.blockKey(): String {
 }
 
 private fun Grade.academicYearLabel(): String {
-    Regex("\\d{4}\\s*-\\s*\\d{4}").find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
+    ACADEMIC_YEAR_REGEX.find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
     val gradeDate = date ?: return ""
     val startYear = if (gradeDate.monthValue >= 9) gradeDate.year else gradeDate.year - 1
     return "$startYear-${startYear + 1}"
@@ -4202,19 +4282,19 @@ private fun Course.academicYearLabel(): String? {
         startYear.toIntOrNull()?.let { return "$it-${it + 1}" }
         return startYear
     }
-    Regex("\\d{4}\\s*-\\s*\\d{4}").find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
+    ACADEMIC_YEAR_REGEX.find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
     return null
 }
 
 private fun Absence.academicYearLabel(): String {
-    Regex("\\d{4}\\s*-\\s*\\d{4}").find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
+    ACADEMIC_YEAR_REGEX.find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
     val date = startsAt.atZone(ZoneId.systemDefault()).toLocalDate()
     val startYear = if (date.monthValue >= 9) date.year else date.year - 1
     return "$startYear-${startYear + 1}"
 }
 
 private fun String.academicYearLabel(): String {
-    Regex("\\d{4}\\s*-\\s*\\d{4}").find(this)?.value?.replace(" ", "")?.let { return it }
+    ACADEMIC_YEAR_REGEX.find(this)?.value?.replace(" ", "")?.let { return it }
     return this
 }
 
@@ -4231,7 +4311,7 @@ private fun Course.semesterLabel(): String? {
 }
 
 private fun String.semesterLabel(): String? {
-    return Regex("Semestre\\s*\\d+", RegexOption.IGNORE_CASE).find(this)?.value
+    return SEMESTER_REGEX.find(this)?.value
 }
 
 @Composable

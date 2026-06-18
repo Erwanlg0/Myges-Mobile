@@ -34,6 +34,28 @@ fun List<Grade>.toGradeSummary(): GradeSummary {
     )
 }
 
+private val CC_SUBJECT_REGEX = Regex("^(cc|contrôle continu)\\s*\\d*$", RegexOption.IGNORE_CASE)
+
+fun combineCcExam(ccAverage: Double?, examValue: Double?): Double? = when {
+    ccAverage != null && examValue != null -> 0.5 * ccAverage + 0.5 * examValue
+    ccAverage != null -> ccAverage
+    examValue != null -> examValue
+    else -> null
+}
+
+fun List<Grade>.mainGrades(): List<Grade> {
+    val structuredKeys = filter { it.subject.isBlank() && !it.id.contains("-cc-") && !it.id.contains("-exam") }
+        .map { it.courseName to it.period }
+        .toSet()
+    return filter { grade ->
+        !grade.id.contains("-cc-") &&
+        !grade.id.contains("-exam") &&
+        !((grade.courseName to grade.period) in structuredKeys &&
+            (grade.subject.matches(CC_SUBJECT_REGEX) ||
+             grade.subject.trim().equals("examen", ignoreCase = true)))
+    }
+}
+
 private data class GradeWeight(
     val normalizedValue: Double,
     val coefficient: Double?
