@@ -22,7 +22,12 @@ class MygesApplication : Application(), Configuration.Provider {
         super.onCreate()
         val sentryDsn = BuildConfig.SENTRY_DSN
         if (sentryDsn.isNotBlank()) {
-            SentryAndroid.init(this) { options -> options.dsn = sentryDsn }
+            SentryAndroid.init(this) { options ->
+                options.dsn = sentryDsn
+                options.release = "${BuildConfig.APPLICATION_ID}@${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}"
+                options.environment = if (BuildConfig.DEBUG) "debug" else "production"
+                options.isSendDefaultPii = false
+            }
         }
         notificationScheduler.ensureChannels()
     }
