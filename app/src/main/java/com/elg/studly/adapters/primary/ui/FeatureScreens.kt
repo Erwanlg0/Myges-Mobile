@@ -43,6 +43,8 @@ import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Lightbulb
 import com.elg.studly.BuildConfig
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.OpenInNew
@@ -704,6 +706,8 @@ private const val PRIVACY_POLICY_URL = "https://github.com/Erwanlg0/Myges-Mobile
 private const val SOURCE_CODE_URL = "https://github.com/Erwanlg0/Myges-Mobile"
 private const val LICENSES_URL = "https://github.com/Erwanlg0/Myges-Mobile/blob/main/THIRD_PARTY_LICENSES.md"
 private const val SUPPORT_EMAIL = "erwan.luce.guedon@gmail.com"
+private const val GITHUB_ISSUES_BUG_URL = "https://github.com/Erwanlg0/Myges-Mobile/issues/new?labels=bug"
+private const val GITHUB_ISSUES_FEATURE_URL = "https://github.com/Erwanlg0/Myges-Mobile/issues/new?labels=enhancement"
 
 private val ACADEMIC_YEAR_REGEX = Regex("\\d{4}\\s*-\\s*\\d{4}")
 private val SEMESTER_REGEX = Regex("Semestre\\s*\\d+", RegexOption.IGNORE_CASE)
@@ -2091,6 +2095,32 @@ fun SettingsScreen(
                     Icon(Icons.Rounded.Star, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.settings_rate_play_store))
+                }
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_ISSUES_BUG_URL)))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.BugReport, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.about_report_bug))
+                }
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_ISSUES_FEATURE_URL)))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.Lightbulb, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.about_suggest_improvement))
                 }
             }
         }

@@ -251,6 +251,8 @@
     <string name="about_licenses">Open-source licenses</string>
     <string name="about_source_code">Source code</string>
     <string name="about_contact">Contact the developer</string>
+    <string name="about_report_bug">Report a bug</string>
+    <string name="about_suggest_improvement">Suggest an improvement</string>
     <string name="settings_notifications">Notification preferences</string>
     <string name="settings_notify_absences">Absences</string>
     <string name="settings_notify_agenda">Agenda</string>
