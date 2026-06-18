@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.elg.studly.adapters.primary.widget.WidgetUpdater
 import com.elg.studly.application.ports.NotificationScheduler
 import com.elg.studly.application.usecase.RefreshStudentDataUseCase
 import dagger.assisted.Assisted
@@ -18,7 +19,10 @@ class StudentSyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, workerParameters) {
     override suspend fun doWork(): Result {
         return runCatching { refreshStudentDataUseCase() }.fold(
-            onSuccess = { Result.success() },
+            onSuccess = {
+                WidgetUpdater.refreshAll(applicationContext)
+                Result.success()
+            },
             onFailure = {
                 notificationScheduler.showSyncFailure()
                 Result.retry()

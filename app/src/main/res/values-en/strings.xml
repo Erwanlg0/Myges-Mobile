@@ -292,4 +292,19 @@
     <string name="settings_sync_interval_feature_directory">Directory</string>
     <string name="settings_sync_interval_feature_news">News</string>
     <string name="settings_sync_interval_title">Interval for %1$s</string>
+    <string name="widget_next_course_label">Next class</string>
+    <string name="widget_next_course_description">Shows your next class</string>
+    <string name="widget_no_course">No upcoming class</string>
+    <string name="widget_average_label">Term average</string>
+    <string name="widget_average_description">Shows the current term average</string>
+    <string name="widget_average_value">%1$s/20</string>
+    <string name="widget_no_grades">No grades</string>
+    <string name="widget_deadline_label">Next deadline</string>
+    <string name="widget_deadline_description">Shows the next project to submit</string>
+    <string name="widget_no_deadline">No deadlines</string>
+    <string name="widget_summary_description">Overview: class, average and deadline</string>
+    <plurals name="widget_grades_count">
+        <item quantity="one">%1$d grade</item>
+        <item quantity="other">%1$d grades</item>
+    </plurals>
 </resources>

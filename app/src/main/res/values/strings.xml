@@ -292,4 +292,19 @@
     <string name="settings_sync_interval_feature_directory">Trombinoscope</string>
     <string name="settings_sync_interval_feature_news">Actualités</string>
     <string name="settings_sync_interval_title">Intervalle pour %1$s</string>
+    <string name="widget_next_course_label">Prochain cours</string>
+    <string name="widget_next_course_description">Affiche votre prochain cours</string>
+    <string name="widget_no_course">Aucun cours à venir</string>
+    <string name="widget_average_label">Moyenne du trimestre</string>
+    <string name="widget_average_description">Affiche la moyenne du trimestre en cours</string>
+    <string name="widget_average_value">%1$s/20</string>
+    <string name="widget_no_grades">Aucune note</string>
+    <string name="widget_deadline_label">Prochaine échéance</string>
+    <string name="widget_deadline_description">Affiche le prochain projet à rendre</string>
+    <string name="widget_no_deadline">Aucune échéance</string>
+    <string name="widget_summary_description">Aperçu : cours, moyenne et échéance</string>
+    <plurals name="widget_grades_count">
+        <item quantity="one">%1$d note</item>
+        <item quantity="other">%1$d notes</item>
+    </plurals>
 </resources>
