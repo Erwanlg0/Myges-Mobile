@@ -12,6 +12,7 @@ import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ProjectMessage
 import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
 import com.elg.studly.domain.model.StudentEvent
@@ -48,6 +49,8 @@ interface StudentDataRepository {
     suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit = {}): Uri
     suspend fun joinGroup(courseId: String, projectId: String, groupId: String)
     suspend fun leaveGroup(courseId: String, projectId: String, groupId: String)
+    suspend fun projectMessages(groupId: String): List<ProjectMessage> = emptyList()
+    suspend fun sendProjectMessage(groupId: String, message: String) = Unit
 }
 
 interface SettingsRepository {

@@ -16,6 +16,7 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ProjectMessage
 import com.elg.studly.domain.model.ReminderKind
 import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
@@ -224,6 +225,20 @@ class LeaveGroupUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(courseId: String, projectId: String, groupId: String) =
         repository.leaveGroup(courseId, projectId, groupId)
+}
+
+class ProjectMessagesUseCase @Inject constructor(
+    private val repository: StudentDataRepository
+) {
+    suspend operator fun invoke(groupId: String): List<ProjectMessage> =
+        repository.projectMessages(groupId)
+}
+
+class SendProjectMessageUseCase @Inject constructor(
+    private val repository: StudentDataRepository
+) {
+    suspend operator fun invoke(groupId: String, message: String) =
+        repository.sendProjectMessage(groupId, message)
 }
 
 class ObserveSettingsUseCase @Inject constructor(

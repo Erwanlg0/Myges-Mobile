@@ -325,7 +325,7 @@ internal data class DesiredCalendarEvent(
             } else if (colorArgb != null) {
                 put(CalendarContract.Events.EVENT_COLOR, colorArgb)
             }
-            put(CalendarContract.Events.CUSTOM_APP_PACKAGE, "com.elg.Studly")
+            put(CalendarContract.Events.CUSTOM_APP_PACKAGE, "com.elg.studly")
             put(CalendarContract.Events.CUSTOM_APP_URI, "Studly://agenda/$externalId")
             if (location == null) {
                 putNull(CalendarContract.Events.EVENT_LOCATION)

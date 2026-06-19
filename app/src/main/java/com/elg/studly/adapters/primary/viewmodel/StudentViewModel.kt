@@ -22,7 +22,9 @@ import com.elg.studly.application.usecase.ObserveEventsUseCase
 import com.elg.studly.application.usecase.ObserveNewsUseCase
 import com.elg.studly.application.usecase.ObservePracticalsUseCase
 import com.elg.studly.application.usecase.ObserveProjectsUseCase
+import com.elg.studly.application.usecase.ProjectMessagesUseCase
 import com.elg.studly.application.usecase.RefreshStudentDataUseCase
+import com.elg.studly.application.usecase.SendProjectMessageUseCase
 import com.elg.studly.application.usecase.SyncAgendaToCalendarUseCase
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
@@ -36,6 +38,7 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ProjectMessage
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.toAppError
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -76,6 +79,8 @@ class StudentViewModel @Inject constructor(
     private val downloadDocumentUseCase: DownloadDocumentUseCase,
     private val joinGroupUseCase: JoinGroupUseCase,
     private val leaveGroupUseCase: LeaveGroupUseCase,
+    private val projectMessagesUseCase: ProjectMessagesUseCase,
+    private val sendProjectMessageUseCase: SendProjectMessageUseCase,
     private val logoutUseCase: LogoutUseCase,
     networkMonitor: NetworkMonitor
 ) : ViewModel() {
@@ -92,6 +97,8 @@ class StudentViewModel @Inject constructor(
     val refreshSucceeded: SharedFlow<Unit> = _refreshSucceeded
     private val _calendarSyncCompleted = MutableSharedFlow<Unit>()
     val calendarSyncCompleted: SharedFlow<Unit> = _calendarSyncCompleted
+    private val _projectMessages = MutableStateFlow<Map<String, FeatureUiState<List<ProjectMessage>>>>(emptyMap())
+    val projectMessages: StateFlow<Map<String, FeatureUiState<List<ProjectMessage>>>> = _projectMessages
 
     private val _depositRequests = MutableSharedFlow<String>()
     val depositRequests: SharedFlow<String> = _depositRequests
@@ -225,6 +232,46 @@ class StudentViewModel @Inject constructor(
 
     fun leaveGroup(courseId: String, projectId: String, groupId: String) {
         changeGroupMembership { leaveGroupUseCase(courseId, projectId, groupId) }
+    }
+
+    fun loadProjectMessages(groupId: String) {
+        viewModelScope.launch {
+            _projectMessages.update { states ->
+                states + (groupId to (states[groupId] ?: FeatureUiState(emptyList())).copy(refreshing = true, error = null))
+            }
+            runCatching { projectMessagesUseCase(groupId) }
+                .onSuccess { messages ->
+                    _projectMessages.update { states ->
+                        states + (groupId to FeatureUiState(data = messages.sortedBy { it.sentAt }, online = true))
+                    }
+                }
+                .onFailure { throwable ->
+                    val appError = throwable.toAppError()
+                    _projectMessages.update { states ->
+                        states + (groupId to (states[groupId] ?: FeatureUiState(emptyList())).copy(refreshing = false, error = appError))
+                    }
+                    if (appError == AppError.Unauthorized) handleFailure(throwable)
+                }
+        }
+    }
+
+    fun sendProjectMessage(groupId: String, message: String) {
+        val trimmed = message.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            _projectMessages.update { states ->
+                states + (groupId to (states[groupId] ?: FeatureUiState(emptyList())).copy(refreshing = true, error = null))
+            }
+            runCatching { sendProjectMessageUseCase(groupId, trimmed) }
+                .onSuccess { loadProjectMessages(groupId) }
+                .onFailure { throwable ->
+                    val appError = throwable.toAppError()
+                    _projectMessages.update { states ->
+                        states + (groupId to (states[groupId] ?: FeatureUiState(emptyList())).copy(refreshing = false, error = appError))
+                    }
+                    if (appError == AppError.Unauthorized) handleFailure(throwable)
+                }
+        }
     }
 
     private fun changeGroupMembership(action: suspend () -> Unit) {

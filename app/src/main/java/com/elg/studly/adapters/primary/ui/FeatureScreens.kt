@@ -50,6 +50,8 @@ import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.GroupAdd
 import androidx.compose.material.icons.rounded.Logout
+import androidx.compose.material.icons.rounded.Forum
+import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.LocationOn
@@ -122,6 +124,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elg.studly.R
+import com.elg.studly.adapters.primary.state.FeatureUiState
 import com.elg.studly.adapters.primary.viewmodel.SettingsViewModel
 import com.elg.studly.adapters.primary.viewmodel.StudentViewModel
 import com.elg.studly.domain.model.Absence
@@ -140,6 +143,7 @@ import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ProjectGroup
+import com.elg.studly.domain.model.ProjectMessage
 import com.elg.studly.domain.model.ProjectStep
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
@@ -1366,6 +1370,7 @@ fun ProjectsScreen(
     val documentsState by viewModel.documents.collectAsStateWithLifecycle()
     val downloadingDocumentIds by viewModel.downloadingDocumentIds.collectAsStateWithLifecycle()
     val documentDownloadProgress by viewModel.documentDownloadProgress.collectAsStateWithLifecycle()
+    val projectMessages by viewModel.projectMessages.collectAsStateWithLifecycle()
     var selectedProject by remember { mutableStateOf<Project?>(null) }
     var selectedYear by remember(state.data) { mutableStateOf<String?>(null) }
 
@@ -1394,6 +1399,9 @@ fun ProjectsScreen(
             onOpenDocument = viewModel::openDocument,
             onDownloadDocument = viewModel::downloadDocument,
             onDeposit = viewModel::requestDeposit,
+            messageStates = projectMessages,
+            onLoadMessages = viewModel::loadProjectMessages,
+            onSendMessage = viewModel::sendProjectMessage,
             onJoinGroup = project.courseId?.let { rcId ->
                 { groupId: String -> viewModel.joinGroup(rcId, project.id, groupId) }
             },
@@ -3304,12 +3312,25 @@ private fun ProjectDetailsDialog(
     onOpenDocument: (AcademicDocument) -> Unit,
     onDownloadDocument: (AcademicDocument) -> Unit,
     onDeposit: (String) -> Unit,
+    messageStates: Map<String, FeatureUiState<List<ProjectMessage>>>,
+    onLoadMessages: (String) -> Unit,
+    onSendMessage: (String, String) -> Unit,
     onJoinGroup: ((String) -> Unit)? = null,
     onLeaveGroup: ((String) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var selectedStepId by remember(project.id) { mutableStateOf(project.steps.firstOrNull()?.id) }
+    var chatGroup by remember(project.id) { mutableStateOf<ProjectGroup?>(null) }
     val selectedStep = project.steps.firstOrNull { it.id == selectedStepId }
+    chatGroup?.let { group ->
+        ProjectChatDialog(
+            group = group,
+            state = messageStates[group.id] ?: FeatureUiState(emptyList()),
+            onLoad = { onLoadMessages(group.id) },
+            onSend = { message -> onSendMessage(group.id, message) },
+            onDismiss = { chatGroup = null }
+        )
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.projects_detail_title)) },
@@ -3398,6 +3419,15 @@ private fun ProjectDetailsDialog(
                                 Spacer(Modifier.width(8.dp))
                                 Text(stringResource(R.string.deposit_document))
                             }
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { chatGroup = myGroup },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Rounded.Forum, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.projects_chat_open))
+                            }
                         }
                     }
                     var showAllGroupsDialog by remember { mutableStateOf(false) }
@@ -3409,6 +3439,7 @@ private fun ProjectDetailsDialog(
                             documentDownloadProgress = documentDownloadProgress,
                             onOpenDocument = onOpenDocument,
                             onDownloadDocument = onDownloadDocument,
+                            onOpenChat = { chatGroup = it },
                             onJoinGroup = onJoinGroup,
                             onLeaveGroup = onLeaveGroup,
                             maxStudents = project.maxStudents,
@@ -3467,6 +3498,7 @@ private fun AllGroupsDialog(
     documentDownloadProgress: Map<String, Float?>,
     onOpenDocument: (AcademicDocument) -> Unit,
     onDownloadDocument: (AcademicDocument) -> Unit,
+    onOpenChat: ((ProjectGroup) -> Unit)? = null,
     onJoinGroup: ((String) -> Unit)? = null,
     onLeaveGroup: ((String) -> Unit)? = null,
     maxStudents: Int? = null,
@@ -3521,6 +3553,17 @@ private fun AllGroupsDialog(
 
                         if (group.isMine && onLeaveGroup != null) {
                             Spacer(Modifier.height(8.dp))
+                            onOpenChat?.let { openChat ->
+                                OutlinedButton(
+                                    onClick = { openChat(group) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Rounded.Forum, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.projects_chat_open))
+                                }
+                                Spacer(Modifier.height(8.dp))
+                            }
                             OutlinedButton(
                                 onClick = { onLeaveGroup(group.id) },
                                 modifier = Modifier.fillMaxWidth()
@@ -3559,6 +3602,100 @@ private fun AllGroupsDialog(
             }
         }
     )
+}
+
+@Composable
+private fun ProjectChatDialog(
+    group: ProjectGroup,
+    state: FeatureUiState<List<ProjectMessage>>,
+    onLoad: () -> Unit,
+    onSend: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var draft by remember(group.id) { mutableStateOf("") }
+    LaunchedEffect(group.id) {
+        onLoad()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.projects_chat_title, group.name)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.error?.let { StateBanner(it) }
+                if (state.refreshing) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                }
+                if (state.data.isEmpty() && !state.refreshing) {
+                    Text(
+                        text = stringResource(R.string.projects_chat_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(state.data, key = { it.id }) { message ->
+                            ProjectMessageRow(message)
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.projects_chat_message)) },
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                onSend(draft)
+                                draft = ""
+                            },
+                            enabled = draft.isNotBlank() && !state.refreshing
+                        ) {
+                            Icon(Icons.Rounded.Send, contentDescription = null)
+                        }
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        }
+    )
+}
+
+@Composable
+private fun ProjectMessageRow(message: ProjectMessage) {
+    val alignment = if (message.mine) Alignment.End else Alignment.Start
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = alignment
+    ) {
+        CompactCard(
+            modifier = Modifier.fillMaxWidth(if (message.mine) 0.86f else 1f)
+        ) {
+            Text(
+                text = message.author.ifBlank { stringResource(R.string.projects_chat_unknown_author) },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = message.body,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            message.sentAt?.let {
+                Text(
+                    text = formatInstant(it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }
 
 private fun String?.isCompletedStatus(): Boolean {

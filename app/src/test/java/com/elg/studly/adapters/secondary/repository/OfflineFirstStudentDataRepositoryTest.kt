@@ -14,6 +14,7 @@ import com.elg.studly.adapters.secondary.storage.ProjectEntity
 import com.elg.studly.adapters.secondary.storage.ProjectGroupEntity
 import com.elg.studly.adapters.secondary.storage.ProjectStepEntity
 import com.elg.studly.adapters.secondary.storage.StudentDao
+import com.elg.studly.adapters.secondary.storage.StudentEventEntity
 import com.elg.studly.adapters.secondary.storage.StudentProfileEntity
 import com.elg.studly.application.ports.NotificationScheduler
 import com.elg.studly.application.ports.SettingsRepository
@@ -133,7 +134,7 @@ class OfflineFirstStudentDataRepositoryTest {
     ): OfflineFirstStudentDataRepository {
         val context = mockk<Context> {
             every { this@mockk.cacheDir } returns cacheDir
-            every { packageName } returns "com.elg.Studly"
+            every { packageName } returns "com.elg.studly"
         }
         return OfflineFirstStudentDataRepository(
             context = context,
@@ -267,6 +268,8 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"ss_id":"speed-1","title":"Speed meeting","corporate_name":"Company","location":"ONLINE","appointment_start":"2026-06-03T08:00:00Z"}]}"""
     )
 
+    override suspend fun events(): JsonElement = jsonElement("""{"result":[]}""")
+
     override suspend fun download(url: String): Response<ResponseBody> {
         error("unused")
     }
@@ -276,6 +279,15 @@ private class RepositoryApi : MyGesApiService {
     }
 
     override suspend fun leaveGroup(rcId: String, projectId: String, groupId: String): Response<ResponseBody> {
+        error("unused")
+    }
+
+    override suspend fun projectGroupMessages(projectGroupId: String): JsonElement = jsonElement("""{"result":[]}""")
+
+    override suspend fun sendProjectGroupMessage(
+        projectGroupId: String,
+        message: JsonElement
+    ): Response<ResponseBody> {
         error("unused")
     }
 }
@@ -293,6 +305,7 @@ private class RepositoryDao : StudentDao() {
     val documentState = MutableStateFlow(emptyList<AcademicDocumentEntity>())
     val directoryState = MutableStateFlow(emptyList<DirectoryPersonEntity>())
     val newsState = MutableStateFlow(emptyList<NewsEntity>())
+    val eventState = MutableStateFlow(emptyList<StudentEventEntity>())
 
     override fun observeProfile(): Flow<StudentProfileEntity?> = profileState
     override fun observeAgenda(): Flow<List<AgendaEventEntity>> = agendaState
@@ -306,6 +319,7 @@ private class RepositoryDao : StudentDao() {
     override fun observeDocuments(): Flow<List<AcademicDocumentEntity>> = documentState
     override fun observeDirectory(): Flow<List<DirectoryPersonEntity>> = directoryState
     override fun observeNews(): Flow<List<NewsEntity>> = newsState
+    override fun observeEvents(): Flow<List<StudentEventEntity>> = eventState
     override suspend fun agendaIds(): List<String> = agendaState.value.map { it.id }
     override suspend fun gradeIds(): List<String> = gradeState.value.map { it.id }
     override suspend fun absenceIds(): List<String> = absenceState.value.map { it.id }
@@ -325,6 +339,7 @@ private class RepositoryDao : StudentDao() {
         documentState.value.firstOrNull { it.id == id }?.inlineContent
     override suspend fun directoryPeople(): List<DirectoryPersonEntity> = directoryState.value
     override suspend fun news(): List<NewsEntity> = newsState.value
+    override suspend fun events(): List<StudentEventEntity> = eventState.value
     override suspend fun upsertProfile(profile: StudentProfileEntity) {
         profileState.value = profile
     }
@@ -364,6 +379,9 @@ private class RepositoryDao : StudentDao() {
     override suspend fun upsertNews(news: List<NewsEntity>) {
         newsState.value = news
     }
+    override suspend fun upsertEvents(events: List<StudentEventEntity>) {
+        eventState.value = events
+    }
     override suspend fun deleteAgenda(events: List<AgendaEventEntity>) = Unit
     override suspend fun deleteGrades(grades: List<GradeEntity>) = Unit
     override suspend fun deleteAbsences(absences: List<AbsenceEntity>) = Unit
@@ -375,6 +393,7 @@ private class RepositoryDao : StudentDao() {
     override suspend fun deleteDocuments(documents: List<AcademicDocumentEntity>) = Unit
     override suspend fun deleteDirectoryPeople(people: List<DirectoryPersonEntity>) = Unit
     override suspend fun deleteNews(news: List<NewsEntity>) = Unit
+    override suspend fun deleteEvents(events: List<StudentEventEntity>) = Unit
     override suspend fun clearProfile() {
         profileState.value = null
     }
@@ -410,6 +429,9 @@ private class RepositoryDao : StudentDao() {
     }
     override suspend fun clearNews() {
         newsState.value = emptyList()
+    }
+    override suspend fun clearEvents() {
+        eventState.value = emptyList()
     }
 }
 

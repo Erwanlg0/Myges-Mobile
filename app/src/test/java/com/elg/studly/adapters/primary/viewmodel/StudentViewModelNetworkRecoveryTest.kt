@@ -18,11 +18,14 @@ import com.elg.studly.application.usecase.ObserveCoursesUseCase
 import com.elg.studly.application.usecase.ObserveDashboardUseCase
 import com.elg.studly.application.usecase.ObserveDirectoryUseCase
 import com.elg.studly.application.usecase.ObserveDocumentsUseCase
+import com.elg.studly.application.usecase.ObserveEventsUseCase
 import com.elg.studly.application.usecase.ObserveGradesUseCase
 import com.elg.studly.application.usecase.ObserveNewsUseCase
 import com.elg.studly.application.usecase.ObservePracticalsUseCase
 import com.elg.studly.application.usecase.ObserveProjectsUseCase
+import com.elg.studly.application.usecase.ProjectMessagesUseCase
 import com.elg.studly.application.usecase.RefreshStudentDataUseCase
+import com.elg.studly.application.usecase.SendProjectMessageUseCase
 import com.elg.studly.application.usecase.SyncAgendaToCalendarUseCase
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
@@ -39,6 +42,7 @@ import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
+import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.Dispatchers
@@ -218,11 +222,14 @@ class StudentViewModelNetworkRecoveryTest {
             ObserveDocumentsUseCase(repository),
             ObserveDirectoryUseCase(repository),
             ObserveNewsUseCase(repository),
+            ObserveEventsUseCase(repository),
             RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, notificationScheduler),
             SyncAgendaToCalendarUseCase(calendarSyncPort),
             DownloadDocumentUseCase(repository),
             JoinGroupUseCase(repository),
             LeaveGroupUseCase(repository),
+            ProjectMessagesUseCase(repository),
+            SendProjectMessageUseCase(repository),
             LogoutUseCase(sessionRepository, notificationScheduler),
             networkMonitor
         )
@@ -247,6 +254,7 @@ private class FakeStudentDataRepository : StudentDataRepository {
     private val practicals = MutableStateFlow(emptyList<Practical>())
     private val documents = MutableStateFlow(emptyList<AcademicDocument>())
     private val news = MutableStateFlow(emptyList<NewsItem>())
+    private val events = MutableStateFlow(emptyList<StudentEvent>())
 
     override fun observeDashboard(): Flow<DashboardSummary> = dashboard
     override fun observeAgenda(): Flow<List<AgendaEvent>> = agenda
@@ -258,6 +266,7 @@ private class FakeStudentDataRepository : StudentDataRepository {
     override fun observeDocuments(): Flow<List<AcademicDocument>> = documents
     override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = news
+    override fun observeEvents(): Flow<List<StudentEvent>> = events
     override suspend fun syncAll(force: Boolean, features: Set<SyncFeature>?) {
         syncFailure?.let { throw it }
         syncCount += 1

@@ -12,6 +12,7 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ProjectGroup
+import com.elg.studly.domain.model.ProjectMessage
 import com.elg.studly.domain.model.ProjectStep
 import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.StudentProfile
@@ -626,6 +627,25 @@ fun JsonElement.toEvents(): List<StudentEvent> {
             subscriptionEnd = root.instant("end_subscription_date"),
             subscribed = root.bool("is_participant_subscribed", "subscribed") ?: false,
             detailUrl = root.linkHref()
+        )
+    }
+}
+
+fun JsonElement.toProjectMessages(currentUserId: String? = null): List<ProjectMessage> {
+    return arrayOrNested("messages", "items", "data").mapNotNull { element ->
+        val root = element as? JsonObject ?: return@mapNotNull null
+        val authorId = root.text("uid", "u_id", "user_id", "author_id")
+        val firstName = root.text("firstname", "firstName")
+        val lastName = root.text("name", "lastname", "lastName")
+        val author = root.text("author", "displayName", "fullName")
+            ?: listOfNotNull(firstName, lastName).joinToString(" ").ifBlank { authorId ?: "" }
+        val body = root.text("message", "body", "content", "text") ?: return@mapNotNull null
+        ProjectMessage(
+            id = root.text("id", "message_id", "pm_id") ?: stableId(root),
+            author = author,
+            body = body,
+            sentAt = root.instant("date", "createdAt", "created_at", "sentAt", "sent_at"),
+            mine = currentUserId != null && authorId == currentUserId
         )
     }
 }

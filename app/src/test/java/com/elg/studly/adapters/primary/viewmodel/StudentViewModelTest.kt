@@ -30,6 +30,8 @@ class StudentViewModelTest {
     private lateinit var downloadDocumentUseCase: DownloadDocumentUseCase
     private lateinit var joinGroupUseCase: JoinGroupUseCase
     private lateinit var leaveGroupUseCase: LeaveGroupUseCase
+    private lateinit var projectMessagesUseCase: ProjectMessagesUseCase
+    private lateinit var sendProjectMessageUseCase: SendProjectMessageUseCase
     private lateinit var logoutUseCase: LogoutUseCase
     private lateinit var networkMonitor: NetworkMonitor
 
@@ -41,6 +43,8 @@ class StudentViewModelTest {
         downloadDocumentUseCase = mockk(relaxed = true)
         joinGroupUseCase = mockk(relaxed = true)
         leaveGroupUseCase = mockk(relaxed = true)
+        projectMessagesUseCase = mockk(relaxed = true)
+        sendProjectMessageUseCase = mockk(relaxed = true)
         logoutUseCase = mockk(relaxed = true)
         networkMonitor = mockk {
             every { isOnline } returns MutableStateFlow(true)
@@ -64,11 +68,14 @@ class StudentViewModelTest {
             observeDocuments = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
             observeDirectory = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
             observeNews = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
+            observeEvents = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
             refreshStudentDataUseCase = refreshStudentDataUseCase,
             syncAgendaToCalendarUseCase = syncAgendaToCalendarUseCase,
             downloadDocumentUseCase = downloadDocumentUseCase,
             joinGroupUseCase = joinGroupUseCase,
             leaveGroupUseCase = leaveGroupUseCase,
+            projectMessagesUseCase = projectMessagesUseCase,
+            sendProjectMessageUseCase = sendProjectMessageUseCase,
             logoutUseCase = logoutUseCase,
             networkMonitor = networkMonitor
         )

@@ -75,6 +75,14 @@ data class ProjectGroup(
     val isMine: Boolean
 )
 
+data class ProjectMessage(
+    val id: String,
+    val author: String,
+    val body: String,
+    val sentAt: Instant?,
+    val mine: Boolean
+)
+
 data class Project(
     val id: String,
     val name: String,

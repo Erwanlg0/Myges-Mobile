@@ -102,6 +102,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        const val EXTRA_NOTIFICATION_ROUTE = "com.elg.Studly.extra.NOTIFICATION_ROUTE"
+        const val EXTRA_NOTIFICATION_ROUTE = "com.elg.studly.extra.NOTIFICATION_ROUTE"
     }
 }

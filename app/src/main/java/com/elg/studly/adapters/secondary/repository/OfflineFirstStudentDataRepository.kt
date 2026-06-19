@@ -20,6 +20,7 @@ import com.elg.studly.adapters.secondary.api.toPracticals
 import com.elg.studly.adapters.secondary.api.toProfile
 import com.elg.studly.adapters.secondary.api.toPracticalDocuments
 import com.elg.studly.adapters.secondary.api.toProjectDocuments
+import com.elg.studly.adapters.secondary.api.toProjectMessages
 import com.elg.studly.adapters.secondary.api.toProjects
 import com.elg.studly.adapters.secondary.api.toYears
 import com.elg.studly.adapters.secondary.storage.ProjectGroupEntity
@@ -79,6 +80,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -440,6 +443,28 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {
         changeGroupMembership(projectId, groupId, join = false) { api.leaveGroup(courseId, projectId, groupId) }
+    }
+
+    override suspend fun projectMessages(groupId: String) = withContext(Dispatchers.IO) {
+        try {
+            api.projectGroupMessages(groupId)?.toProjectMessages(dao.profile()?.id).orEmpty()
+        } catch (throwable: Throwable) {
+            throw throwable.toRepositoryException()
+        }
+    }
+
+    override suspend fun sendProjectMessage(groupId: String, message: String) {
+        withContext(Dispatchers.IO) {
+            val body = JsonObject(mapOf("message" to JsonPrimitive(message)))
+            val response = try {
+                api.sendProjectGroupMessage(groupId, body)
+            } catch (throwable: Throwable) {
+                throw throwable.toRepositoryException()
+            }
+            if (!response.isSuccessful && response.code() != 500) {
+                throw HttpException(response).toRepositoryException()
+            }
+        }
     }
 
     private suspend fun changeGroupMembership(

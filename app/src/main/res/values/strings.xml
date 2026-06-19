@@ -171,6 +171,11 @@
     <string name="group_join">Rejoindre ce groupe</string>
     <string name="group_full">Groupe complet</string>
     <string name="group_leave">Quitter le groupe</string>
+    <string name="projects_chat_open">Ouvrir le chat</string>
+    <string name="projects_chat_title">Chat - %1$s</string>
+    <string name="projects_chat_empty">Aucun message</string>
+    <string name="projects_chat_message">Message</string>
+    <string name="projects_chat_unknown_author">Inconnu</string>
     <string name="projects_deliverables_label">Rendus :</string>
 
 

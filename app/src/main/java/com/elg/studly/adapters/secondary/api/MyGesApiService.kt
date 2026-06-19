@@ -135,6 +135,15 @@ interface MyGesApiService {
         @Path("groupId") groupId: String
     ): Response<ResponseBody>
 
+    @GET("me/projectGroups/{projectGroupId}/messages")
+    suspend fun projectGroupMessages(@Path("projectGroupId") projectGroupId: String): JsonElement?
+
+    @POST("me/projectGroups/{projectGroupId}/messages")
+    suspend fun sendProjectGroupMessage(
+        @Path("projectGroupId") projectGroupId: String,
+        @Body message: JsonElement
+    ): Response<ResponseBody>
+
     @GET("me/events")
     suspend fun events(): JsonElement?
 

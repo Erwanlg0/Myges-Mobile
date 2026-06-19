@@ -55,20 +55,22 @@ jobs:
         if: steps.version.outputs.changed == 'true'
         shell: bash
         env:
-          MYGES_RELEASE_KEYSTORE_BASE64: ${{ secrets.MYGES_RELEASE_KEYSTORE_BASE64 }}
+          MYGES_RELEASE_KEYSTORE_BASE64: ${{ secrets.KEYSTORE_B64 }}
         run: |
-          if [[ -n "$MYGES_RELEASE_KEYSTORE_BASE64" ]]; then
-            echo "$MYGES_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
-            echo "MYGES_RELEASE_STORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          if [[ -z "$MYGES_RELEASE_KEYSTORE_BASE64" ]]; then
+            echo "Missing MYGES_RELEASE_KEYSTORE_BASE64"
+            exit 1
           fi
+          echo "$MYGES_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "MYGES_RELEASE_STORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
 
       - name: Build release
         if: steps.version.outputs.changed == 'true'
         run: ./gradlew :app:assembleRelease --quiet
         env:
-          MYGES_RELEASE_STORE_PASSWORD: ${{ secrets.MYGES_RELEASE_STORE_PASSWORD }}
-          MYGES_RELEASE_KEY_ALIAS: ${{ secrets.MYGES_RELEASE_KEY_ALIAS }}
-          MYGES_RELEASE_KEY_PASSWORD: ${{ secrets.MYGES_RELEASE_KEY_PASSWORD }}
+          MYGES_RELEASE_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          MYGES_RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          MYGES_RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           MYGES_SENTRY_DSN: ${{ secrets.MYGES_SENTRY_DSN }}
 
       - name: Create release

@@ -28,6 +28,7 @@ import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
+import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.Job
@@ -330,6 +331,7 @@ private class RecordingStudentDataRepository(
     override fun observeDocuments(): Flow<List<AcademicDocument>> = flowOf(emptyList())
     override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = flowOf(emptyList())
+    override fun observeEvents(): Flow<List<StudentEvent>> = flowOf(emptyList())
     override suspend fun syncAll(force: Boolean, features: Set<SyncFeature>?) = Unit
     override suspend fun clearCache() {
         events += "clearCache"
