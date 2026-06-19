@@ -41,7 +41,6 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Code
-import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Lightbulb
@@ -1806,6 +1805,13 @@ fun EventsScreen(
     studentViewModel: StudentViewModel
 ) {
     val state by studentViewModel.events.collectAsStateWithLifecycle()
+    var selectedEvent by remember { mutableStateOf<StudentEvent?>(null) }
+    selectedEvent?.let { event ->
+        EventDetailsDialog(
+            event = event,
+            onDismiss = { selectedEvent = null }
+        )
+    }
     FeatureStateContent(
         state = state,
         empty = List<StudentEvent>::isEmpty,
@@ -1817,21 +1823,20 @@ fun EventsScreen(
         val (future, past) = events.partition { (it.date ?: Instant.MIN).isAfter(now) }
         if (future.isNotEmpty()) {
             item { SectionTitleText(stringResource(R.string.events_section_future)) }
-            items(future, key = { "f:${it.id}" }) { EventCard(it) }
+            items(future, key = { "f:${it.id}" }) { EventCard(it, onOpen = { selectedEvent = it }) }
         }
         if (past.isNotEmpty()) {
             item { SectionTitleText(stringResource(R.string.events_section_past)) }
-            items(past, key = { "p:${it.id}" }) { EventCard(it) }
+            items(past, key = { "p:${it.id}" }) { EventCard(it, onOpen = { selectedEvent = it }) }
         }
     }
 }
 
 @Composable
-private fun EventCard(event: StudentEvent) {
-    var expanded by remember(event.id) { mutableStateOf(false) }
+private fun EventCard(event: StudentEvent, onOpen: () -> Unit) {
     val hasDescription = !event.description.isNullOrBlank()
     CompactCard(
-        modifier = if (hasDescription) Modifier.clickable { expanded = !expanded } else Modifier
+        modifier = Modifier.clickable { onOpen() }
     ) {
         Text(
             text = event.title.orUntitled(),
@@ -1863,12 +1868,44 @@ private fun EventCard(event: StudentEvent) {
         if (hasDescription) {
             Text(
                 text = event.description!!,
-                maxLines = if (expanded) Int.MAX_VALUE else 4,
+                maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
+}
+
+@Composable
+private fun EventDetailsDialog(
+    event: StudentEvent,
+    onDismiss: () -> Unit
+) {
+    val now = remember { Instant.now() }
+    val canSubscribe = event.subscriptionStart?.let { !now.isBefore(it) } == true &&
+        event.subscriptionEnd?.let { !now.isAfter(it) } == true
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(event.title.orUntitled()) },
+        text = {
+            Text(
+                text = event.description.orEmpty(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            if (canSubscribe) {
+                Button(onClick = {}) {
+                    Text(stringResource(if (event.subscribed) R.string.events_leave else R.string.events_join))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        }
+    )
 }
 
 @Composable
@@ -2128,19 +2165,6 @@ fun SettingsScreen(
                     Icon(Icons.Rounded.Code, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.about_source_code))
-                }
-                OutlinedButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        runCatching {
-                            context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$SUPPORT_EMAIL")))
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Rounded.Email, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.about_contact))
                 }
                 OutlinedButton(
                     onClick = {

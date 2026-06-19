@@ -215,6 +215,8 @@
     <string name="events_subscription_window_value">from %1$s to %2$s</string>
     <string name="events_subscribed">Registered</string>
     <string name="events_not_subscribed">Not registered</string>
+    <string name="events_join">Join</string>
+    <string name="events_leave">Leave</string>
 
     <string name="notifications_title">News</string>
     <string name="notifications_action_open">Open</string>

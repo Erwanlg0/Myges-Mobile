@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - app/build.gradle.kts
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          previous_file="$(mktemp)"
+          git show HEAD^:app/build.gradle.kts > "$previous_file" 2>/dev/null || touch "$previous_file"
+
+          old_code="$(grep -E '^[[:space:]]*versionCode[[:space:]]*=' "$previous_file" | head -n1 | sed -E 's/.*=[[:space:]]*([0-9]+).*/\1/')"
+          old_name="$(grep -E '^[[:space:]]*versionName[[:space:]]*=' "$previous_file" | head -n1 | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')"
+          version_code="$(grep -E '^[[:space:]]*versionCode[[:space:]]*=' app/build.gradle.kts | head -n1 | sed -E 's/.*=[[:space:]]*([0-9]+).*/\1/')"
+          version_name="$(grep -E '^[[:space:]]*versionName[[:space:]]*=' app/build.gradle.kts | head -n1 | sed -E 's/.*=[[:space:]]*"([^"]+)".*/\1/')"
+
+          if [[ "$old_code" == "$version_code" && "$old_name" == "$version_name" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "tag=android-v${version_name}-${version_code}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        if: steps.version.outputs.changed == 'true'
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.version.outputs.changed == 'true'
+
+      - name: Prepare signing
+        if: steps.version.outputs.changed == 'true'
+        shell: bash
+        env:
+          MYGES_RELEASE_KEYSTORE_BASE64: ${{ secrets.MYGES_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [[ -n "$MYGES_RELEASE_KEYSTORE_BASE64" ]]; then
+            echo "$MYGES_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            echo "MYGES_RELEASE_STORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build release
+        if: steps.version.outputs.changed == 'true'
+        run: ./gradlew :app:assembleRelease --quiet
+        env:
+          MYGES_RELEASE_STORE_PASSWORD: ${{ secrets.MYGES_RELEASE_STORE_PASSWORD }}
+          MYGES_RELEASE_KEY_ALIAS: ${{ secrets.MYGES_RELEASE_KEY_ALIAS }}
+          MYGES_RELEASE_KEY_PASSWORD: ${{ secrets.MYGES_RELEASE_KEY_PASSWORD }}
+          MYGES_SENTRY_DSN: ${{ secrets.MYGES_SENTRY_DSN }}
+
+      - name: Create release
+        if: steps.version.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            app/build/outputs/apk/release/*.apk \
+            --title "${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }})" \
+            --notes "Version ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }})"
