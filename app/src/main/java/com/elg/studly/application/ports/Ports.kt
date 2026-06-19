@@ -14,6 +14,7 @@ import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
+import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
@@ -41,6 +42,7 @@ interface StudentDataRepository {
     fun observeDocuments(): Flow<List<AcademicDocument>>
     fun observeDirectory(): Flow<List<DirectoryPerson>>
     fun observeNews(): Flow<List<NewsItem>>
+    fun observeEvents(): Flow<List<StudentEvent>>
     suspend fun syncAll(force: Boolean = false, features: Set<SyncFeature>? = null)
     suspend fun clearCache()
     suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit = {}): Uri

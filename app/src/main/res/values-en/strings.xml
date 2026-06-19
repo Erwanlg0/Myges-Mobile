@@ -204,6 +204,18 @@
     <string name="directory_teacher">Faculty</string>
     <string name="directory_teachers">Faculty</string>
 
+    <string name="events_title">Events</string>
+    <string name="events_empty_title">No events</string>
+    <string name="events_empty_body">Events you can take part in will appear here.</string>
+    <string name="events_section_future">My upcoming events</string>
+    <string name="events_section_past">My past events</string>
+    <string name="events_location">Location</string>
+    <string name="events_organizer">Organizer</string>
+    <string name="events_subscription_window">Registration</string>
+    <string name="events_subscription_window_value">from %1$s to %2$s</string>
+    <string name="events_subscribed">Registered</string>
+    <string name="events_not_subscribed">Not registered</string>
+
     <string name="notifications_title">News</string>
     <string name="notifications_action_open">Open</string>
     <string name="notifications_empty_title">No news</string>
@@ -299,6 +311,7 @@
     <string name="settings_sync_interval_feature_documents">Documents</string>
     <string name="settings_sync_interval_feature_directory">Directory</string>
     <string name="settings_sync_interval_feature_news">News</string>
+    <string name="settings_sync_interval_feature_events">Events</string>
     <string name="settings_sync_interval_title">Interval for %1$s</string>
     <string name="widget_next_course_label">Next class</string>
     <string name="widget_next_course_description">Shows your next class</string>

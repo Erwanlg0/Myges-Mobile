@@ -139,6 +139,21 @@ data class DirectoryPersonEntity(
     val avatarUrl: String?
 )
 
+@Entity(tableName = "events")
+data class StudentEventEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val type: String?,
+    val location: String?,
+    val organizer: String?,
+    val description: String?,
+    val dateEpochMillis: Long?,
+    val subscriptionStartEpochMillis: Long?,
+    val subscriptionEndEpochMillis: Long?,
+    val subscribed: Boolean,
+    val detailUrl: String? = null
+)
+
 @Entity(tableName = "news")
 data class NewsEntity(
     @PrimaryKey val id: String,

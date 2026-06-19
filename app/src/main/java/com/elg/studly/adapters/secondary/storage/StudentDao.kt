@@ -48,6 +48,9 @@ abstract class StudentDao {
     @Query("SELECT * FROM news ORDER BY publishedAtEpochMillis DESC, title ASC")
     abstract fun observeNews(): Flow<List<NewsEntity>>
 
+    @Query("SELECT * FROM events ORDER BY dateEpochMillis DESC, title ASC")
+    abstract fun observeEvents(): Flow<List<StudentEventEntity>>
+
     @Query("SELECT id FROM agenda_events")
     abstract suspend fun agendaIds(): List<String>
 
@@ -99,6 +102,9 @@ abstract class StudentDao {
     @Query("SELECT * FROM news")
     abstract suspend fun news(): List<NewsEntity>
 
+    @Query("SELECT * FROM events")
+    abstract suspend fun events(): List<StudentEventEntity>
+
     @Upsert
     abstract suspend fun upsertProfile(profile: StudentProfileEntity)
 
@@ -144,6 +150,9 @@ abstract class StudentDao {
     @Upsert
     abstract suspend fun upsertNews(news: List<NewsEntity>)
 
+    @Upsert
+    abstract suspend fun upsertEvents(events: List<StudentEventEntity>)
+
     @Delete
     abstract suspend fun deleteAgenda(events: List<AgendaEventEntity>)
 
@@ -176,6 +185,9 @@ abstract class StudentDao {
 
     @Delete
     abstract suspend fun deleteNews(news: List<NewsEntity>)
+
+    @Delete
+    abstract suspend fun deleteEvents(events: List<StudentEventEntity>)
 
     @Query("DELETE FROM student_profile")
     abstract suspend fun clearProfile()
@@ -212,6 +224,9 @@ abstract class StudentDao {
 
     @Query("DELETE FROM news")
     abstract suspend fun clearNews()
+
+    @Query("DELETE FROM events")
+    abstract suspend fun clearEvents()
 
     @Transaction
     open suspend fun syncProfile(profile: StudentProfileEntity) = replaceProfile(profile)
@@ -251,6 +266,9 @@ abstract class StudentDao {
     open suspend fun syncNews(news: List<NewsEntity>) = replaceNews(news)
 
     @Transaction
+    open suspend fun syncEvents(events: List<StudentEventEntity>) = replaceEvents(events)
+
+    @Transaction
     open suspend fun clearAll() {
         clearProfile()
         clearAgenda()
@@ -264,6 +282,7 @@ abstract class StudentDao {
         clearDocuments()
         clearDirectoryPeople()
         clearNews()
+        clearEvents()
     }
 
     private suspend fun replaceProfile(profile: StudentProfileEntity) {
@@ -336,5 +355,11 @@ abstract class StudentDao {
         val plan = entitySyncPlan(news(), incoming, NewsEntity::id)
         if (plan.deletes.isNotEmpty()) deleteNews(plan.deletes)
         if (plan.upserts.isNotEmpty()) upsertNews(plan.upserts)
+    }
+
+    private suspend fun replaceEvents(incoming: List<StudentEventEntity>) {
+        val plan = entitySyncPlan(events(), incoming, StudentEventEntity::id)
+        if (plan.deletes.isNotEmpty()) deleteEvents(plan.deletes)
+        if (plan.upserts.isNotEmpty()) upsertEvents(plan.upserts)
     }
 }

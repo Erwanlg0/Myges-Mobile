@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Grade
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Celebration
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.Science
@@ -74,6 +75,7 @@ import com.elg.studly.adapters.primary.ui.DepositWebViewScreen
 import com.elg.studly.adapters.primary.ui.DirectoryScreen
 import com.elg.studly.adapters.primary.ui.DocumentsScreen
 import com.elg.studly.adapters.primary.ui.GradesScreen
+import com.elg.studly.adapters.primary.ui.EventsScreen
 import com.elg.studly.adapters.primary.ui.NotificationsScreen
 import com.elg.studly.adapters.primary.ui.PracticalsScreen
 import com.elg.studly.adapters.primary.ui.ProjectsScreen
@@ -135,6 +137,7 @@ private val destinations = listOf(
     Destination("practicals", R.string.practicals_title, Icons.Rounded.Science),
     Destination("documents", R.string.documents_title, Icons.Rounded.Description),
     Destination("directory", R.string.directory_title, Icons.Rounded.People),
+    Destination("events", R.string.events_title, Icons.Rounded.Celebration),
     Destination("notifications", R.string.notifications_title, Icons.Rounded.Notifications),
     Destination("settings", R.string.settings_title, Icons.Rounded.Settings)
 )
@@ -396,6 +399,7 @@ private fun StudentScaffold(
                 )
             }
             composable("directory") { DirectoryScreen(studentViewModel) }
+            composable("events") { EventsScreen(studentViewModel) }
             composable("notifications") { NotificationsScreen(studentViewModel) }
             composable("settings") { SettingsScreen(settingsViewModel, studentViewModel) }
         }

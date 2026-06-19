@@ -146,6 +146,20 @@ data class NewsItem(
     val imageUrl: String? = null
 )
 
+data class StudentEvent(
+    val id: String,
+    val title: String,
+    val type: String?,
+    val location: String?,
+    val organizer: String?,
+    val description: String?,
+    val date: Instant?,
+    val subscriptionStart: Instant?,
+    val subscriptionEnd: Instant?,
+    val subscribed: Boolean,
+    val detailUrl: String? = null
+)
+
 data class DashboardSummary(
     val profile: StudentProfile?,
     val nextEvent: AgendaEvent?,
@@ -244,7 +258,8 @@ enum class SyncFeature {
     Projects,
     Documents,
     Directory,
-    News
+    News,
+    Events
 }
 
 
@@ -255,7 +270,8 @@ data class RefreshIntervals(
     val projects: Int = DEFAULT_REFRESH_MINUTES,
     val documents: Int = DEFAULT_REFRESH_MINUTES,
     val directory: Int = DEFAULT_REFRESH_MINUTES,
-    val news: Int = DEFAULT_REFRESH_MINUTES
+    val news: Int = DEFAULT_REFRESH_MINUTES,
+    val events: Int = DEFAULT_REFRESH_MINUTES
 ) {
     fun minutesFor(feature: SyncFeature): Int = when (feature) {
         SyncFeature.Agenda -> agenda
@@ -265,6 +281,7 @@ data class RefreshIntervals(
         SyncFeature.Documents -> documents
         SyncFeature.Directory -> directory
         SyncFeature.News -> news
+        SyncFeature.Events -> events
     }
 
     fun with(feature: SyncFeature, minutes: Int): RefreshIntervals {
@@ -277,6 +294,7 @@ data class RefreshIntervals(
             SyncFeature.Documents -> copy(documents = value)
             SyncFeature.Directory -> copy(directory = value)
             SyncFeature.News -> copy(news = value)
+            SyncFeature.Events -> copy(events = value)
         }
     }
 

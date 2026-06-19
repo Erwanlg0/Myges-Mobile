@@ -18,6 +18,7 @@ import com.elg.studly.application.usecase.ObserveDirectoryUseCase
 import com.elg.studly.application.usecase.ObserveDashboardUseCase
 import com.elg.studly.application.usecase.ObserveDocumentsUseCase
 import com.elg.studly.application.usecase.ObserveGradesUseCase
+import com.elg.studly.application.usecase.ObserveEventsUseCase
 import com.elg.studly.application.usecase.ObserveNewsUseCase
 import com.elg.studly.application.usecase.ObservePracticalsUseCase
 import com.elg.studly.application.usecase.ObserveProjectsUseCase
@@ -32,6 +33,7 @@ import com.elg.studly.domain.model.DashboardSummary
 import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.NewsItem
+import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.SyncFeature
@@ -68,6 +70,7 @@ class StudentViewModel @Inject constructor(
     observeDocuments: ObserveDocumentsUseCase,
     observeDirectory: ObserveDirectoryUseCase,
     observeNews: ObserveNewsUseCase,
+    observeEvents: ObserveEventsUseCase,
     private val refreshStudentDataUseCase: RefreshStudentDataUseCase,
     private val syncAgendaToCalendarUseCase: SyncAgendaToCalendarUseCase,
     private val downloadDocumentUseCase: DownloadDocumentUseCase,
@@ -148,6 +151,9 @@ class StudentViewModel @Inject constructor(
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
     val news: StateFlow<FeatureUiState<List<NewsItem>>> = observeNews()
+        .asFeatureState(emptyList(), networkMonitor.isOnline)
+
+    val events: StateFlow<FeatureUiState<List<StudentEvent>>> = observeEvents()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
     init {

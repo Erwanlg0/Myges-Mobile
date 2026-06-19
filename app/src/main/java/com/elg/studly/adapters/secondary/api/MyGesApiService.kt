@@ -135,6 +135,9 @@ interface MyGesApiService {
         @Path("groupId") groupId: String
     ): Response<ResponseBody>
 
+    @GET("me/events")
+    suspend fun events(): JsonElement?
+
     @GET("me/news")
     suspend fun news(): JsonElement?
 

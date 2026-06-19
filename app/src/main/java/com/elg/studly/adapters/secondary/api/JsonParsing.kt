@@ -13,6 +13,7 @@ import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ProjectGroup
 import com.elg.studly.domain.model.ProjectStep
+import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.StudentProfile
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -605,6 +606,26 @@ fun JsonElement.toNews(): List<NewsItem> {
             imageUrl = (root.namedLinkHref("photo")
                 ?: root.text("image", "photo", "picture", "banner", "imageUrl"))
                 ?.takeUnless { it.isBlank() || it.isDefaultLogoAsset() }
+        )
+    }
+}
+
+fun JsonElement.toEvents(): List<StudentEvent> {
+    return arrayOrNested("events", "items", "data").map { element ->
+        val root = element.objectOrData()
+        StudentEvent(
+            id = root.text("event_id", "id", "uid") ?: stableId(root),
+            title = root.text("event_title", "title", "name", "label") ?: "",
+            type = root.text("event_type", "type"),
+            location = root.text("location", "place"),
+            organizer = root.text("organizer"),
+            description = root.text("description", "summary", "text")?.takeIf { it.contains('<').not() }
+                ?: root.text("description", "summary", "text")?.htmlToPlainText(),
+            date = root.instant("event_date", "date"),
+            subscriptionStart = root.instant("start_subscription_date"),
+            subscriptionEnd = root.instant("end_subscription_date"),
+            subscribed = root.bool("is_participant_subscribed", "subscribed") ?: false,
+            detailUrl = root.linkHref()
         )
     }
 }

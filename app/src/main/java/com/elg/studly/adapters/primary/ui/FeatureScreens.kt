@@ -137,6 +137,7 @@ import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.combineCcExam
 import com.elg.studly.domain.model.mainGrades
 import com.elg.studly.domain.model.NewsItem
+import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ProjectGroup
@@ -1801,6 +1802,76 @@ fun NotificationsScreen(
 }
 
 @Composable
+fun EventsScreen(
+    studentViewModel: StudentViewModel
+) {
+    val state by studentViewModel.events.collectAsStateWithLifecycle()
+    FeatureStateContent(
+        state = state,
+        empty = List<StudentEvent>::isEmpty,
+        emptyTitle = R.string.events_empty_title,
+        emptyBody = R.string.events_empty_body,
+        onRetry = studentViewModel::refresh
+    ) { events ->
+        val now = Instant.now()
+        val (future, past) = events.partition { (it.date ?: Instant.MIN).isAfter(now) }
+        if (future.isNotEmpty()) {
+            item { SectionTitleText(stringResource(R.string.events_section_future)) }
+            items(future, key = { "f:${it.id}" }) { EventCard(it) }
+        }
+        if (past.isNotEmpty()) {
+            item { SectionTitleText(stringResource(R.string.events_section_past)) }
+            items(past, key = { "p:${it.id}" }) { EventCard(it) }
+        }
+    }
+}
+
+@Composable
+private fun EventCard(event: StudentEvent) {
+    var expanded by remember(event.id) { mutableStateOf(false) }
+    val hasDescription = !event.description.isNullOrBlank()
+    CompactCard(
+        modifier = if (hasDescription) Modifier.clickable { expanded = !expanded } else Modifier
+    ) {
+        Text(
+            text = event.title.orUntitled(),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        LabelValue(R.string.common_date, formatInstant(event.date))
+        LabelValue(R.string.events_location, event.location.orEmpty())
+        LabelValue(R.string.events_organizer, event.organizer.orEmpty())
+        if (event.subscriptionStart != null && event.subscriptionEnd != null) {
+            LabelValue(
+                R.string.events_subscription_window,
+                stringResource(
+                    R.string.events_subscription_window_value,
+                    formatInstant(event.subscriptionStart),
+                    formatInstant(event.subscriptionEnd)
+                )
+            )
+        }
+        Text(
+            text = stringResource(
+                if (event.subscribed) R.string.events_subscribed else R.string.events_not_subscribed
+            ),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (event.subscribed) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (hasDescription) {
+            Text(
+                text = event.description!!,
+                maxLines = if (expanded) Int.MAX_VALUE else 4,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
 fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
     studentViewModel: StudentViewModel
@@ -2224,6 +2295,7 @@ private fun SyncFeature.displayName(): String {
             SyncFeature.Documents -> R.string.settings_sync_interval_feature_documents
             SyncFeature.Directory -> R.string.settings_sync_interval_feature_directory
             SyncFeature.News -> R.string.settings_sync_interval_feature_news
+            SyncFeature.Events -> R.string.settings_sync_interval_feature_events
         }
     )
 }

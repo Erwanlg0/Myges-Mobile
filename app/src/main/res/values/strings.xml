@@ -204,6 +204,18 @@
     <string name="directory_teacher">Intervenant</string>
     <string name="directory_teachers">Intervenants</string>
 
+    <string name="events_title">Événements</string>
+    <string name="events_empty_title">Aucun événement</string>
+    <string name="events_empty_body">Les événements auxquels vous pouvez participer apparaîtront ici.</string>
+    <string name="events_section_future">Mes futurs événements</string>
+    <string name="events_section_past">Mes événements passés</string>
+    <string name="events_location">Lieu</string>
+    <string name="events_organizer">Organisateur</string>
+    <string name="events_subscription_window">Inscriptions</string>
+    <string name="events_subscription_window_value">du %1$s au %2$s</string>
+    <string name="events_subscribed">Inscrit(e)</string>
+    <string name="events_not_subscribed">Non inscrit(e)</string>
+
     <string name="notifications_title">Actualités</string>
     <string name="notifications_action_open">Ouvrir</string>
     <string name="notifications_empty_title">Aucune actualité</string>
@@ -299,6 +311,7 @@
     <string name="settings_sync_interval_feature_documents">Documents</string>
     <string name="settings_sync_interval_feature_directory">Trombinoscope</string>
     <string name="settings_sync_interval_feature_news">Actualités</string>
+    <string name="settings_sync_interval_feature_events">Événements</string>
     <string name="settings_sync_interval_title">Intervalle pour %1$s</string>
     <string name="widget_next_course_label">Prochain cours</string>
     <string name="widget_next_course_description">Affiche votre prochain cours</string>

@@ -16,9 +16,10 @@ import androidx.room.RoomDatabase
         PracticalEntity::class,
         AcademicDocumentEntity::class,
         DirectoryPersonEntity::class,
-        NewsEntity::class
+        NewsEntity::class,
+        StudentEventEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class MygesDatabase : RoomDatabase() {

@@ -13,6 +13,7 @@ import com.elg.studly.adapters.secondary.api.toCourses
 import com.elg.studly.adapters.secondary.api.toDirectoryPeople
 import com.elg.studly.adapters.secondary.api.toDocuments
 import com.elg.studly.adapters.secondary.api.toGrades
+import com.elg.studly.adapters.secondary.api.toEvents
 import com.elg.studly.adapters.secondary.api.toNews
 import com.elg.studly.adapters.secondary.api.toNextProjectStepProjects
 import com.elg.studly.adapters.secondary.api.toPracticals
@@ -45,6 +46,7 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ProjectGroup
+import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.StudentProfile
 import com.elg.studly.domain.model.SyncFeature
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -170,6 +172,10 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return dao.observeNews().map { news -> news.map { it.toDomain() } }
     }
 
+    override fun observeEvents(): Flow<List<StudentEvent>> {
+        return dao.observeEvents().map { events -> events.map { it.toDomain() } }
+    }
+
     override suspend fun syncAll(force: Boolean, features: Set<SyncFeature>?) {
         withContext(Dispatchers.IO) {
             try {
@@ -185,7 +191,8 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 val needDocuments = SyncFeature.Documents in due
                 val needDirectory = SyncFeature.Directory in due
                 val needNews = SyncFeature.News in due
-                
+                val needEvents = SyncFeature.Events in due
+
                 val academicDue = needProjects || needDocuments
                 val needYears = needGrades || needAbsences || needDirectory || academicDue
 
@@ -223,19 +230,21 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     }
                     val directoryDeferred = if (needDirectory) async { fetchDirectory(finalSyncYears) } else null
                     val newsDeferred = if (needNews) async { fetchNews() } else null
+                    val eventsDeferred = if (needEvents) async { fetchEvents() } else null
 
                     val agenda = agendaDeferred?.await()
                     val grades = gradesDeferred?.await()
                     val academic = academicDeferred?.await()
                     val directory = directoryDeferred?.await()
                     val news = newsDeferred?.await()
+                    val events = eventsDeferred?.await()
                     val absences = if (needAbsences) {
                         fetchAbsences(years, absencePeriods(grades, academic?.courses))
                     } else {
                         null
                     }
 
-                    FetchedData(agenda, grades, absences, academic, directory, news)
+                    FetchedData(agenda, grades, absences, academic, directory, news, events)
                 }
 
                 val previousIds = SyncedIds(
@@ -268,6 +277,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 }
                 fetched.directory?.let { people -> dao.syncDirectory(people.map { it.toEntity() }) }
                 fetched.news?.let { news -> dao.syncNews(news.distinctBy { it.id }.map { it.toEntity() }) }
+                fetched.events?.let { events -> dao.syncEvents(events.distinctBy { it.id }.map { it.toEntity() }) }
 
                 notifyAboutChanges(
                     previousIds = previousIds,
@@ -342,7 +352,10 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         ).awaitAll().flatten()
     }
 
-    
+    private suspend fun fetchEvents(): List<StudentEvent> =
+        runCatching { api.events()?.toEvents().orEmpty() }.getOrDefault(emptyList())
+
+
     private suspend fun absencePeriods(grades: List<Grade>?, courses: List<Course>?): List<String> {
         val resolvedGrades = grades ?: dao.grades().map { it.toDomain() }
         val resolvedCourses = courses ?: dao.courses().map { it.toDomain() }
@@ -798,7 +811,8 @@ private data class FetchedData(
     val absences: List<Absence>?,
     val academic: AcademicData?,
     val directory: List<DirectoryPerson>?,
-    val news: List<NewsItem>?
+    val news: List<NewsItem>?,
+    val events: List<StudentEvent>?
 )
 
 internal data class AgendaWindow(

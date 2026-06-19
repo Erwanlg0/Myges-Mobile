@@ -13,6 +13,7 @@ import com.elg.studly.domain.model.DashboardSummary
 import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.NewsItem
+import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ReminderKind
@@ -126,6 +127,12 @@ class ObserveNewsUseCase @Inject constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<NewsItem>> = repository.observeNews()
+}
+
+class ObserveEventsUseCase @Inject constructor(
+    private val repository: StudentDataRepository
+) {
+    operator fun invoke(): Flow<List<StudentEvent>> = repository.observeEvents()
 }
 
 class RefreshStudentDataUseCase @Inject constructor(

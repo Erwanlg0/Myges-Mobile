@@ -12,6 +12,7 @@ import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
 import com.elg.studly.domain.model.ProjectGroup
 import com.elg.studly.domain.model.ProjectStep
+import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.StudentProfile
 import java.time.Instant
 import java.time.LocalDate
@@ -314,4 +315,32 @@ fun NewsEntity.toDomain() = NewsItem(
     publishedAt = publishedAtEpochMillis?.let { Instant.ofEpochMilli(it) },
     html = html,
     imageUrl = imageUrl
+)
+
+fun StudentEvent.toEntity() = StudentEventEntity(
+    id = id,
+    title = title,
+    type = type,
+    location = location,
+    organizer = organizer,
+    description = description,
+    dateEpochMillis = date?.toEpochMilli(),
+    subscriptionStartEpochMillis = subscriptionStart?.toEpochMilli(),
+    subscriptionEndEpochMillis = subscriptionEnd?.toEpochMilli(),
+    subscribed = subscribed,
+    detailUrl = detailUrl
+)
+
+fun StudentEventEntity.toDomain() = StudentEvent(
+    id = id,
+    title = title,
+    type = type,
+    location = location,
+    organizer = organizer,
+    description = description,
+    date = dateEpochMillis?.let { Instant.ofEpochMilli(it) },
+    subscriptionStart = subscriptionStartEpochMillis?.let { Instant.ofEpochMilli(it) },
+    subscriptionEnd = subscriptionEndEpochMillis?.let { Instant.ofEpochMilli(it) },
+    subscribed = subscribed,
+    detailUrl = detailUrl
 )
