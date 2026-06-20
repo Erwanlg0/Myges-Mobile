@@ -5,7 +5,7 @@ import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elg.studly.adapters.primary.state.FeatureUiState
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
 import com.elg.studly.application.ports.NetworkMonitor
 import com.elg.studly.application.usecase.DownloadDocumentUseCase
 import com.elg.studly.application.usecase.JoinGroupUseCase
@@ -213,7 +213,7 @@ class StudentViewModel @Inject constructor(
                     _documentDownloadProgress.update { it + (document.id to progress) }
                 }
             }
-                .onSuccess { uri -> documentOpenRequests.emit(DocumentOpenRequest(uri, document.resolvedMimeType(), downloadOnly)) }
+                .onSuccess { uri -> documentOpenRequests.emit(DocumentOpenRequest(android.net.Uri.parse(uri), document.resolvedMimeType(), downloadOnly)) }
                 .onFailure { throwable ->
                     val appError = throwable.toAppError()
                     

@@ -16,7 +16,7 @@ class DownloadDocumentUseCaseTest {
     fun delegatesToRepository() = runTest {
         val repository = mockk<StudentDataRepository>()
         val document = mockk<AcademicDocument>()
-        val expectedUri = mockk<Uri>()
+        val expectedUri = "content://documents/expected"
         val onProgress: (Float?) -> Unit = {}
 
         coEvery { repository.downloadDocument(document, onProgress) } returns expectedUri

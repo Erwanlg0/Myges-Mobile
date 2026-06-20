@@ -2,7 +2,8 @@ package com.elg.studly.adapters.secondary.repository
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
+import com.elg.studly.adapters.time.toJavaLocalDate
 import java.time.ZoneOffset
 
 class AgendaWindowTest {
@@ -11,9 +12,9 @@ class AgendaWindowTest {
         val today = LocalDate.parse("2026-06-12")
         val window = AgendaWindow.fromToday(today)
 
-        assertEquals(today.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(), window.start)
+        assertEquals(today.toJavaLocalDate().atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(), window.start)
         assertEquals(
-            today.plusDays(27)
+            today.toJavaLocalDate().plusDays(27)
                 .atTime(23, 59, 59, 999_000_000)
                 .toInstant(ZoneOffset.UTC)
                 .toEpochMilli(),
@@ -26,9 +27,9 @@ class AgendaWindowTest {
         val today = LocalDate.parse("2026-06-12")
         val window = AgendaWindow.firstSync(today)
 
-        assertEquals(LocalDate.of(2023, 9, 1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(), window.start)
+        assertEquals(java.time.LocalDate.of(2023, 9, 1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(), window.start)
         assertEquals(
-            today.plusDays(365)
+            today.toJavaLocalDate().plusDays(365)
                 .atTime(23, 59, 59, 999_000_000)
                 .toInstant(ZoneOffset.UTC)
                 .toEpochMilli(),
@@ -41,9 +42,9 @@ class AgendaWindowTest {
         val today = LocalDate.parse("2026-06-12")
         val window = AgendaWindow.subsequentSync(today)
 
-        assertEquals(today.minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(), window.start)
+        assertEquals(today.toJavaLocalDate().minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(), window.start)
         assertEquals(
-            today.plusDays(365)
+            today.toJavaLocalDate().plusDays(365)
                 .atTime(23, 59, 59, 999_000_000)
                 .toInstant(ZoneOffset.UTC)
                 .toEpochMilli(),

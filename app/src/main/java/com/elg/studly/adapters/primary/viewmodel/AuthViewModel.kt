@@ -18,7 +18,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 import javax.inject.Inject
 
 data class AuthUiState(
@@ -61,7 +62,7 @@ class AuthViewModel @Inject constructor(
         val authorizationToken = accessToken.withAuthorizationScheme(uri.oauthParameter("token_type"))
         val expiresAt = uri.oauthParameter("expires_in")
             ?.toLongOrNull()
-            ?.let { Instant.now().plusSeconds(it) }
+            ?.let { kotlin.time.Clock.System.now().plusSeconds(it) }
         viewModelScope.launch {
             loading.value = true
             error.value = null

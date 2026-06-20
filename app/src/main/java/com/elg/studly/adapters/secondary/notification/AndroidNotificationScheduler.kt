@@ -34,10 +34,13 @@ import com.elg.studly.domain.model.ReminderTarget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.text.NumberFormat
 import java.time.Duration
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import java.time.format.FormatStyle
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -183,15 +186,15 @@ class AndroidNotificationScheduler @Inject constructor(
         }
         if (classLeadMinutes <= 0 && deadlineLeadMinutes <= 0) return
 
-        val now = Instant.now()
-        val horizon = now.plus(REMINDER_HORIZON_DAYS, ChronoUnit.DAYS)
+        val now = kotlin.time.Clock.System.now()
+        val horizon = now + REMINDER_HORIZON_DAYS.days
         targets.asSequence()
             .filter { leadFor(it.kind) > 0 && it.dueAt.isAfter(now) && it.dueAt.isBefore(horizon) }
             .sortedBy { it.dueAt }
             .take(MAX_REMINDERS)
             .forEach { target ->
-                val fireAt = target.dueAt.minus(leadFor(target.kind).toLong(), ChronoUnit.MINUTES)
-                val delayMillis = Duration.between(now, fireAt).toMillis().coerceAtLeast(0)
+                val fireAt = target.dueAt - leadFor(target.kind).minutes
+                val delayMillis = (fireAt - now).inWholeMilliseconds.coerceAtLeast(0)
                 val request = OneTimeWorkRequestBuilder<EventReminderWorker>()
                     .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
                     .addTag(EventReminderWorker.TAG)
@@ -215,7 +218,7 @@ class AndroidNotificationScheduler @Inject constructor(
 
     fun showReminder(id: String, title: String, dueAtEpochMillis: Long, kind: ReminderKind, route: String) {
         val safeTitle = title.ifBlank { context.getString(R.string.common_untitled) }
-        val time = formatInstant(Instant.ofEpochMilli(dueAtEpochMillis))
+        val time = formatInstant(Instant.fromEpochMilliseconds(dueAtEpochMillis))
         val (titleRes, bodyRes) = when (kind) {
             ReminderKind.Class -> R.string.notifications_event_reminder_title to R.string.notifications_event_reminder_body
             ReminderKind.Deadline -> R.string.notifications_deadline_reminder_title to R.string.notifications_deadline_reminder_body
@@ -302,7 +305,7 @@ class AndroidNotificationScheduler @Inject constructor(
         return DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
             .withLocale(currentLocale())
             .withZone(ZoneId.systemDefault())
-            .format(value)
+            .format(value.toJavaInstant())
     }
 
     private fun currentLocale(): Locale {

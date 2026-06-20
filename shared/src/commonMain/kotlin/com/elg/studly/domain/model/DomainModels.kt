@@ -1,7 +1,8 @@
 package com.elg.studly.domain.model
 
-import java.time.Instant
-import java.time.LocalDate
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
 
 data class StudentProfile(
     val id: String,
@@ -187,10 +188,10 @@ data class Session(
     val refreshAfter: Instant
 ) {
     val isExpired: Boolean
-        get() = expiresAt?.isBefore(Instant.now()) == true
+        get() = expiresAt?.let { it < Clock.System.now() } == true
 
     val requiresRefresh: Boolean
-        get() = refreshAfter.isBefore(Instant.now())
+        get() = refreshAfter < Clock.System.now()
 }
 
 data class NotificationPreferences(

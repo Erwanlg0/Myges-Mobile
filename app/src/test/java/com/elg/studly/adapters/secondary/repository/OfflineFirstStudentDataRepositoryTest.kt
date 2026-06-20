@@ -44,8 +44,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.io.IOException
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 class OfflineFirstStudentDataRepositoryTest {
     @Test
@@ -54,11 +55,11 @@ class OfflineFirstStudentDataRepositoryTest {
         val documentCache = File(cacheDir, "documents").apply { mkdirs() }
         val expired = File(documentCache, "expired.pdf").apply {
             writeText("expired")
-            setLastModified(Instant.now().minus(Duration.ofDays(31)).toEpochMilli())
+            setLastModified(kotlin.time.Clock.System.now().minus(31.days).toEpochMilli())
         }
         val current = File(documentCache, "current.pdf").apply {
             writeText("current")
-            setLastModified(Instant.now().minus(Duration.ofDays(2)).toEpochMilli())
+            setLastModified(kotlin.time.Clock.System.now().minus(2.days).toEpochMilli())
         }
         val api = RepositoryApi()
         val dao = RepositoryDao()

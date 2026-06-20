@@ -63,7 +63,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StudentViewModelNetworkRecoveryTest {
@@ -72,11 +73,14 @@ class StudentViewModelNetworkRecoveryTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        io.mockk.mockkStatic(Uri::class)
+        io.mockk.every { Uri.parse(any()) } returns io.mockk.mockk(relaxed = true)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        io.mockk.unmockkStatic(Uri::class)
     }
 
     @Test
@@ -272,10 +276,10 @@ private class FakeStudentDataRepository : StudentDataRepository {
         syncCount += 1
     }
     override suspend fun clearCache() = Unit
-    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri {
+    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): String {
         onProgress(0.5f)
         downloadFinished?.await()
-        return Uri.EMPTY
+        return ""
     }
     override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {}
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}

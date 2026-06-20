@@ -6,7 +6,8 @@ import com.elg.studly.domain.model.AppError
 import com.elg.studly.domain.model.AppException
 import com.elg.studly.domain.model.Session
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,10 +24,10 @@ class SecureSessionStore @Inject constructor(
             val encryptedToken = preferences.getString(KEY_ACCESS_TOKEN, null) ?: return null
             val accessToken = decrypt(encryptedToken)
             val refreshToken = preferences.getString(KEY_REFRESH_TOKEN, null)?.let(::decrypt)
-            val expiresAt = preferences.getLong(KEY_EXPIRES_AT, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli)
-            val issuedAt = preferences.getLong(KEY_ISSUED_AT, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+            val expiresAt = preferences.getLong(KEY_EXPIRES_AT, 0L).takeIf { it > 0L }?.let(Instant::fromEpochMilliseconds)
+            val issuedAt = preferences.getLong(KEY_ISSUED_AT, 0L).takeIf { it > 0L }?.let(Instant::fromEpochMilliseconds)
                 ?: expiresAt?.minusSeconds(TOKEN_VALIDITY_SECONDS)
-                ?: Instant.now()
+                ?: kotlin.time.Clock.System.now()
             val session = Session(
                 username = username,
                 accessToken = accessToken,
@@ -34,7 +35,7 @@ class SecureSessionStore @Inject constructor(
                 expiresAt = expiresAt,
                 biometricEnabled = preferences.getBoolean(KEY_BIOMETRIC, false),
                 issuedAt = issuedAt,
-                refreshAfter = preferences.getLong(KEY_REFRESH_AFTER, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+                refreshAfter = preferences.getLong(KEY_REFRESH_AFTER, 0L).takeIf { it > 0L }?.let(Instant::fromEpochMilliseconds)
                     ?: issuedAt.plusSeconds(TOKEN_REFRESH_SECONDS)
             )
             if (preferences.getBoolean(KEY_NEEDS_ROTATION, false)) {

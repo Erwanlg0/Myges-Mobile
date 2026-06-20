@@ -114,6 +114,7 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        optIn.add("kotlin.time.ExperimentalTime")
     }
 }
 
@@ -122,6 +123,7 @@ ksp {
 }
 
 dependencies {
+    implementation(project(":shared"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.activity.compose)
@@ -149,6 +151,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.datetime)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
     implementation(libs.play.app.update)

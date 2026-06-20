@@ -4,7 +4,8 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 class JsonParsingTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -58,8 +59,8 @@ class JsonParsingTest {
 
         assertEquals(1, events.size)
         assertEquals("course-1", events.first().id)
-        assertEquals(Instant.ofEpochMilli(1781222400000), events.first().startsAt)
-        assertEquals(Instant.ofEpochMilli(1781226000000), events.first().endsAt)
+        assertEquals(Instant.fromEpochMilliseconds(1781222400000), events.first().startsAt)
+        assertEquals(Instant.fromEpochMilliseconds(1781226000000), events.first().endsAt)
     }
 
     @Test
@@ -308,7 +309,7 @@ class JsonParsingTest {
 
         assertEquals(1, absences.size)
         assertEquals("Algorithmique", absences.first().courseName)
-        assertEquals(Instant.ofEpochMilli(1781222400000), absences.first().startsAt)
+        assertEquals(Instant.fromEpochMilliseconds(1781222400000), absences.first().startsAt)
         assertEquals("Absence", absences.first().status)
     }
 
@@ -374,7 +375,7 @@ class JsonParsingTest {
         assertEquals("42", documents.first().id)
         assertEquals("attestation.pdf", documents.first().fileName)
         assertEquals("application/pdf", documents.first().mimeType)
-        assertEquals(Instant.ofEpochMilli(1781222400000), documents.first().updatedAt)
+        assertEquals(Instant.fromEpochMilliseconds(1781222400000), documents.first().updatedAt)
     }
 
     @Test
@@ -523,7 +524,7 @@ class JsonParsingTest {
 
         assertEquals(1, projects.size)
         assertEquals("Groupe 4", projects.first().groupName)
-        assertEquals(Instant.ofEpochMilli(1774653214127), projects.first().deadline)
+        assertEquals(Instant.fromEpochMilliseconds(1774653214127), projects.first().deadline)
         assertEquals("778", projects.first().steps.first().id)
         assertEquals("Rendu final", projects.first().steps.first().title)
         assertEquals(1, projects.first().fileCount)
@@ -558,7 +559,7 @@ class JsonParsingTest {
         ).toProjects()
 
         assertEquals(1, projects.size)
-        assertEquals(Instant.ofEpochMilli(1774653214128), projects.first().deadline)
+        assertEquals(Instant.fromEpochMilliseconds(1774653214128), projects.first().deadline)
     }
 
     @Test
@@ -588,7 +589,7 @@ class JsonParsingTest {
         assertEquals("Projet final ReactJS", projects.first().name)
         assertEquals("React", projects.first().courseName)
         assertEquals("3321", projects.first().groupName)
-        assertEquals(Instant.ofEpochMilli(1774653214127), projects.first().deadline)
+        assertEquals(Instant.fromEpochMilliseconds(1774653214127), projects.first().deadline)
         assertEquals("778", projects.first().steps.first().id)
         assertEquals("Rendu final", projects.first().steps.first().title)
     }
@@ -631,7 +632,7 @@ class JsonParsingTest {
         assertEquals("rendu.zip", documents.first().fileName)
         assertEquals("application/zip", documents.first().mimeType)
         assertEquals("https://api.kordis.fr/bar.zip", documents.first().downloadUrl)
-        assertEquals(Instant.ofEpochMilli(1774653214127), documents.first().updatedAt)
+        assertEquals(Instant.fromEpochMilliseconds(1774653214127), documents.first().updatedAt)
     }
 
     @Test
@@ -685,8 +686,8 @@ class JsonParsingTest {
         ).toPracticals()
 
         assertEquals(1, practicals.size)
-        assertEquals(Instant.ofEpochMilli(1774000000000), practicals.first().startsAt)
-        assertEquals(Instant.ofEpochMilli(1774653214127), practicals.first().endsAt)
+        assertEquals(Instant.fromEpochMilliseconds(1774000000000), practicals.first().startsAt)
+        assertEquals(Instant.fromEpochMilliseconds(1774653214127), practicals.first().endsAt)
     }
 
     @Test
@@ -711,7 +712,7 @@ class JsonParsingTest {
         assertEquals(1, news.size)
         assertEquals("12", news.first().id)
         assertEquals("Résumé", news.first().body)
-        assertEquals(Instant.ofEpochMilli(1781222400000), news.first().publishedAt)
+        assertEquals(Instant.fromEpochMilliseconds(1781222400000), news.first().publishedAt)
     }
     @Test
     fun newsParsesSingleMinimumVersionPayload() {
@@ -761,7 +762,7 @@ class JsonParsingTest {
 
         assertEquals(1, news.size)
         assertEquals("Speed meeting", news.first().title)
-        assertEquals(Instant.ofEpochMilli(1781222400000), news.first().publishedAt)
+        assertEquals(Instant.fromEpochMilliseconds(1781222400000), news.first().publishedAt)
         assertTrue(news.first().body.orEmpty().contains("KEMEO"))
         assertTrue(news.first().body.orEmpty().contains("DÃ©veloppeur PHP h/f"))
     }

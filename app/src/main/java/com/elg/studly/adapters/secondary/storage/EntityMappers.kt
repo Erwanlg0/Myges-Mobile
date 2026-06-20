@@ -14,8 +14,9 @@ import com.elg.studly.domain.model.ProjectGroup
 import com.elg.studly.domain.model.ProjectStep
 import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.StudentProfile
-import java.time.Instant
-import java.time.LocalDate
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
+import kotlinx.datetime.LocalDate
 
 fun StudentProfile.toEntity() = StudentProfileEntity(
     id = id,
@@ -54,8 +55,8 @@ fun AgendaEvent.toEntity() = AgendaEventEntity(
 fun AgendaEventEntity.toDomain() = AgendaEvent(
     id = id,
     title = title,
-    startsAt = Instant.ofEpochMilli(startsAtEpochMillis),
-    endsAt = Instant.ofEpochMilli(endsAtEpochMillis),
+    startsAt = Instant.fromEpochMilliseconds(startsAtEpochMillis),
+    endsAt = Instant.fromEpochMilliseconds(endsAtEpochMillis),
     room = room,
     teacher = teacher,
     type = type,
@@ -103,8 +104,8 @@ fun Absence.toEntity() = AbsenceEntity(
 fun AbsenceEntity.toDomain() = Absence(
     id = id,
     courseName = courseName,
-    startsAt = Instant.ofEpochMilli(startsAtEpochMillis),
-    endsAt = Instant.ofEpochMilli(endsAtEpochMillis),
+    startsAt = Instant.fromEpochMilliseconds(startsAtEpochMillis),
+    endsAt = Instant.fromEpochMilliseconds(endsAtEpochMillis),
     justified = justified,
     status = status,
     reason = reason,
@@ -177,13 +178,13 @@ fun ProjectEntity.toDomain(
     courseName = courseName,
     groupName = groupName,
     status = status,
-    deadline = deadlineEpochMillis?.let { Instant.ofEpochMilli(it) },
+    deadline = deadlineEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
     steps = steps.map { it.toDomain() },
     fileCount = fileCount,
     year = year,
     courseId = courseId,
     groups = groups.map { it.toDomain() },
-    startsAt = startsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
+    startsAt = startsAtEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
     groupMode = groupMode,
     maxStudents = maxStudents
 )
@@ -198,7 +199,7 @@ fun ProjectGroupEntity.toDomain() = ProjectGroup(
 fun ProjectStepEntity.toDomain() = ProjectStep(
     id = id,
     title = title,
-    deadline = deadlineEpochMillis?.let { Instant.ofEpochMilli(it) },
+    deadline = deadlineEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
     status = status
 )
 
@@ -221,8 +222,8 @@ fun PracticalEntity.toDomain(
     id = id,
     name = name,
     courseName = courseName,
-    startsAt = startsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
-    endsAt = endsAtEpochMillis?.let { Instant.ofEpochMilli(it) },
+    startsAt = startsAtEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
+    endsAt = endsAtEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
     room = room,
     status = status,
     year = year,
@@ -273,7 +274,7 @@ fun AcademicDocumentEntity.toDomain() = AcademicDocument(
     mimeType = mimeType,
     fileName = fileName,
     downloadUrl = downloadUrl,
-    updatedAt = updatedAtEpochMillis?.let { Instant.ofEpochMilli(it) },
+    updatedAt = updatedAtEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
     ownerId = ownerId,
     groupId = groupId,
     inlineContent = inlineContent
@@ -312,7 +313,7 @@ fun NewsEntity.toDomain() = NewsItem(
     id = id,
     title = title,
     body = body,
-    publishedAt = publishedAtEpochMillis?.let { Instant.ofEpochMilli(it) },
+    publishedAt = publishedAtEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
     html = html,
     imageUrl = imageUrl
 )
@@ -338,9 +339,9 @@ fun StudentEventEntity.toDomain() = StudentEvent(
     location = location,
     organizer = organizer,
     description = description,
-    date = dateEpochMillis?.let { Instant.ofEpochMilli(it) },
-    subscriptionStart = subscriptionStartEpochMillis?.let { Instant.ofEpochMilli(it) },
-    subscriptionEnd = subscriptionEndEpochMillis?.let { Instant.ofEpochMilli(it) },
+    date = dateEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
+    subscriptionStart = subscriptionStartEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
+    subscriptionEnd = subscriptionEndEpochMillis?.let { Instant.fromEpochMilliseconds(it) },
     subscribed = subscribed,
     detailUrl = detailUrl
 )

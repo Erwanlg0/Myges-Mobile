@@ -25,10 +25,9 @@ import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
-import java.time.Instant
-import javax.inject.Inject
+import kotlin.time.Instant
 
-class CompleteOAuthLoginUseCase @Inject constructor(
+class CompleteOAuthLoginUseCase constructor(
     private val sessionRepository: SessionRepository,
     private val settingsRepository: SettingsRepository,
     private val notificationScheduler: NotificationScheduler
@@ -42,25 +41,25 @@ class CompleteOAuthLoginUseCase @Inject constructor(
     }
 }
 
-class ObserveSessionUseCase @Inject constructor(
+class ObserveSessionUseCase constructor(
     private val sessionRepository: SessionRepository
 ) {
     operator fun invoke(): Flow<Session?> = sessionRepository.session
 }
 
-class ObserveLockedBiometricSessionUseCase @Inject constructor(
+class ObserveLockedBiometricSessionUseCase constructor(
     private val sessionRepository: SessionRepository
 ) {
     operator fun invoke(): Flow<Boolean> = sessionRepository.hasLockedBiometricSession
 }
 
-class UnlockWithBiometricsUseCase @Inject constructor(
+class UnlockWithBiometricsUseCase constructor(
     private val sessionRepository: SessionRepository
 ) {
     suspend operator fun invoke() = sessionRepository.unlockWithBiometrics()
 }
 
-class LogoutUseCase @Inject constructor(
+class LogoutUseCase constructor(
     private val sessionRepository: SessionRepository,
     private val notificationScheduler: NotificationScheduler
 ) {
@@ -70,73 +69,73 @@ class LogoutUseCase @Inject constructor(
     }
 }
 
-class ObserveDashboardUseCase @Inject constructor(
+class ObserveDashboardUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<DashboardSummary> = repository.observeDashboard()
 }
 
-class ObserveAgendaUseCase @Inject constructor(
+class ObserveAgendaUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<AgendaEvent>> = repository.observeAgenda()
 }
 
-class ObserveGradesUseCase @Inject constructor(
+class ObserveGradesUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<Grade>> = repository.observeGrades()
 }
 
-class ObserveAbsencesUseCase @Inject constructor(
+class ObserveAbsencesUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<Absence>> = repository.observeAbsences()
 }
 
-class ObserveCoursesUseCase @Inject constructor(
+class ObserveCoursesUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<Course>> = repository.observeCourses()
 }
 
-class ObserveProjectsUseCase @Inject constructor(
+class ObserveProjectsUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<Project>> = repository.observeProjects()
 }
 
-class ObservePracticalsUseCase @Inject constructor(
+class ObservePracticalsUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<Practical>> = repository.observePracticals()
 }
 
-class ObserveDocumentsUseCase @Inject constructor(
+class ObserveDocumentsUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<AcademicDocument>> = repository.observeDocuments()
 }
 
-class ObserveDirectoryUseCase @Inject constructor(
+class ObserveDirectoryUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<DirectoryPerson>> = repository.observeDirectory()
 }
 
-class ObserveNewsUseCase @Inject constructor(
+class ObserveNewsUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<NewsItem>> = repository.observeNews()
 }
 
-class ObserveEventsUseCase @Inject constructor(
+class ObserveEventsUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     operator fun invoke(): Flow<List<StudentEvent>> = repository.observeEvents()
 }
 
-class RefreshStudentDataUseCase @Inject constructor(
+class RefreshStudentDataUseCase constructor(
     private val repository: StudentDataRepository,
     private val settingsRepository: SettingsRepository,
     private val calendarSyncPort: CalendarSyncPort,
@@ -197,7 +196,7 @@ internal fun buildReminderTargets(
 private fun stepLabel(parent: String, step: String): String =
     listOf(parent, step).filter { it.isNotBlank() }.joinToString(" · ")
 
-class ClearCacheUseCase @Inject constructor(
+class ClearCacheUseCase constructor(
     private val repository: StudentDataRepository,
     private val settingsRepository: SettingsRepository
 ) {
@@ -207,47 +206,47 @@ class ClearCacheUseCase @Inject constructor(
     }
 }
 
-class DownloadDocumentUseCase @Inject constructor(
+class DownloadDocumentUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     suspend operator fun invoke(document: AcademicDocument, onProgress: (Float?) -> Unit = {}) = repository.downloadDocument(document, onProgress)
 }
 
-class JoinGroupUseCase @Inject constructor(
+class JoinGroupUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     suspend operator fun invoke(courseId: String, projectId: String, groupId: String) =
         repository.joinGroup(courseId, projectId, groupId)
 }
 
-class LeaveGroupUseCase @Inject constructor(
+class LeaveGroupUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     suspend operator fun invoke(courseId: String, projectId: String, groupId: String) =
         repository.leaveGroup(courseId, projectId, groupId)
 }
 
-class ProjectMessagesUseCase @Inject constructor(
+class ProjectMessagesUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     suspend operator fun invoke(groupId: String): List<ProjectMessage> =
         repository.projectMessages(groupId)
 }
 
-class SendProjectMessageUseCase @Inject constructor(
+class SendProjectMessageUseCase constructor(
     private val repository: StudentDataRepository
 ) {
     suspend operator fun invoke(groupId: String, message: String) =
         repository.sendProjectMessage(groupId, message)
 }
 
-class ObserveSettingsUseCase @Inject constructor(
+class ObserveSettingsUseCase constructor(
     private val repository: SettingsRepository
 ) {
     operator fun invoke(): Flow<UserSettings> = repository.settings
 }
 
-class UpdateSettingsUseCase @Inject constructor(
+class UpdateSettingsUseCase constructor(
     private val repository: SettingsRepository,
     private val studentDataRepository: StudentDataRepository,
     private val notificationScheduler: NotificationScheduler
@@ -293,7 +292,7 @@ class UpdateSettingsUseCase @Inject constructor(
 }
 
 
-class RescheduleSyncUseCase @Inject constructor(
+class RescheduleSyncUseCase constructor(
     private val settingsRepository: SettingsRepository,
     private val notificationScheduler: NotificationScheduler
 ) {
@@ -303,7 +302,7 @@ class RescheduleSyncUseCase @Inject constructor(
     }
 }
 
-class SyncAgendaToCalendarUseCase @Inject constructor(
+class SyncAgendaToCalendarUseCase constructor(
     private val calendarSyncPort: CalendarSyncPort
 ) {
     suspend operator fun invoke(events: List<AgendaEvent>) {
@@ -311,7 +310,7 @@ class SyncAgendaToCalendarUseCase @Inject constructor(
     }
 }
 
-class CalendarAccountsUseCase @Inject constructor(
+class CalendarAccountsUseCase constructor(
     private val calendarSyncPort: CalendarSyncPort
 ) {
     suspend fun available() = calendarSyncPort.availableCalendars()

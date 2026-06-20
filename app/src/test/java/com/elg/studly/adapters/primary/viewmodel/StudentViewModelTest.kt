@@ -17,8 +17,9 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
-import java.time.LocalDate
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
+import kotlinx.datetime.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StudentViewModelTest {
@@ -105,9 +106,11 @@ class StudentViewModelTest {
     @Test
     fun openDocumentTriggersDownloadAndEmitsUri() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        val document = AcademicDocument("id", "Doc", null, null, "application/pdf", "doc.pdf", "url", Instant.now())
+        val document = AcademicDocument("id", "Doc", null, null, "application/pdf", "doc.pdf", "url", kotlin.time.Clock.System.now())
         val uri = mockk<Uri>()
-        coEvery { downloadDocumentUseCase(document, any()) } returns uri
+        io.mockk.mockkStatic(android.net.Uri::class)
+        io.mockk.every { android.net.Uri.parse(any()) } returns uri
+        coEvery { downloadDocumentUseCase(document, any()) } returns "content://documents/id"
 
         val requests = mutableListOf<DocumentOpenRequest>()
         val job = backgroundScope.launch {
@@ -180,7 +183,7 @@ class StudentViewModelTest {
     @Test
     fun navigateToAgendaDateUpdatesFlow() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        val date = LocalDate.of(2023, 10, 15)
+        val date = LocalDate(2023, 10, 15)
         
         viewModel.navigateToAgendaDate(date)
         

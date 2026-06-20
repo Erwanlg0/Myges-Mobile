@@ -9,7 +9,8 @@ import com.elg.studly.domain.model.Absence
 import com.elg.studly.ui.theme.MygesTheme
 import org.junit.Rule
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 class AbsenceCardTest {
     @get:Rule

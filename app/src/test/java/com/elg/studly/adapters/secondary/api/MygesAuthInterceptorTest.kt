@@ -16,7 +16,8 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 class MygesAuthInterceptorTest {
     @Test
@@ -55,7 +56,7 @@ class MygesAuthInterceptorTest {
     fun interceptorInvalidatesSessionWhenRefreshDatePassed() {
         val session = sampleSession(
             token = "token",
-            refreshAfter = Instant.now().minusSeconds(1)
+            refreshAfter = kotlin.time.Clock.System.now().minusSeconds(1)
         )
         val sessionRepository = RecordingSessionRepository(session)
         val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)
@@ -72,7 +73,7 @@ class MygesAuthInterceptorTest {
     fun interceptorDoesNotAttachTokenForForeignHost() {
         val session = sampleSession(
             token = "token",
-            refreshAfter = Instant.now().minusSeconds(1)
+            refreshAfter = kotlin.time.Clock.System.now().minusSeconds(1)
         )
         val sessionRepository = RecordingSessionRepository(session)
         val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)
@@ -142,9 +143,9 @@ private class RecordingSessionRepository(
 
 private fun sampleSession(
     token: String,
-    refreshAfter: Instant = Instant.now().plusSeconds(3600)
+    refreshAfter: Instant = kotlin.time.Clock.System.now().plusSeconds(3600)
 ): Session {
-    val now = Instant.now()
+    val now = kotlin.time.Clock.System.now()
     return Session(
         username = "Kordis",
         accessToken = token,

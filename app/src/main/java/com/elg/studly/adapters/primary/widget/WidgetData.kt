@@ -14,7 +14,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.first
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -69,9 +70,9 @@ object WidgetData {
         val absences = useCases.observeAbsences().invoke().first()
         val news = useCases.observeNews().invoke().first()
         val zone = ZoneId.systemDefault()
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
 
-        val latestNews = news.maxByOrNull { it.publishedAt ?: Instant.MIN }
+        val latestNews = news.maxByOrNull { it.publishedAt ?: Instant.DISTANT_PAST }
 
         val event = dashboard.nextEvent
         val currentPeriod = grades

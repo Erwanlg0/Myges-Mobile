@@ -154,8 +154,9 @@ import kotlin.math.roundToInt
 import com.elg.studly.domain.model.progress
 import com.elg.studly.domain.model.toGradeSummary
 import coil.compose.AsyncImage
-import java.time.Instant
-import java.time.LocalDate
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
+import kotlinx.datetime.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.FormatStyle
@@ -217,7 +218,7 @@ fun DashboardScreen(
                 dashboard.nextEvent?.let { nextEvent ->
                     IconButton(
                         onClick = {
-                            val nextEventDate = nextEvent.startsAt.atZone(ZoneId.systemDefault()).toLocalDate()
+                            val nextEventDate = nextEvent.startsAt.atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate()
                             viewModel.navigateToAgendaDate(nextEventDate)
                             onNavigateToTab("agenda")
                         }
@@ -343,7 +344,7 @@ fun DashboardScreen(
             item { CompactCard { Text(stringResource(R.string.projects_empty_title)) } }
         } else {
             items(dueProjects, key = { it.id }) { project ->
-                val now = remember { Instant.now() }
+                val now = remember { kotlin.time.Clock.System.now() }
                 val nextDeadline = remember(project) {
                     project.deadline?.takeIf { it.isAfter(now) }
                         ?: project.steps.mapNotNull { it.deadline }.filter { it.isAfter(now) }.minOrNull()
@@ -381,7 +382,7 @@ fun AgendaScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var selectedMode by remember { mutableStateOf(AgendaMode.Grid) }
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var selectedDate by remember { mutableStateOf(java.time.LocalDate.now().toKotlinLocalDate()) }
     var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
     var showCalendarPicker by remember { mutableStateOf(false) }
     var pendingCalendarPick by remember { mutableStateOf(false) }
@@ -425,7 +426,7 @@ fun AgendaScreen(
         if (!highlightedEventId.isNullOrBlank()) {
             val event = state.data.firstOrNull { it.id == highlightedEventId }
             if (event != null) {
-                selectedDate = event.startsAt.atZone(ZoneId.systemDefault()).toLocalDate()
+                selectedDate = event.startsAt.atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate()
                 selectedEvent = event
                 selectedMode = AgendaMode.Week7
             }
@@ -445,7 +446,7 @@ fun AgendaScreen(
         }
     }
     val daysWithEvents = remember(state.data) {
-        state.data.map { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate() }.toSet()
+        state.data.map { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() }.toSet()
     }
     val calendarLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         if (grants.values.all { it }) {
@@ -560,7 +561,7 @@ fun AgendaScreen(
                     val headerText = when (selectedMode) {
                         AgendaMode.Day -> formatDate(selectedDate)
                         AgendaMode.Grid, AgendaMode.Week7 -> {
-                            val startOfWeek = selectedDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                            val startOfWeek = selectedDate.previousOrSameMonday()
                             val endDay = when (selectedMode) {
                                 AgendaMode.Grid -> 5
                                 else -> 6
@@ -570,7 +571,7 @@ fun AgendaScreen(
                         }
                         AgendaMode.Month -> {
                             val formatter = DateTimeFormatter.ofPattern("MMMM yyyy", currentJavaLocale())
-                            selectedDate.format(formatter).replaceFirstChar { it.uppercase() }
+                            selectedDate.toJavaLocalDate().format(formatter).replaceFirstChar { it.uppercase() }
                         }
                         else -> ""
                     }
@@ -599,7 +600,7 @@ fun AgendaScreen(
         
         when (selectedMode) {
             AgendaMode.Grid -> {
-                val startOfWeek = selectedDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                val startOfWeek = selectedDate.previousOrSameMonday()
                 item {
                     AgendaWeekGrid(
                         weekStart = startOfWeek,
@@ -621,7 +622,7 @@ fun AgendaScreen(
                 }
             }
             AgendaMode.Day -> {
-                val dayEvents = events.filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate() == selectedDate }
+                val dayEvents = events.filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() == selectedDate }
                 if (dayEvents.isEmpty()) {
                     item { CompactCard { Text(stringResource(R.string.agenda_filter_empty)) } }
                 } else {
@@ -634,13 +635,13 @@ fun AgendaScreen(
                 }
             }
             AgendaMode.Week7 -> {
-                val startOfWeek = selectedDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+                val startOfWeek = selectedDate.previousOrSameMonday()
                 val numDays = 7
                 val daysList = (0 until numDays).map { startOfWeek.plusDays(it.toLong()) }
                 
                 var hasAnyEvent = false
                 daysList.forEach { day ->
-                    val dayEvents = events.filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate() == day }
+                    val dayEvents = events.filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() == day }
                     if (dayEvents.isNotEmpty()) {
                         hasAnyEvent = true
                         item {
@@ -673,7 +674,7 @@ fun AgendaScreen(
                     )
                 }
                 
-                val dayEvents = events.filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate() == selectedDate }
+                val dayEvents = events.filter { it.startsAt.atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate() == selectedDate }
                 if (dayEvents.isNotEmpty()) {
                     item {
                         Text(
@@ -1778,7 +1779,7 @@ private fun AcademicDocument.filterYear(): String? {
         return raw
     }
     val instant = updatedAt ?: return null
-    val date = instant.atZone(ZoneId.systemDefault()).toLocalDate()
+    val date = instant.atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate()
     val start = if (date.monthValue >= 8) date.year else date.year - 1
     return "$start-${start + 1}"
 }
@@ -1827,8 +1828,8 @@ fun EventsScreen(
         emptyBody = R.string.events_empty_body,
         onRetry = studentViewModel::refresh
     ) { events ->
-        val now = Instant.now()
-        val (future, past) = events.partition { (it.date ?: Instant.MIN).isAfter(now) }
+        val now = kotlin.time.Clock.System.now()
+        val (future, past) = events.partition { (it.date ?: Instant.DISTANT_PAST).isAfter(now) }
         if (future.isNotEmpty()) {
             item { SectionTitleText(stringResource(R.string.events_section_future)) }
             items(future, key = { "f:${it.id}" }) { EventCard(it, onOpen = { selectedEvent = it }) }
@@ -1889,7 +1890,7 @@ private fun EventDetailsDialog(
     event: StudentEvent,
     onDismiss: () -> Unit
 ) {
-    val now = remember { Instant.now() }
+    val now = remember { kotlin.time.Clock.System.now() }
     val canSubscribe = event.subscriptionStart?.let { !now.isBefore(it) } == true &&
         event.subscriptionEnd?.let { !now.isAfter(it) } == true
     AlertDialog(
@@ -2697,7 +2698,7 @@ private fun GradeCard(
         LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
         LabelValue(R.string.common_date, formatDate(grade.date))
         if (!grade.period.isNullOrBlank()) {
-            LabelValue(R.string.common_period, grade.period)
+            LabelValue(R.string.common_period, grade.period!!)
         }
     }
 }
@@ -2844,7 +2845,7 @@ private fun GradeSimulationEditCard(
         }
         LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
         if (!grade.period.isNullOrBlank()) {
-            LabelValue(R.string.common_period, grade.period)
+            LabelValue(R.string.common_period, grade.period!!)
         }
     }
 }
@@ -3021,7 +3022,7 @@ internal fun AbsenceCard(
             if (absence.justified) stringResource(R.string.absences_justified) else stringResource(R.string.absences_unjustified)
         )
         if (!absence.period.isNullOrBlank()) {
-            LabelValue(R.string.common_period, absence.period)
+            LabelValue(R.string.common_period, absence.period!!)
         }
     }
 }
@@ -3101,7 +3102,7 @@ internal fun CourseCard(
                     val saveSyllabus: () -> Unit = {
                         val uri = PdfGenerator.savePdfToDownloads(
                             context = context,
-                            text = course.syllabus,
+                            text = course.syllabus!!,
                             title = "${course.name} - Syllabus",
                             fileName = "${course.name}_syllabus"
                         )
@@ -3906,7 +3907,7 @@ internal fun NewsCard(newsItem: NewsItem, onOpen: () -> Unit = {}) {
         LabelValue(R.string.common_date, formatInstant(newsItem.publishedAt))
         if (!newsItem.body.isNullOrBlank()) {
             Text(
-                text = newsItem.body,
+                text = newsItem.body!!,
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -4116,7 +4117,7 @@ private fun AgendaWeekGrid(
     val locale = currentJavaLocale()
     val dayFmt = remember(locale) { DateTimeFormatter.ofPattern("EEE d", locale) }
     val hourFmt = remember(locale) { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale) }
-    val today = LocalDate.now()
+    val today = java.time.LocalDate.now().toKotlinLocalDate()
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         
@@ -4132,7 +4133,7 @@ private fun AgendaWeekGrid(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = day.format(dayFmt).replaceFirstChar { it.uppercase() },
+                                text = day.toJavaLocalDate().format(dayFmt).replaceFirstChar { it.uppercase() },
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -4366,8 +4367,8 @@ private fun List<AgendaEvent>.toIcsString(): String {
         val desc = listOfNotNull(event.teacher, event.type, event.modality).joinToString(" - ")
         lines += "BEGIN:VEVENT"
         lines += "UID:${event.id.escapeIcsText()}"
-        lines += "DTSTART:${formatter.format(event.startsAt)}"
-        lines += "DTEND:${formatter.format(event.endsAt)}"
+        lines += "DTSTART:${formatter.format(event.startsAt.toJavaInstant())}"
+        lines += "DTEND:${formatter.format(event.endsAt.toJavaInstant())}"
         lines += "SUMMARY:${event.title.escapeIcsText()}"
         lines += "DESCRIPTION:${desc.escapeIcsText()}"
         lines += "LOCATION:${event.room.orEmpty().escapeIcsText()}"
@@ -4551,7 +4552,7 @@ private fun Course.academicYearLabel(): String? {
 
 private fun Absence.academicYearLabel(): String {
     ACADEMIC_YEAR_REGEX.find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
-    val date = startsAt.atZone(ZoneId.systemDefault()).toLocalDate()
+    val date = startsAt.atZone(ZoneId.systemDefault()).toLocalDate().toKotlinLocalDate()
     val startYear = if (date.monthValue >= 9) date.year else date.year - 1
     return "$startYear-${startYear + 1}"
 }

@@ -49,7 +49,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModelTest {
@@ -336,7 +337,7 @@ private class RecordingStudentDataRepository(
     override suspend fun clearCache() {
         events += "clearCache"
     }
-    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri = Uri.EMPTY
+    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): String = ""
     override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {}
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
 }

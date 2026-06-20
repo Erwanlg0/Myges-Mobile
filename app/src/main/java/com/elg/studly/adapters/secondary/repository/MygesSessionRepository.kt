@@ -7,7 +7,8 @@ import com.elg.studly.domain.model.AppException
 import com.elg.studly.domain.model.Session
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,7 +35,7 @@ class MygesSessionRepository @Inject constructor(
     override suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) {
         try {
             if (accessToken.isBlank()) throw AppException(AppError.Unauthorized)
-            val issuedAt = Instant.now()
+            val issuedAt = kotlin.time.Clock.System.now()
             val resolvedExpiresAt = expiresAt ?: issuedAt.plusSeconds(TOKEN_VALIDITY_SECONDS)
             val session = Session(
                 username = KORDIS_SESSION_USERNAME,

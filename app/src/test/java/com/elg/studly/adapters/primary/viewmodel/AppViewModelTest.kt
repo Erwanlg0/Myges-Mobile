@@ -20,7 +20,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
@@ -50,7 +51,7 @@ class AppViewModelTest {
         val viewModel = AppViewModel(observeSession, observeSettings)
         
         val job = backgroundScope.launch { viewModel.session.collect {} }
-        val expectedSession = Session("user", "token", null, Instant.now(), false, Instant.now(), Instant.now())
+        val expectedSession = Session("user", "token", null, kotlin.time.Clock.System.now(), false, kotlin.time.Clock.System.now(), kotlin.time.Clock.System.now())
         sessionFlow.value = expectedSession
         
         advanceUntilIdle()

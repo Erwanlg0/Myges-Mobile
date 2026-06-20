@@ -25,8 +25,9 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
-import java.time.Instant
-import java.time.LocalDate
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
+import kotlinx.datetime.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -270,7 +271,7 @@ fun JsonElement.toAbsences(year: String? = null, availablePeriods: List<String> 
         val endsAt = root.instant("endsAt", "end", "endDate", "dateEnd")
             ?: startsAt.plusSeconds(3600)
 
-        val startsAtLdt = java.time.LocalDateTime.ofInstant(startsAt, java.time.ZoneOffset.UTC)
+        val startsAtLdt = java.time.LocalDateTime.ofInstant(startsAt.toJavaInstant(), java.time.ZoneOffset.UTC)
         val month = startsAtLdt.monthValue
 
         val startYearNum = root.number("year", "academicYear")?.toInt()
@@ -908,7 +909,7 @@ private fun JsonObject.localDate(vararg keys: String): LocalDate? {
         val text = (value as? JsonPrimitive)?.contentOrNull
         text?.let { candidate ->
             runCatching { LocalDate.parse(candidate.take(10)) }.getOrNull()?.let { return it }
-            parseInstant(value)?.atZone(ZoneOffset.UTC)?.toLocalDate()?.let { return it }
+            parseInstant(value)?.atZone(ZoneOffset.UTC)?.toLocalDate()?.toKotlinLocalDate()?.let { return it }
         }
     }
     return null
@@ -964,35 +965,35 @@ private fun parseInstant(value: JsonElement?): Instant? {
     primitive.contentOrNull?.let { text ->
         val cleanText = text.trim().replace(Regex("\\s+"), " ")
         cleanText.toLongOrNull()?.let { number ->
-            return if (number > 9999999999L) Instant.ofEpochMilli(number) else Instant.ofEpochSecond(number)
+            return if (number > 9999999999L) Instant.fromEpochMilliseconds(number) else Instant.fromEpochSeconds(number)
         }
         if (cleanText.contains('/') && cleanText.contains('h')) {
             runCatching {
                 val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH'h'mm")
                 val ldt = java.time.LocalDateTime.parse(cleanText, formatter)
-                ldt.atZone(java.time.ZoneId.systemDefault()).toInstant()
+                ldt.atZone(java.time.ZoneId.systemDefault()).toInstant().toKotlinInstant()
             }.getOrNull()?.let { return it }
         }
         if (cleanText.contains('/') && cleanText.contains(':')) {
             runCatching {
                 val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
                 val ldt = java.time.LocalDateTime.parse(cleanText, formatter)
-                ldt.atZone(java.time.ZoneId.systemDefault()).toInstant()
+                ldt.atZone(java.time.ZoneId.systemDefault()).toInstant().toKotlinInstant()
             }.getOrNull()?.let { return it }
         }
         if (cleanText.contains('/') && cleanText.length == 10) {
             runCatching {
                 val formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
                 val ld = java.time.LocalDate.parse(cleanText, formatter)
-                ld.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant()
+                ld.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toKotlinInstant()
             }.getOrNull()?.let { return it }
         }
         runCatching { Instant.parse(cleanText) }.getOrNull()?.let { return it }
-        runCatching { LocalDate.parse(cleanText.take(10)).atStartOfDay().toInstant(ZoneOffset.UTC) }.getOrNull()?.let { return it }
-        runCatching { DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(cleanText, Instant::from) }.getOrNull()?.let { return it }
+        runCatching { java.time.LocalDate.parse(cleanText.take(10)).atStartOfDay().toInstant(ZoneOffset.UTC).toKotlinInstant() }.getOrNull()?.let { return it }
+        runCatching { DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(cleanText, java.time.Instant::from).toKotlinInstant() }.getOrNull()?.let { return it }
     }
     primitive.doubleOrNull?.toLong()?.let { number ->
-        return if (number > 9999999999L) Instant.ofEpochMilli(number) else Instant.ofEpochSecond(number)
+        return if (number > 9999999999L) Instant.fromEpochMilliseconds(number) else Instant.fromEpochSeconds(number)
     }
     return null
 }

@@ -1,8 +1,9 @@
 package com.elg.studly.adapters.secondary.repository
 
 import java.io.File
-import java.time.Duration
-import java.time.Instant
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,14 +15,14 @@ class DocumentCachePolicyTest {
         val now = Instant.parse("2026-06-12T12:00:00Z")
         val expired = File(directory, "expired.pdf").apply {
             writeText("expired")
-            setLastModified(now.minus(Duration.ofDays(31)).toEpochMilli())
+            setLastModified(now.minus(31.days).toEpochMilli())
         }
         val current = File(directory, "current.pdf").apply {
             writeText("current")
-            setLastModified(now.minus(Duration.ofDays(29)).toEpochMilli())
+            setLastModified(now.minus(29.days).toEpochMilli())
         }
 
-        purgeExpiredDocumentCache(directory, now, Duration.ofDays(30))
+        purgeExpiredDocumentCache(directory, now, 30.days)
 
         assertFalse(expired.exists())
         assertTrue(current.exists())
@@ -39,7 +40,7 @@ class DocumentCachePolicyTest {
         purgeExpiredDocumentCache(
             directory = directory,
             now = Instant.parse("2026-06-12T12:00:00Z"),
-            maxAge = Duration.ofDays(30)
+            maxAge = 30.days
         )
 
         assertFalse(nested.exists())

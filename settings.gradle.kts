@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Studly"
 include(":app")
+include(":shared")
  

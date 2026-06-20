@@ -12,8 +12,9 @@ import com.elg.studly.domain.model.ProjectStep
 import com.elg.studly.domain.model.StudentProfile
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.time.Instant
-import java.time.LocalDate
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
+import kotlinx.datetime.LocalDate
 
 class EntityMappersTest {
     @Test

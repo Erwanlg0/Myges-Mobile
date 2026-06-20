@@ -11,14 +11,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 class ObserverUseCasesTest {
 
     @Test
     fun observeSessionUseCaseReturnsFlow() = runTest {
         val repository = mockk<SessionRepository>()
-        val expectedSession = Session("user", "token", null, Instant.now(), false, Instant.now(), Instant.now())
+        val expectedSession = Session("user", "token", null, kotlin.time.Clock.System.now(), false, kotlin.time.Clock.System.now(), kotlin.time.Clock.System.now())
         every { repository.session } returns MutableStateFlow(expectedSession)
 
         val useCase = ObserveSessionUseCase(repository)

@@ -21,7 +21,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -48,7 +49,7 @@ class AppSettingsRepository @Inject constructor(
             refreshIntervals = preferences.toRefreshIntervals(),
             classReminderLeadMinutes = clampReminderLeadMinutes(preferences[CLASS_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
             deadlineReminderLeadMinutes = clampReminderLeadMinutes(preferences[DEADLINE_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
-            lastSyncAt = preferences[LAST_SYNC]?.let(Instant::ofEpochMilli)
+            lastSyncAt = preferences[LAST_SYNC]?.let(Instant::fromEpochMilliseconds)
         )
     }
 
@@ -88,12 +89,12 @@ class AppSettingsRepository @Inject constructor(
 
     override suspend fun lastFetchedAt(feature: SyncFeature): Instant? {
         return context.settingsDataStore.data.first()[LAST_FETCH_KEYS.getValue(feature)]
-            ?.let(Instant::ofEpochMilli)
+            ?.let(Instant::fromEpochMilliseconds)
     }
 
     override suspend fun markFeatureFetched(feature: SyncFeature) {
         context.settingsDataStore.edit { preferences ->
-            preferences[LAST_FETCH_KEYS.getValue(feature)] = Instant.now().toEpochMilli()
+            preferences[LAST_FETCH_KEYS.getValue(feature)] = kotlin.time.Clock.System.now().toEpochMilli()
         }
     }
 
@@ -132,7 +133,7 @@ class AppSettingsRepository @Inject constructor(
     }
 
     override suspend fun markSynced() {
-        context.settingsDataStore.edit { preferences -> preferences[LAST_SYNC] = Instant.now().toEpochMilli() }
+        context.settingsDataStore.edit { preferences -> preferences[LAST_SYNC] = kotlin.time.Clock.System.now().toEpochMilli() }
     }
 
     override suspend fun clearSyncMetadata() {

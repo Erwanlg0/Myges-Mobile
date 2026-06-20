@@ -2,6 +2,9 @@ package com.elg.studly.domain.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.elg.studly.adapters.time.minusSeconds
+import com.elg.studly.adapters.time.plusSeconds
+import kotlin.time.Duration.Companion.days
 
 class ProjectProgressTest {
     @Test
@@ -28,8 +31,8 @@ class ProjectProgressTest {
 
     @Test
     fun projectProgressIncludesPassedDeadlines() {
-        val past = java.time.Instant.now().minusSeconds(3600)
-        val future = java.time.Instant.now().plusSeconds(3600)
+        val past = kotlin.time.Clock.System.now().minusSeconds(3600)
+        val future = kotlin.time.Clock.System.now().plusSeconds(3600)
         val progress = project(
             ProjectStep("one", "Draft", past, "todo"),
             ProjectStep("two", "Final", future, "todo")
@@ -42,7 +45,7 @@ class ProjectProgressTest {
 
     @Test
     fun projectProgressIsFullWhenAllDeadlinesPassed() {
-        val past = java.time.Instant.now().minusSeconds(3600)
+        val past = kotlin.time.Clock.System.now().minusSeconds(3600)
         val progress = project(
             ProjectStep("one", "Draft", past, "todo"),
             ProjectStep("two", "Final", past, "todo")
@@ -55,7 +58,7 @@ class ProjectProgressTest {
 
     @Test
     fun projectProgressCountsDeadlinesOlderThanSixMonths() {
-        val veryPast = java.time.Instant.now().minus(190, java.time.temporal.ChronoUnit.DAYS)
+        val veryPast = kotlin.time.Clock.System.now() - 190.days
         val progress = project(
             ProjectStep("one", "Draft", veryPast, "todo"),
             ProjectStep("two", "Final", veryPast, "completed")
@@ -69,8 +72,8 @@ class ProjectProgressTest {
     @Test
     fun projectProgressIgnoresProjectDeadlineAndUsesSteps() {
         
-        val past = java.time.Instant.now().minusSeconds(3600)
-        val future = java.time.Instant.now().plusSeconds(3600)
+        val past = kotlin.time.Clock.System.now().minusSeconds(3600)
+        val future = kotlin.time.Clock.System.now().plusSeconds(3600)
         val progress = Project(
             id = "project-1",
             name = "Project",
@@ -92,7 +95,7 @@ class ProjectProgressTest {
 
     @Test
     fun projectProgressIsFullWhenStatusCompleted() {
-        val future = java.time.Instant.now().plusSeconds(3600)
+        val future = kotlin.time.Clock.System.now().plusSeconds(3600)
         val progress = Project(
             id = "project-1",
             name = "Project",

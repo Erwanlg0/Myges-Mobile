@@ -9,7 +9,7 @@ import com.elg.studly.domain.model.Grade
 import com.elg.studly.ui.theme.MygesTheme
 import org.junit.Rule
 import org.junit.Test
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
 
 class GradeSummaryCardTest {
     @get:Rule

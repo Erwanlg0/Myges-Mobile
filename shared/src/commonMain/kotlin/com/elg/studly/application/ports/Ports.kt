@@ -1,6 +1,5 @@
 package com.elg.studly.application.ports
 
-import android.net.Uri
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
 import com.elg.studly.domain.model.AgendaEvent
@@ -20,7 +19,7 @@ import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
-import java.time.Instant
+import kotlin.time.Instant
 
 interface SessionRepository {
     val session: Flow<Session?>
@@ -46,7 +45,7 @@ interface StudentDataRepository {
     fun observeEvents(): Flow<List<StudentEvent>>
     suspend fun syncAll(force: Boolean = false, features: Set<SyncFeature>? = null)
     suspend fun clearCache()
-    suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit = {}): Uri
+    suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit = {}): String
     suspend fun joinGroup(courseId: String, projectId: String, groupId: String)
     suspend fun leaveGroup(courseId: String, projectId: String, groupId: String)
     suspend fun projectMessages(groupId: String): List<ProjectMessage> = emptyList()

@@ -5,8 +5,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 import java.text.NumberFormat
-import java.time.Instant
-import java.time.LocalDate
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
+import kotlinx.datetime.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -20,7 +21,7 @@ fun formatInstant(value: Instant?): String {
         DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
             .withLocale(locale)
             .withZone(ZoneId.systemDefault())
-            .format(value)
+            .format(value.toJavaInstant())
     }
 }
 
@@ -31,7 +32,7 @@ fun formatDate(value: LocalDate?): String {
     return remember(value, locale) {
         DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
             .withLocale(locale)
-            .format(value)
+            .format(value.toJavaLocalDate())
     }
 }
 

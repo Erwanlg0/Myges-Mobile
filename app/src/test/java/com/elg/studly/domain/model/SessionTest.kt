@@ -3,12 +3,13 @@ package com.elg.studly.domain.model
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 class SessionTest {
     @Test
     fun sessionRequiresRefreshAfterConfiguredRefreshDate() {
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val session = Session(
             username = "Kordis",
             accessToken = "token",
@@ -25,7 +26,7 @@ class SessionTest {
 
     @Test
     fun sessionExpiresAfterConfiguredExpiryDate() {
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val session = Session(
             username = "Kordis",
             accessToken = "token",

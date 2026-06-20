@@ -71,8 +71,9 @@ import java.io.File
 import java.io.IOException
 import java.net.URLDecoder
 import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
+import kotlinx.datetime.LocalDate
 import java.time.Year
 import java.time.ZoneOffset
 import java.nio.charset.StandardCharsets
@@ -105,7 +106,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         ) { profile, agenda, grades, absences, projects ->
             DashboardLocalData(profile, agenda, grades, absences, projects)
         }.combine(settingsRepository.settings) { localData, settings ->
-            val now = Instant.now()
+            val now = kotlin.time.Clock.System.now()
             DashboardSummary(
                 profile = localData.profile?.toDomain(),
                 nextEvent = localData.agenda.firstOrNull { it.endsAt.isAfter(now) },
@@ -211,7 +212,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                 val updatedProfile = profileAndYears?.profile
                 val years = profileAndYears?.years.orEmpty()
 
-                val today = LocalDate.now(ZoneOffset.UTC)
+                val today = java.time.LocalDate.now(ZoneOffset.UTC).toKotlinLocalDate()
                 val currentAcademicYearStart = (if (today.monthValue >= 9) today.year else today.year - 1).toString()
                 
                 val isFirstSync = settingsRepository.settings.first().lastSyncAt == null
@@ -301,10 +302,10 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     private suspend fun dueFeatures(force: Boolean): Set<SyncFeature> {
         if (force) return SyncFeature.entries.toSet()
         val intervals = settingsRepository.settings.first().refreshIntervals
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         return SyncFeature.entries.filterTo(mutableSetOf()) { feature ->
             val last = settingsRepository.lastFetchedAt(feature)
-            last == null || Duration.between(last, now).toMinutes() >= intervals.minutesFor(feature)
+            last == null || (now - last).inWholeMinutes >= intervals.minutesFor(feature)
         }
     }
 
@@ -374,7 +375,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         }
     }
 
-    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri {
+    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): String {
         return withContext(Dispatchers.IO) {
             try {
                 val directory = File(context.cacheDir, DOCUMENT_CACHE).apply { mkdirs() }
@@ -429,8 +430,8 @@ class OfflineFirstStudentDataRepository @Inject constructor(
                     onProgress(1f)
                     file
                 }
-                target.setLastModified(Instant.now().toEpochMilli())
-                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target)
+                target.setLastModified(kotlin.time.Clock.System.now().toEpochMilli())
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target).toString()
             } catch (throwable: Throwable) {
                 throw throwable.toRepositoryException()
             }
@@ -780,7 +781,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         documents: List<AcademicDocument>
     ) {
         val settings = settingsRepository.settings.first()
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = java.time.LocalDate.now(ZoneOffset.UTC).toKotlinLocalDate()
         val currentAcademicYearStart = (if (today.monthValue >= 9) today.year else today.year - 1).toString()
 
         if (settings.notifications.agenda && previousIds.agenda.isNotEmpty()) {
@@ -845,27 +846,27 @@ internal data class AgendaWindow(
     val end: Long
 ) {
     companion object {
-        fun firstSync(today: LocalDate = LocalDate.now(ZoneOffset.UTC)): AgendaWindow {
-            val start = LocalDate.of(2023, 9, 1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
-            val end = today.plusDays(365)
+        fun firstSync(today: LocalDate = java.time.LocalDate.now(ZoneOffset.UTC).toKotlinLocalDate()): AgendaWindow {
+            val start = java.time.LocalDate.of(2023, 9, 1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+            val end = today.toJavaLocalDate().plusDays(365)
                 .atTime(23, 59, 59, 999_000_000)
                 .toInstant(ZoneOffset.UTC)
                 .toEpochMilli()
             return AgendaWindow(start, end)
         }
 
-        fun subsequentSync(today: LocalDate = LocalDate.now(ZoneOffset.UTC)): AgendaWindow {
-            val start = today.minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
-            val end = today.plusDays(365)
+        fun subsequentSync(today: LocalDate = java.time.LocalDate.now(ZoneOffset.UTC).toKotlinLocalDate()): AgendaWindow {
+            val start = today.toJavaLocalDate().minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+            val end = today.toJavaLocalDate().plusDays(365)
                 .atTime(23, 59, 59, 999_000_000)
                 .toInstant(ZoneOffset.UTC)
                 .toEpochMilli()
             return AgendaWindow(start, end)
         }
 
-        fun fromToday(today: LocalDate = LocalDate.now(ZoneOffset.UTC)): AgendaWindow {
-            val start = today.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
-            val end = today.plusDays(27)
+        fun fromToday(today: LocalDate = java.time.LocalDate.now(ZoneOffset.UTC).toKotlinLocalDate()): AgendaWindow {
+            val start = today.toJavaLocalDate().atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+            val end = today.toJavaLocalDate().plusDays(27)
                 .atTime(23, 59, 59, 999_000_000)
                 .toInstant(ZoneOffset.UTC)
                 .toEpochMilli()

@@ -26,7 +26,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 
 class RefreshStudentDataUseCaseTest {
     @Test
@@ -95,7 +96,7 @@ private class RecordingStudentDataRepository(
     override suspend fun clearCache() {
         events += "clearCache"
     }
-    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri = Uri.EMPTY
+    override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): String = ""
     override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {}
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
 }

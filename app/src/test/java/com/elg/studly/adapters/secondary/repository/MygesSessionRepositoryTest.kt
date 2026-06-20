@@ -9,11 +9,13 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlin.time.Duration.Companion.days
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
+import kotlin.time.Instant
+import com.elg.studly.adapters.time.*
 import java.time.temporal.ChronoUnit
 
 class MygesSessionRepositoryTest {
@@ -36,10 +38,10 @@ class MygesSessionRepositoryTest {
             username = "user",
             accessToken = "token",
             refreshToken = null,
-            expiresAt = Instant.now().plusSeconds(3600),
+            expiresAt = kotlin.time.Clock.System.now().plusSeconds(3600),
             biometricEnabled = false,
-            issuedAt = Instant.now(),
-            refreshAfter = Instant.now().plusSeconds(1800)
+            issuedAt = kotlin.time.Clock.System.now(),
+            refreshAfter = kotlin.time.Clock.System.now().plusSeconds(1800)
         )
         val secureStore = mockk<SecureSessionStore> {
             every { read() } returns session
@@ -56,10 +58,10 @@ class MygesSessionRepositoryTest {
             username = "user",
             accessToken = "token",
             refreshToken = null,
-            expiresAt = Instant.now().minusSeconds(3600),
+            expiresAt = kotlin.time.Clock.System.now().minusSeconds(3600),
             biometricEnabled = false,
-            issuedAt = Instant.now(),
-            refreshAfter = Instant.now().plusSeconds(1800)
+            issuedAt = kotlin.time.Clock.System.now(),
+            refreshAfter = kotlin.time.Clock.System.now().plusSeconds(1800)
         )
         val secureStore = mockk<SecureSessionStore> {
             every { read() } returns session
@@ -77,10 +79,10 @@ class MygesSessionRepositoryTest {
             username = "user",
             accessToken = "token",
             refreshToken = null,
-            expiresAt = Instant.now().plusSeconds(3600),
+            expiresAt = kotlin.time.Clock.System.now().plusSeconds(3600),
             biometricEnabled = true,
-            issuedAt = Instant.now(),
-            refreshAfter = Instant.now().plusSeconds(1800)
+            issuedAt = kotlin.time.Clock.System.now(),
+            refreshAfter = kotlin.time.Clock.System.now().plusSeconds(1800)
         )
         val secureStore = mockk<SecureSessionStore> {
             every { read() } returns session
@@ -98,7 +100,7 @@ class MygesSessionRepositoryTest {
         }
         val repository = MygesSessionRepository(secureStore)
 
-        val expiresAt = Instant.now().plusSeconds(3600)
+        val expiresAt = kotlin.time.Clock.System.now().plusSeconds(3600)
         repository.authenticateWithToken("new_token", expiresAt, false)
 
         val newSession = repository.session.first()
@@ -115,10 +117,10 @@ class MygesSessionRepositoryTest {
             username = "user",
             accessToken = "token",
             refreshToken = null,
-            expiresAt = Instant.now().plus(10, ChronoUnit.DAYS),
+            expiresAt = kotlin.time.Clock.System.now() + 10.days,
             biometricEnabled = true,
-            issuedAt = Instant.now(),
-            refreshAfter = Instant.now().plus(5, ChronoUnit.DAYS)
+            issuedAt = kotlin.time.Clock.System.now(),
+            refreshAfter = kotlin.time.Clock.System.now() + 5.days
         )
         val secureStore = mockk<SecureSessionStore>(relaxed = true) {
             every { read() } returns session
@@ -140,10 +142,10 @@ class MygesSessionRepositoryTest {
             username = "user",
             accessToken = "token",
             refreshToken = null,
-            expiresAt = Instant.now().plusSeconds(3600),
+            expiresAt = kotlin.time.Clock.System.now().plusSeconds(3600),
             biometricEnabled = false,
-            issuedAt = Instant.now(),
-            refreshAfter = Instant.now().plusSeconds(1800)
+            issuedAt = kotlin.time.Clock.System.now(),
+            refreshAfter = kotlin.time.Clock.System.now().plusSeconds(1800)
         )
         val secureStore = mockk<SecureSessionStore>(relaxed = true) {
             every { read() } returns session

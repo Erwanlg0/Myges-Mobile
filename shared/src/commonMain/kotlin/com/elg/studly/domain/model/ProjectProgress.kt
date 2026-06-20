@@ -1,6 +1,7 @@
 package com.elg.studly.domain.model
 
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 data class ProjectProgress(
     val completedSteps: Int,
@@ -10,10 +11,10 @@ data class ProjectProgress(
 
 
 private fun ProjectStep.isCompleted(now: Instant): Boolean =
-    status.isCompletedStatus() || (deadline != null && deadline.isBefore(now))
+    status.isCompletedStatus() || (deadline != null && deadline < now)
 
 fun Project.progress(): ProjectProgress {
-    val now = Instant.now()
+    val now = Clock.System.now()
     val total = steps.size
     
     
@@ -30,7 +31,7 @@ fun Project.progress(): ProjectProgress {
 }
 
 fun Practical.progress(): ProjectProgress {
-    val now = Instant.now()
+    val now = Clock.System.now()
     val total = steps.size
     val practicalDone = status.isCompletedStatus()
     if (total == 0) {
