@@ -1,6 +1,7 @@
 package com.elg.studly.adapters.secondary.play
 
 import android.app.Activity
+import android.content.IntentSender
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.InstallStatus
@@ -21,7 +22,10 @@ class AndroidPlayQualityManager @Inject constructor() {
                     info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE &&
                     info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
                 ) {
-                    manager.startUpdateFlowForResult(info, AppUpdateType.FLEXIBLE, activity, UPDATE_REQUEST_CODE)
+                    try {
+                        manager.startUpdateFlowForResult(info, AppUpdateType.FLEXIBLE, activity, UPDATE_REQUEST_CODE)
+                    } catch (e: IntentSender.SendIntentException) {
+                    }
                 }
             }
     }
