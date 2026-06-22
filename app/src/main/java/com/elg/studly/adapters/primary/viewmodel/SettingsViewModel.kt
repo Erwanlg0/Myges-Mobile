@@ -9,6 +9,7 @@ import com.elg.studly.application.usecase.ObserveSettingsUseCase
 import com.elg.studly.application.usecase.UpdateSettingsUseCase
 import com.elg.studly.application.usecase.RescheduleSyncUseCase
 import com.elg.studly.domain.model.SyncFeature
+import com.elg.studly.domain.model.AgendaColorMode
 import com.elg.studly.domain.model.AppError
 import com.elg.studly.domain.model.CalendarAccount
 import com.elg.studly.domain.model.ThemeMode
@@ -83,6 +84,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setDynamicColor(enabled: Boolean) = launchSettingChange {
         updateSettingsUseCase.dynamicColor(enabled)
+    }
+
+    fun setAgendaColorMode(mode: AgendaColorMode) = launchSettingChange {
+        updateSettingsUseCase.agendaColorMode(mode)
     }
 
     fun setCalendarSync(enabled: Boolean) = launchSettingChange {

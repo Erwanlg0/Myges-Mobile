@@ -257,6 +257,9 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_dynamic_color">Dynamic color (Material You)</string>
+    <string name="settings_agenda_color_mode">Agenda event color</string>
+    <string name="settings_agenda_color_course">By course</string>
+    <string name="settings_agenda_color_location">By location</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_french">French</string>
     <string name="settings_language_system">System</string>

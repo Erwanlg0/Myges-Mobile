@@ -307,6 +307,7 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
     override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
+    override suspend fun setAgendaColorMode(mode: com.elg.studly.domain.model.AgendaColorMode) = Unit
     override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
     override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
     override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit

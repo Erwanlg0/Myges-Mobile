@@ -17,6 +17,7 @@ import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
 import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.SyncFeature
+import com.elg.studly.domain.model.AgendaColorMode
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
@@ -65,6 +66,7 @@ interface SettingsRepository {
     suspend fun setDocumentNotificationsEnabled(enabled: Boolean)
     suspend fun setThemeMode(themeMode: ThemeMode)
     suspend fun setDynamicColorEnabled(enabled: Boolean)
+    suspend fun setAgendaColorMode(mode: AgendaColorMode)
     suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int)
     suspend fun setClassReminderLeadMinutes(minutes: Int)
     suspend fun setDeadlineReminderLeadMinutes(minutes: Int)

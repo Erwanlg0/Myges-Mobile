@@ -257,6 +257,9 @@
     <string name="settings_theme_light">Clair</string>
     <string name="settings_theme_dark">Sombre</string>
     <string name="settings_dynamic_color">Couleurs dynamiques (Material You)</string>
+    <string name="settings_agenda_color_mode">Couleur des cours dans l\'agenda</string>
+    <string name="settings_agenda_color_course">Par cours</string>
+    <string name="settings_agenda_color_location">Par lieu</string>
     <string name="settings_language_english">Anglais</string>
     <string name="settings_language_french">Français</string>
     <string name="settings_language_system">Système</string>

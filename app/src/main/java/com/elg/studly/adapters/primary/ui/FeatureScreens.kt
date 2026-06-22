@@ -129,6 +129,7 @@ import com.elg.studly.adapters.primary.viewmodel.SettingsViewModel
 import com.elg.studly.adapters.primary.viewmodel.StudentViewModel
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
+import com.elg.studly.domain.model.AgendaColorMode
 import com.elg.studly.domain.model.AgendaEvent
 import com.elg.studly.domain.model.CalendarAccount
 import com.elg.studly.domain.model.Course
@@ -605,6 +606,7 @@ fun AgendaScreen(
                     AgendaWeekGrid(
                         weekStart = startOfWeek,
                         events = events,
+                        colorMode = settingsState.settings?.agendaColorMode ?: AgendaColorMode.Course,
                         onOpen = { ev -> selectedEvent = ev }
                     )
                 }
@@ -2006,6 +2008,13 @@ fun SettingsScreen(
                         onCheckedChange = settingsViewModel::setDynamicColor
                     )
                 }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.settings_agenda_color_mode),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                AgendaColorModeSelector(settings.agendaColorMode, settingsViewModel::setAgendaColorMode)
             }
         }
         item {
@@ -2537,6 +2546,35 @@ internal fun ThemeSelector(
                                 ThemeMode.System -> R.string.settings_theme_system
                                 ThemeMode.Light -> R.string.settings_theme_light
                                 ThemeMode.Dark -> R.string.settings_theme_dark
+                            }
+                        )
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AgendaColorModeSelector(
+    selectedMode: AgendaColorMode,
+    onModeSelected: (AgendaColorMode) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        AgendaColorMode.entries.forEach { mode ->
+            FilterChip(
+                selected = selectedMode == mode,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onModeSelected(mode)
+                },
+                label = {
+                    Text(
+                        stringResource(
+                            when (mode) {
+                                AgendaColorMode.Course -> R.string.settings_agenda_color_course
+                                AgendaColorMode.Location -> R.string.settings_agenda_color_location
                             }
                         )
                     )
@@ -4019,13 +4057,19 @@ private val GRID_TIME_GUTTER = 44.dp
 private val GRID_DAY_MIN_WIDTH = 96.dp
 
 private val EVENT_PALETTE = listOf(
-    Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFE53935),
-    Color(0xFF8E24AA), Color(0xFFF4511E), Color(0xFF00897B),
-    Color(0xFF3949AB), Color(0xFF6D4C41)
+    Color(0xFF039BE5), Color(0xFF0B8043), Color(0xFFD50000),
+    Color(0xFF8E24AA), Color(0xFFF4511E), Color(0xFF33B679),
+    Color(0xFF3F51B5), Color(0xFF7986CB), Color(0xFFF6BF26),
+    Color(0xFFE67C73), Color(0xFF616161)
 )
 
-private fun eventColor(event: AgendaEvent): Color {
-    val key = event.courseId?.takeIf { it.isNotBlank() } ?: event.title.ifBlank { event.id }
+private fun eventColor(event: AgendaEvent, mode: AgendaColorMode): Color {
+    val key = when (mode) {
+        AgendaColorMode.Course -> event.courseId?.takeIf { it.isNotBlank() } ?: event.title.ifBlank { event.id }
+        AgendaColorMode.Location -> event.address?.takeIf { it.isNotBlank() }
+            ?: event.room?.takeIf { it.isNotBlank() }
+            ?: event.title.ifBlank { event.id }
+    }
     val idx = (key.hashCode() and 0x7fffffff) % EVENT_PALETTE.size
     return EVENT_PALETTE[idx]
 }
@@ -4090,6 +4134,7 @@ private fun layoutDayEvents(events: List<AgendaEvent>, zone: ZoneId): List<DayLa
 private fun AgendaWeekGrid(
     weekStart: LocalDate,
     events: List<AgendaEvent>,
+    colorMode: AgendaColorMode,
     onOpen: (AgendaEvent) -> Unit
 ) {
     val zone = remember { ZoneId.systemDefault() }
@@ -4183,6 +4228,7 @@ private fun AgendaWeekGrid(
                                     EventBlock(
                                         event = le.event,
                                         zone = zone,
+                                        colorMode = colorMode,
                                         modifier = Modifier
                                             .offset(x = laneW * le.lane, y = topDp)
                                             .width(laneW)
@@ -4204,6 +4250,7 @@ private fun AgendaWeekGrid(
 private fun EventBlock(
     event: AgendaEvent,
     zone: ZoneId,
+    colorMode: AgendaColorMode,
     modifier: Modifier,
     onOpen: () -> Unit
 ) {
@@ -4216,7 +4263,7 @@ private fun EventBlock(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(eventColor(event))
+            .background(eventColor(event, colorMode))
             .clickable(onClick = onOpen, role = Role.Button)
             .semantics(mergeDescendants = true) { contentDescription = description }
             .padding(horizontal = 4.dp, vertical = 2.dp)

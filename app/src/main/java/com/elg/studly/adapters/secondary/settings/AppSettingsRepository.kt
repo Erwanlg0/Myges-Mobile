@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.elg.studly.application.ports.SettingsRepository
+import com.elg.studly.domain.model.AgendaColorMode
 import com.elg.studly.domain.model.NotificationPreferences
 import com.elg.studly.domain.model.RefreshIntervals
 import com.elg.studly.domain.model.SyncFeature
@@ -45,6 +46,7 @@ class AppSettingsRepository @Inject constructor(
             biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
             themeMode = preferences[THEME_MODE]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System,
             dynamicColorEnabled = preferences[DYNAMIC_COLOR] ?: false,
+            agendaColorMode = preferences[AGENDA_COLOR_MODE]?.let { runCatching { AgendaColorMode.valueOf(it) }.getOrNull() } ?: AgendaColorMode.Course,
             refreshIntervals = preferences.toRefreshIntervals(),
             classReminderLeadMinutes = clampReminderLeadMinutes(preferences[CLASS_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
             deadlineReminderLeadMinutes = clampReminderLeadMinutes(preferences[DEADLINE_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
@@ -66,6 +68,10 @@ class AppSettingsRepository @Inject constructor(
 
     override suspend fun setDynamicColorEnabled(enabled: Boolean) {
         context.settingsDataStore.edit { preferences -> preferences[DYNAMIC_COLOR] = enabled }
+    }
+
+    override suspend fun setAgendaColorMode(mode: AgendaColorMode) {
+        context.settingsDataStore.edit { preferences -> preferences[AGENDA_COLOR_MODE] = mode.name }
     }
 
     override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) {
@@ -156,6 +162,7 @@ class AppSettingsRepository @Inject constructor(
         val DEADLINE_REMINDER_LEAD = intPreferencesKey("deadline_reminder_lead_minutes")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        val AGENDA_COLOR_MODE = stringPreferencesKey("agenda_color_mode")
 
         val INTERVAL_KEYS = SyncFeature.entries.associateWith {
             intPreferencesKey("refresh_interval_${it.name.lowercase()}")

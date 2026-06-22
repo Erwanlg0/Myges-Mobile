@@ -21,6 +21,7 @@ import com.elg.studly.domain.model.ReminderKind
 import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.Session
 import com.elg.studly.domain.model.SyncFeature
+import com.elg.studly.domain.model.AgendaColorMode
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
@@ -262,6 +263,7 @@ class UpdateSettingsUseCase @Inject constructor(
     suspend fun documentNotifications(enabled: Boolean) = repository.setDocumentNotificationsEnabled(enabled)
     suspend fun themeMode(themeMode: ThemeMode) = repository.setThemeMode(themeMode)
     suspend fun dynamicColor(enabled: Boolean) = repository.setDynamicColorEnabled(enabled)
+    suspend fun agendaColorMode(mode: AgendaColorMode) = repository.setAgendaColorMode(mode)
     suspend fun refreshInterval(feature: SyncFeature, minutes: Int) = repository.setRefreshInterval(feature, minutes)
 
     

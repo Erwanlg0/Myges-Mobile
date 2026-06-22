@@ -303,6 +303,7 @@ private class RecordingSettingsRepository(
     override suspend fun setDynamicColorEnabled(enabled: Boolean) {
         this.dynamicColorEnabled = enabled
     }
+    override suspend fun setAgendaColorMode(mode: com.elg.studly.domain.model.AgendaColorMode) = Unit
     override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) {
         refreshIntervals[feature] = minutes
     }
