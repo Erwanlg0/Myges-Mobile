@@ -7,6 +7,7 @@ import com.elg.studly.domain.model.Course
 import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.DirectoryRole
 import com.elg.studly.domain.model.Grade
+import com.elg.studly.domain.model.isToeicExcluded
 import com.elg.studly.domain.model.combineCcExam
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
@@ -955,7 +956,7 @@ private fun JsonObject.toGrade(
         average = number("average", "moyenne", "ccaverage"),
         date = date ?: localDate(*dateKeys),
         period = resolvedPeriod
-    )
+    ).let { if (it.isToeicExcluded()) it.copy(scale = 990.0) else it }
 }
 
 private fun parseInstant(value: JsonElement?): Instant? {

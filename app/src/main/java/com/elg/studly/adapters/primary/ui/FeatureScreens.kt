@@ -152,6 +152,7 @@ import com.elg.studly.domain.model.SyncFeature
 import androidx.compose.material3.Slider
 import kotlin.math.roundToInt
 import com.elg.studly.domain.model.progress
+import com.elg.studly.domain.model.isToeicExcluded
 import com.elg.studly.domain.model.toGradeSummary
 import coil.compose.AsyncImage
 import java.time.Instant
@@ -2734,10 +2735,10 @@ internal fun GradeSummaryCard(
 ) {
     val summary = remember(grades) { grades.toGradeSummary() }
     val ccAverage = remember(allGrades) {
-        allGrades.filter { it.id.contains("-cc-") }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
+        allGrades.filter { it.id.contains("-cc-") && !it.isToeicExcluded() }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
     }
     val examAverage = remember(allGrades) {
-        allGrades.filter { it.id.contains("-exam") }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
+        allGrades.filter { it.id.contains("-exam") && !it.isToeicExcluded() }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
     }
     DataCard {
         Text(

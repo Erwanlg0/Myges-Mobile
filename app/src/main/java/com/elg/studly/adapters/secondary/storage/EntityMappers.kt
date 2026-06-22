@@ -7,6 +7,7 @@ import com.elg.studly.domain.model.Course
 import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.DirectoryRole
 import com.elg.studly.domain.model.Grade
+import com.elg.studly.domain.model.isToeicExcluded
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
@@ -87,7 +88,7 @@ fun GradeEntity.toDomain() = Grade(
     average = average,
     date = dateIso?.let { LocalDate.parse(it) },
     period = period
-)
+).let { if (it.isToeicExcluded()) it.copy(scale = 990.0) else it }
 
 fun Absence.toEntity() = AbsenceEntity(
     id = id,
