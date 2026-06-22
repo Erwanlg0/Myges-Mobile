@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="agenda"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_agenda"
+        android:shortcutShortLabel="@string/agenda_title"
+        android:shortcutLongLabel="@string/agenda_title">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.elg.studly"
+            android:targetClass="com.elg.studly.MainActivity"
+            android:data="myges://agenda" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="grades"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_grades"
+        android:shortcutShortLabel="@string/grades_title"
+        android:shortcutLongLabel="@string/grades_title">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.elg.studly"
+            android:targetClass="com.elg.studly.MainActivity"
+            android:data="myges://grades" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="absences"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_absences"
+        android:shortcutShortLabel="@string/absences_title"
+        android:shortcutLongLabel="@string/absences_title">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.elg.studly"
+            android:targetClass="com.elg.studly.MainActivity"
+            android:data="myges://absences" />
+    </shortcut>
+</shortcuts>

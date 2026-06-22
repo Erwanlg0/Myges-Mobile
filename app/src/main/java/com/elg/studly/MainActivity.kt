@@ -87,10 +87,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_VIEW) {
-            if (intent.data.isOAuthCallback()) oauthCallbackUri = intent.data
-        } else {
-            notificationRoute = intent?.getStringExtra(EXTRA_NOTIFICATION_ROUTE)
+        when {
+            intent?.action == Intent.ACTION_VIEW && intent.data.isOAuthCallback() ->
+                oauthCallbackUri = intent.data
+            intent?.action == Intent.ACTION_VIEW && intent.data?.scheme == SHORTCUT_SCHEME ->
+                notificationRoute = intent.data?.host
+            else ->
+                notificationRoute = intent?.getStringExtra(EXTRA_NOTIFICATION_ROUTE)
         }
     }
 
@@ -103,5 +106,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_NOTIFICATION_ROUTE = "com.elg.studly.extra.NOTIFICATION_ROUTE"
+        private const val SHORTCUT_SCHEME = "myges"
     }
 }
