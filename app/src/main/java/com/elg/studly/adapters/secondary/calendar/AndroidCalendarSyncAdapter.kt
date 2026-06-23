@@ -45,12 +45,12 @@ class AndroidCalendarSyncAdapter @Inject constructor(
                 val resolver = context.contentResolver
                 val zone = ZoneId.systemDefault()
                 val timeZone = zone.id
-                val eventColors = eventColorsForCalendar(calendarId)
+                val eventColorKeys = eventColorKeysForCalendar(calendarId)
                 val markerPrefix = context.getString(R.string.calendar_event_marker_prefix)
                 val weekStart = LocalDate.now(zone).with(DayOfWeek.MONDAY).atStartOfDay(zone).toInstant()
                 val desiredEvents = events
                     .filter { it.startsAt >= weekStart }
-                    .map { event -> event.toCalendarEvent(calendarId, timeZone, eventColors, markerPrefix) }
+                    .map { event -> event.toCalendarEvent(calendarId, timeZone, eventColorKeys, markerPrefix) }
                 val plan = calendarSyncPlan(currentEvents(calendarId, desiredEvents), desiredEvents)
                 val operations = ArrayList<ContentProviderOperation>(plan.deletes.size + plan.updates.size + plan.inserts.size)
                 plan.deletes.forEach { event ->
@@ -158,23 +158,19 @@ class AndroidCalendarSyncAdapter @Inject constructor(
     }
 
     
-    private fun eventColorsForCalendar(calendarId: Long): Map<String, Int> {
-        val account = accountForCalendar(calendarId) ?: return emptyMap()
+    private fun eventColorKeysForCalendar(calendarId: Long): Set<String> {
+        val account = accountForCalendar(calendarId) ?: return emptySet()
         val (accountName, accountType) = account
-        val projection = arrayOf(
-            CalendarContract.Colors.COLOR_KEY,
-            CalendarContract.Colors.COLOR
-        )
+        val projection = arrayOf(CalendarContract.Colors.COLOR_KEY)
         val selection = "${CalendarContract.Colors.ACCOUNT_NAME} = ? AND " +
             "${CalendarContract.Colors.ACCOUNT_TYPE} = ? AND " +
             "${CalendarContract.Colors.COLOR_TYPE} = ?"
         val args = arrayOf(accountName, accountType, CalendarContract.Colors.TYPE_EVENT.toString())
         return context.contentResolver.query(CalendarContract.Colors.CONTENT_URI, projection, selection, args, null)
             ?.use { cursor ->
-                buildMap {
+                buildSet {
                     while (cursor.moveToNext()) {
-                        val key = cursor.getString(0) ?: continue
-                        put(key, cursor.getInt(1))
+                        cursor.getString(0)?.let { add(it) }
                     }
                 }
             }.orEmpty()
@@ -212,7 +208,7 @@ class AndroidCalendarSyncAdapter @Inject constructor(
             CalendarContract.Events.EVENT_TIMEZONE,
             CalendarContract.Events.EVENT_LOCATION,
             CalendarContract.Events.CUSTOM_APP_URI,
-            CalendarContract.Events.EVENT_COLOR
+            CalendarContract.Events.EVENT_COLOR_KEY
         )
         val selectionParts = mutableListOf<String>()
         val args = mutableListOf<String>()
@@ -256,7 +252,7 @@ class AndroidCalendarSyncAdapter @Inject constructor(
                             endsAtEpochMillis = cursor.getLong(5),
                             timeZone = cursor.getString(6).orEmpty(),
                             location = cursor.getString(7),
-                            color = if (cursor.isNull(9)) null else cursor.getInt(9)
+                            colorKey = cursor.getString(9)
                         )
                     )
                 }
@@ -267,7 +263,7 @@ class AndroidCalendarSyncAdapter @Inject constructor(
     private fun AgendaEvent.toCalendarEvent(
         calendarId: Long,
         timeZone: String,
-        eventColors: Map<String, Int>,
+        eventColorKeys: Set<String>,
         markerPrefix: String
     ): DesiredCalendarEvent {
         val loc = address
@@ -288,8 +284,7 @@ class AndroidCalendarSyncAdapter @Inject constructor(
                 descBuilder.append("Salle : ").append(roomList.first()).append("\n")
             }
         }
-        val colorKey = colorId?.takeIf { eventColors.containsKey(it) }
-        val colorArgb = colorKey?.let { eventColors[it] } ?: colorIdToArgb(colorId)
+        val colorKey = colorId?.takeIf { it in eventColorKeys }
         val body = descBuilder.toString().trim()
         val markerLine = "$markerPrefix$id"
         return DesiredCalendarEvent(
@@ -301,25 +296,8 @@ class AndroidCalendarSyncAdapter @Inject constructor(
             endsAtEpochMillis = endsAt.toEpochMilli(),
             timeZone = timeZone,
             location = loc,
-            colorKey = colorKey,
-            colorArgb = colorArgb
+            colorKey = colorKey
         )
-    }
-}
-
-private fun colorIdToArgb(colorId: String?): Int {
-    return when (colorId) {
-        "1" -> 0xFF7986CB.toInt() 
-        "2" -> 0xFF33B679.toInt() 
-        "3" -> 0xFF8E24AA.toInt() 
-        "4" -> 0xFFE67C73.toInt() 
-        "5" -> 0xFFF6BF26.toInt() 
-        "6" -> 0xFFF4511E.toInt() 
-        "7" -> 0xFF039BE5.toInt() 
-        "8" -> 0xFF616161.toInt() 
-        "9" -> 0xFF3F51B5.toInt() 
-        "10" -> 0xFF0B8043.toInt() 
-        else -> 0xFFFFF56F.toInt() 
     }
 }
 
@@ -333,7 +311,7 @@ internal data class CalendarEventRow(
     val endsAtEpochMillis: Long,
     val timeZone: String,
     val location: String?,
-    val color: Int? = null
+    val colorKey: String? = null
 ) {
     fun sameContentAs(event: DesiredCalendarEvent): Boolean {
         return calendarId == event.calendarId &&
@@ -343,7 +321,7 @@ internal data class CalendarEventRow(
             endsAtEpochMillis == event.endsAtEpochMillis &&
             timeZone == event.timeZone &&
             location == event.location &&
-            color == event.colorArgb
+            colorKey == event.colorKey
     }
 }
 
@@ -356,8 +334,7 @@ internal data class DesiredCalendarEvent(
     val endsAtEpochMillis: Long,
     val timeZone: String,
     val location: String?,
-    val colorKey: String? = null,
-    val colorArgb: Int? = null
+    val colorKey: String? = null
 ) {
     fun toContentValues(): ContentValues {
         return ContentValues().apply {
@@ -369,8 +346,6 @@ internal data class DesiredCalendarEvent(
             put(CalendarContract.Events.EVENT_TIMEZONE, timeZone)
             if (colorKey != null) {
                 put(CalendarContract.Events.EVENT_COLOR_KEY, colorKey)
-            } else if (colorArgb != null) {
-                put(CalendarContract.Events.EVENT_COLOR, colorArgb)
             }
             put(CalendarContract.Events.CUSTOM_APP_PACKAGE, "com.elg.studly")
             put(CalendarContract.Events.CUSTOM_APP_URI, "Studly://agenda/$externalId")
