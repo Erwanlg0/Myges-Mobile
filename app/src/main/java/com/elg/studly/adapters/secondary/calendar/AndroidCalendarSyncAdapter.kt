@@ -1,6 +1,7 @@
 package com.elg.studly.adapters.secondary.calendar
 
 import android.Manifest
+import android.content.ContentProviderOperation
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
@@ -14,6 +15,8 @@ import com.elg.studly.domain.model.CalendarAccount
 import com.elg.studly.domain.model.AppError
 import com.elg.studly.domain.model.AppException
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,30 +27,55 @@ import javax.inject.Singleton
 class AndroidCalendarSyncAdapter @Inject constructor(
     @ApplicationContext private val context: Context
 ) : CalendarSyncPort {
+    private companion object {
+        const val BATCH_SIZE = 100
+    }
+
     override suspend fun sync(events: List<AgendaEvent>) {
         withContext(Dispatchers.IO) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
-                throw AppException(AppError.PermissionDenied)
-            }
-            val calendarId = writableCalendarId() ?: throw AppException(AppError.Storage)
-            val resolver = context.contentResolver
-            val timeZone = ZoneId.systemDefault().id
-            val eventColors = eventColorsForCalendar(calendarId)
-            val desiredEvents = events.map { event -> event.toCalendarEvent(calendarId, timeZone, eventColors) }
-            val plan = calendarSyncPlan(currentEvents(), desiredEvents)
-            plan.deletes.forEach { event ->
-                resolver.delete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.rowId), null, null)
-            }
-            plan.updates.forEach { update ->
-                resolver.update(
-                    ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, update.current.rowId),
-                    update.desired.toContentValues(),
-                    null,
-                    null
-                )
-            }
-            plan.inserts.forEach { event ->
-                resolver.insert(CalendarContract.Events.CONTENT_URI, event.toContentValues())
+            try {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
+                    android.util.Log.w("CalendarSync", "WRITE_CALENDAR not granted")
+                    throw AppException(AppError.PermissionDenied)
+                }
+                val calendarId = writableCalendarId() ?: run {
+                    android.util.Log.w("CalendarSync", "no writable calendar found")
+                    throw AppException(AppError.Storage)
+                }
+                val resolver = context.contentResolver
+                val zone = ZoneId.systemDefault()
+                val timeZone = zone.id
+                val eventColors = eventColorsForCalendar(calendarId)
+                val markerPrefix = context.getString(R.string.calendar_event_marker_prefix)
+                val weekStart = LocalDate.now(zone).with(DayOfWeek.MONDAY).atStartOfDay(zone).toInstant()
+                val desiredEvents = events
+                    .filter { it.startsAt >= weekStart }
+                    .map { event -> event.toCalendarEvent(calendarId, timeZone, eventColors, markerPrefix) }
+                val plan = calendarSyncPlan(currentEvents(calendarId, desiredEvents), desiredEvents)
+                val operations = ArrayList<ContentProviderOperation>(plan.deletes.size + plan.updates.size + plan.inserts.size)
+                plan.deletes.forEach { event ->
+                    operations += ContentProviderOperation
+                        .newDelete(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.rowId))
+                        .build()
+                }
+                plan.updates.forEach { update ->
+                    operations += ContentProviderOperation
+                        .newUpdate(ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, update.current.rowId))
+                        .withValues(update.desired.toContentValues())
+                        .build()
+                }
+                plan.inserts.forEach { event ->
+                    operations += ContentProviderOperation
+                        .newInsert(CalendarContract.Events.CONTENT_URI)
+                        .withValues(event.toContentValues())
+                        .build()
+                }
+                operations.chunked(BATCH_SIZE).forEach { chunk ->
+                    resolver.applyBatch(CalendarContract.AUTHORITY, ArrayList(chunk))
+                }
+            } catch (t: Throwable) {
+                android.util.Log.e("CalendarSync", "sync failed", t)
+                throw t
             }
         }
     }
@@ -172,7 +200,7 @@ class AndroidCalendarSyncAdapter @Inject constructor(
         }
     }
 
-    private fun currentEvents(): List<CalendarEventRow> {
+    private fun currentEvents(calendarId: Long, desired: List<DesiredCalendarEvent>): List<CalendarEventRow> {
         val markerPrefix = context.getString(R.string.calendar_event_marker_prefix)
         val projection = arrayOf(
             CalendarContract.Events._ID,
@@ -186,11 +214,23 @@ class AndroidCalendarSyncAdapter @Inject constructor(
             CalendarContract.Events.CUSTOM_APP_URI,
             CalendarContract.Events.EVENT_COLOR
         )
+        val selectionParts = mutableListOf<String>()
+        val args = mutableListOf<String>()
+        if (desired.isNotEmpty()) {
+            selectionParts += "(${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ?)"
+            args += calendarId.toString()
+            args += desired.minOf { it.startsAtEpochMillis }.toString()
+            args += desired.maxOf { it.startsAtEpochMillis }.toString()
+        }
+        selectionParts += "${CalendarContract.Events.CUSTOM_APP_PACKAGE} = ?"
+        args += context.packageName
+        selectionParts += "${CalendarContract.Events.DESCRIPTION} LIKE ?"
+        args += "%$markerPrefix%"
         return context.contentResolver.query(
             CalendarContract.Events.CONTENT_URI,
             projection,
-            "${CalendarContract.Events.CUSTOM_APP_PACKAGE} = ? OR ${CalendarContract.Events.DESCRIPTION} LIKE ?",
-            arrayOf(context.packageName, "$markerPrefix%"),
+            selectionParts.joinToString(" OR "),
+            args.toTypedArray(),
             null
         )?.use { cursor ->
             buildList {
@@ -199,8 +239,12 @@ class AndroidCalendarSyncAdapter @Inject constructor(
                     val externalId = cursor.getString(8)
                         ?.removePrefix("Studly://agenda/")
                         ?.takeIf { it.isNotBlank() }
-                        ?: description.removePrefix(markerPrefix).substringBefore('\n').trim()
-                    if (externalId.isBlank()) continue
+                        ?: description.lineSequence()
+                            .firstOrNull { it.startsWith(markerPrefix) }
+                            ?.removePrefix(markerPrefix)
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() }
+                        ?: ""
                     add(
                         CalendarEventRow(
                             rowId = cursor.getLong(0),
@@ -223,7 +267,8 @@ class AndroidCalendarSyncAdapter @Inject constructor(
     private fun AgendaEvent.toCalendarEvent(
         calendarId: Long,
         timeZone: String,
-        eventColors: Map<String, Int>
+        eventColors: Map<String, Int>,
+        markerPrefix: String
     ): DesiredCalendarEvent {
         val loc = address
         val descBuilder = StringBuilder()
@@ -245,11 +290,13 @@ class AndroidCalendarSyncAdapter @Inject constructor(
         }
         val colorKey = colorId?.takeIf { eventColors.containsKey(it) }
         val colorArgb = colorKey?.let { eventColors[it] } ?: colorIdToArgb(colorId)
+        val body = descBuilder.toString().trim()
+        val markerLine = "$markerPrefix$id"
         return DesiredCalendarEvent(
             externalId = id,
             calendarId = calendarId,
             title = title,
-            description = descBuilder.toString().trim(),
+            description = if (body.isEmpty()) markerLine else "$body\n$markerLine",
             startsAtEpochMillis = startsAt.toEpochMilli(),
             endsAtEpochMillis = endsAt.toEpochMilli(),
             timeZone = timeZone,
@@ -351,15 +398,45 @@ internal fun calendarSyncPlan(
     current: List<CalendarEventRow>,
     desired: List<DesiredCalendarEvent>
 ): CalendarSyncPlan {
-    val currentById = current.associateBy(CalendarEventRow::externalId)
     val distinctDesired = desired.distinctBy(DesiredCalendarEvent::externalId)
-    val desiredById = distinctDesired.associateBy(DesiredCalendarEvent::externalId)
-    return CalendarSyncPlan(
-        inserts = distinctDesired.filter { it.externalId !in currentById },
-        updates = distinctDesired.mapNotNull { event ->
-            val currentEvent = currentById[event.externalId] ?: return@mapNotNull null
-            if (currentEvent.sameContentAs(event)) null else CalendarEventUpdate(currentEvent, event)
-        },
-        deletes = current.filter { it.externalId !in desiredById }
-    )
+    val byId = HashMap<String, ArrayList<CalendarEventRow>>()
+    val bySignature = HashMap<String, ArrayList<CalendarEventRow>>()
+    current.forEach { row ->
+        if (row.externalId.isNotBlank()) byId.getOrPut(row.externalId) { ArrayList() }.add(row)
+        bySignature.getOrPut(row.signature()) { ArrayList() }.add(row)
+    }
+    val consumed = HashSet<Long>()
+    val inserts = ArrayList<DesiredCalendarEvent>()
+    val updates = ArrayList<CalendarEventUpdate>()
+    val deletes = ArrayList<CalendarEventRow>()
+
+    distinctDesired.forEach { event ->
+        val candidates = LinkedHashSet<CalendarEventRow>()
+        byId[event.externalId]?.forEach { if (it.rowId !in consumed) candidates += it }
+        bySignature[event.signature()]?.forEach { if (it.rowId !in consumed) candidates += it }
+        if (candidates.isEmpty()) {
+            inserts += event
+            return@forEach
+        }
+        val iterator = candidates.iterator()
+        val keep = iterator.next()
+        consumed += keep.rowId
+        if (!keep.sameContentAs(event)) updates += CalendarEventUpdate(keep, event)
+        while (iterator.hasNext()) {
+            val duplicate = iterator.next()
+            consumed += duplicate.rowId
+            deletes += duplicate
+        }
+    }
+    current.forEach { row ->
+        if (row.rowId !in consumed && row.externalId.isNotBlank()) deletes += row
+    }
+
+    return CalendarSyncPlan(inserts, updates, deletes)
 }
+
+private fun CalendarEventRow.signature(): String =
+    "$calendarId|$title|$startsAtEpochMillis|$endsAtEpochMillis"
+
+private fun DesiredCalendarEvent.signature(): String =
+    "$calendarId|$title|$startsAtEpochMillis|$endsAtEpochMillis"
