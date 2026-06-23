@@ -4142,7 +4142,8 @@ private fun AgendaWeekGrid(
     val zone = remember { ZoneId.systemDefault() }
     val days = remember(weekStart) { (0 until 6).map { weekStart.plusDays(it.toLong()) } }
     val eventsByDay = remember(events, days) {
-        days.associateWith { day -> events.filter { it.startsAt.atZone(zone).toLocalDate() == day } }
+        val byDate = events.groupBy { it.startsAt.atZone(zone).toLocalDate() }
+        days.associateWith { byDate[it].orEmpty() }
     }
     val allDayEvents = remember(eventsByDay) { eventsByDay.values.flatten() }
     val startHour = remember(allDayEvents) {
