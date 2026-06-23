@@ -88,6 +88,7 @@
     <string name="grades_average">Average</string>
     <string name="grades_component">Component</string>
     <string name="grades_coefficient">Coefficient</string>
+    <string name="grades_not_counted">N.C</string>
     <string name="grades_count">Included grades</string>
     <string name="grades_detail_title">Course details</string>
     <string name="grades_gpa">Estimated GPA</string>

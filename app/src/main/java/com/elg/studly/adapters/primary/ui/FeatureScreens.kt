@@ -154,6 +154,8 @@ import androidx.compose.material3.Slider
 import kotlin.math.roundToInt
 import com.elg.studly.domain.model.progress
 import com.elg.studly.domain.model.isToeicExcluded
+import com.elg.studly.domain.model.isExcludedFromAverage
+import com.elg.studly.domain.model.isNotCounted
 import com.elg.studly.domain.model.toGradeSummary
 import coil.compose.AsyncImage
 import java.time.Instant
@@ -2733,7 +2735,7 @@ private fun GradeCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
+        LabelValue(R.string.grades_coefficient, if (grade.isNotCounted()) stringResource(R.string.grades_not_counted) else formatNumber(grade.coefficient))
         LabelValue(R.string.common_date, formatDate(grade.date))
         if (!grade.period.isNullOrBlank()) {
             LabelValue(R.string.common_period, grade.period)
@@ -2773,10 +2775,10 @@ internal fun GradeSummaryCard(
 ) {
     val summary = remember(grades) { grades.toGradeSummary() }
     val ccAverage = remember(allGrades) {
-        allGrades.filter { it.id.contains("-cc-") && !it.isToeicExcluded() }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
+        allGrades.filter { it.id.contains("-cc-") && !it.isExcludedFromAverage() }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
     }
     val examAverage = remember(allGrades) {
-        allGrades.filter { it.id.contains("-exam") && !it.isToeicExcluded() }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
+        allGrades.filter { it.id.contains("-exam") && !it.isExcludedFromAverage() }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
     }
     DataCard {
         Text(
@@ -2881,7 +2883,7 @@ private fun GradeSimulationEditCard(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
+        LabelValue(R.string.grades_coefficient, if (grade.isNotCounted()) stringResource(R.string.grades_not_counted) else formatNumber(grade.coefficient))
         if (!grade.period.isNullOrBlank()) {
             LabelValue(R.string.common_period, grade.period)
         }
@@ -3028,7 +3030,7 @@ private fun GradeDetailsDialog(
                     R.string.grades_general_average,
                     if (grade.value != null) stringResource(R.string.grades_value_format, formatNumber(grade.value), formatNumber(grade.scale)) else stringResource(R.string.grades_no_grade)
                 )
-                LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
+                LabelValue(R.string.grades_coefficient, if (grade.isNotCounted()) stringResource(R.string.grades_not_counted) else formatNumber(grade.coefficient))
                 LabelValue(R.string.common_date, formatDate(grade.date))
             }
         },

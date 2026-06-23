@@ -8,12 +8,18 @@ data class GradeSummary(
     val incomplete: Boolean
 )
 
+const val NOT_COUNTED_COEFFICIENT = -1.0
+
 fun Grade.isToeicExcluded(): Boolean =
     (courseName.contains("TOEIC", ignoreCase = true) || subject.contains("TOEIC", ignoreCase = true)) &&
         (value ?: 0.0) > 20.0
 
+fun Grade.isNotCounted(): Boolean = coefficient == NOT_COUNTED_COEFFICIENT
+
+fun Grade.isExcludedFromAverage(): Boolean = isToeicExcluded() || isNotCounted()
+
 fun List<Grade>.toGradeSummary(): GradeSummary {
-    val relevant = filterNot { it.isToeicExcluded() }
+    val relevant = filterNot { it.isExcludedFromAverage() }
     val graded = relevant.filter { it.value != null && it.scale != null && it.scale > 0.0 }
     val weightedGrades = graded.map { grade ->
         val coefficient = grade.coefficient?.takeIf { it > 0.0 }

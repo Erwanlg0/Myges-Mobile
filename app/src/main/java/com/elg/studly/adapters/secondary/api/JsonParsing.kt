@@ -8,6 +8,7 @@ import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.DirectoryRole
 import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.isToeicExcluded
+import com.elg.studly.domain.model.NOT_COUNTED_COEFFICIENT
 import com.elg.studly.domain.model.combineCcExam
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
@@ -716,6 +717,14 @@ private fun JsonObject.text(vararg keys: String): String? {
     return null
 }
 
+private val NOT_COUNTED_REGEX = Regex("^n\\.?\\s*c\\.?$", RegexOption.IGNORE_CASE)
+
+private fun JsonObject.coefficientValue(): Double? {
+    val raw = ((this["coefficient"] ?: this["coef"]) as? JsonPrimitive)?.contentOrNull?.trim()
+    if (raw != null && NOT_COUNTED_REGEX.matches(raw)) return NOT_COUNTED_COEFFICIENT
+    return number("coefficient", "coef")
+}
+
 private fun JsonObject.number(vararg keys: String): Double? {
     keys.forEach { key ->
         val primitive = this[key] as? JsonPrimitive
@@ -952,7 +961,7 @@ private fun JsonObject.toGrade(
         subject = subject ?: text("subject", "title", "name", "evaluation", "trimester_name") ?: "",
         value = value,
         scale = scale ?: number("scale", "outOf", "bareme") ?: 20.0,
-        coefficient = number("coefficient", "coef"),
+        coefficient = coefficientValue(),
         average = number("average", "moyenne", "ccaverage"),
         date = date ?: localDate(*dateKeys),
         period = resolvedPeriod
