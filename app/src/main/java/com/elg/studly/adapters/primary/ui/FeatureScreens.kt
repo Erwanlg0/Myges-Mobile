@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -157,6 +159,15 @@ import com.elg.studly.domain.model.isToeicExcluded
 import com.elg.studly.domain.model.isExcludedFromAverage
 import com.elg.studly.domain.model.isNotCounted
 import com.elg.studly.domain.model.toGradeSummary
+import com.elg.studly.domain.model.isPerfectScore
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.rotate
+import kotlin.random.Random
 import coil.compose.AsyncImage
 import java.time.Instant
 import java.time.LocalDate
@@ -739,6 +750,22 @@ fun GradesScreen(
     
     val gradesList = state.data.orEmpty()
 
+    val celebrationPrefs = remember(context) {
+        context.getSharedPreferences("grade_celebrations", Context.MODE_PRIVATE)
+    }
+    var showConfetti by remember { mutableStateOf(false) }
+    LaunchedEffect(gradesList) {
+        if (gradesList.isEmpty()) return@LaunchedEffect
+        val perfectIds = gradesList.filter { it.isPerfectScore() }.map { it.id }.toSet()
+        val celebrated = celebrationPrefs.getStringSet("celebrated", null)
+        if (celebrated == null) {
+            celebrationPrefs.edit().putStringSet("celebrated", perfectIds).apply()
+        } else if ((perfectIds - celebrated).isNotEmpty()) {
+            showConfetti = true
+            celebrationPrefs.edit().putStringSet("celebrated", celebrated + perfectIds).apply()
+        }
+    }
+
     val years = remember(gradesList) {
         gradesList.mapNotNull { it.academicYearLabel().takeIf(String::isNotBlank) }
             .distinct()
@@ -840,6 +867,7 @@ fun GradesScreen(
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     FeatureStateContent(
         state = state,
         empty = List<Grade>::isEmpty,
@@ -1017,6 +1045,62 @@ fun GradesScreen(
         } else {
             items(mainGrades, key = { it.id }) { grade ->
                 GradeCard(grade = grade, onOpen = { selectedGrade = grade })
+            }
+        }
+    }
+    if (showConfetti) {
+        ConfettiOverlay(onFinished = { showConfetti = false })
+    }
+    }
+}
+
+private data class ConfettiPiece(
+    val xFraction: Float,
+    val color: Color,
+    val widthPx: Float,
+    val spin: Float,
+    val delay: Float,
+    val drift: Float
+)
+
+@Composable
+private fun ConfettiOverlay(onFinished: () -> Unit) {
+    val colors = listOf(
+        Color(0xFFE53935), Color(0xFFFFB300), Color(0xFF43A047),
+        Color(0xFF1E88E5), Color(0xFF8E24AA), Color(0xFFF06292)
+    )
+    val pieces = remember {
+        List(90) {
+            ConfettiPiece(
+                xFraction = Random.nextFloat(),
+                color = colors[Random.nextInt(colors.size)],
+                widthPx = Random.nextFloat() * 6f + 6f,
+                spin = Random.nextFloat() * 6f - 3f,
+                delay = Random.nextFloat() * 0.25f,
+                drift = Random.nextFloat() * 0.3f - 0.15f
+            )
+        }
+    }
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(durationMillis = 2600, easing = LinearEasing))
+        onFinished()
+    }
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val fallHeight = size.height + 80f
+        pieces.forEach { p ->
+            val span = (1f - p.delay).coerceAtLeast(0.0001f)
+            val t = (progress.value - p.delay) / span
+            if (t <= 0f) return@forEach
+            val x = (p.xFraction + p.drift * t) * size.width
+            val y = t * fallHeight - 40f
+            val alpha = (1f - t * t).coerceIn(0f, 1f)
+            rotate(degrees = p.spin * t * 360f, pivot = Offset(x, y)) {
+                drawRect(
+                    color = p.color.copy(alpha = alpha),
+                    topLeft = Offset(x, y),
+                    size = Size(p.widthPx, p.widthPx * 1.8f)
+                )
             }
         }
     }
@@ -2036,6 +2120,34 @@ fun SettingsScreen(
                         Icon(Icons.Rounded.Notifications, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.notifications_grant_permission))
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val powerManager = context.getSystemService(PowerManager::class.java)
+                    val ignoringBatteryOptimizations =
+                        powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+                    if (!ignoringBatteryOptimizations) {
+                        OutlinedButton(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val intent = Intent(
+                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:${context.packageName}")
+                            )
+                            runCatching { context.startActivity(intent) }.onFailure {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Rounded.Notifications, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.settings_background_reliability))
+                        }
+                        Text(
+                            text = stringResource(R.string.settings_background_reliability_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
                 NotificationPreferences(settings, settingsViewModel)

@@ -229,6 +229,8 @@
     <string name="notifications_empty_title">Aucune actualité</string>
     <string name="notifications_empty_body">Les actualités et alertes synchronisées apparaîtront ici.</string>
     <string name="notifications_grant_permission">Autoriser les notifications</string>
+    <string name="settings_background_reliability">Autoriser en arrière-plan</string>
+    <string name="settings_background_reliability_hint">Sans cette autorisation, Xiaomi/MIUI bloque la synchro en arrière-plan et les notifications n\'arrivent pas.</string>
     <string name="notifications_channel_student">Suivi étudiant</string>
     <string name="notifications_channel_student_description">Notes, absences, agenda, documents et projets.</string>
     <string name="notifications_sync_failed_title">Synchronisation impossible</string>

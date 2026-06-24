@@ -18,6 +18,9 @@ fun Grade.isNotCounted(): Boolean = coefficient == NOT_COUNTED_COEFFICIENT
 
 fun Grade.isExcludedFromAverage(): Boolean = isToeicExcluded() || isNotCounted()
 
+fun Grade.isPerfectScore(): Boolean =
+    value != null && scale != null && scale > 0.0 && value >= scale && !isToeicExcluded()
+
 fun List<Grade>.toGradeSummary(): GradeSummary {
     val relevant = filterNot { it.isExcludedFromAverage() }
     val graded = relevant.filter { it.value != null && it.scale != null && it.scale > 0.0 }

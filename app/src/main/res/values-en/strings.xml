@@ -229,6 +229,8 @@
     <string name="notifications_empty_title">No news</string>
     <string name="notifications_empty_body">Synced news and alerts will appear here.</string>
     <string name="notifications_grant_permission">Allow notifications</string>
+    <string name="settings_background_reliability">Allow in background</string>
+    <string name="settings_background_reliability_hint">Without this, the system may block background sync and notifications won\'t arrive.</string>
     <string name="notifications_channel_student">Student tracking</string>
     <string name="notifications_channel_student_description">Grades, absences, agenda, documents, and projects.</string>
     <string name="notifications_sync_failed_title">Unable to sync</string>
