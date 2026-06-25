@@ -10,6 +10,8 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 class ApiRetryInterceptorTest {
     @Test
@@ -72,6 +74,61 @@ class ApiRetryInterceptorTest {
 
         assertEquals(503, result.code)
         assertEquals(emptyList<Long>(), delays)
+    }
+
+    @Test
+    fun doesNotRetrySuccessfulGetWithDefaults() {
+        val chain = retryChain(
+            request = getRequest(),
+            responses = listOf(response(200))
+        )
+
+        val result = ApiRetryInterceptor().intercept(chain)
+
+        assertEquals(200, result.code)
+    }
+
+    @Test
+    fun capsRetryAfterHeaderSeconds() {
+        val delays = mutableListOf<Long>()
+        val interceptor = ApiRetryInterceptor(maxDelayMs = 2_000L, sleeper = delays::add)
+        val chain = retryChain(
+            request = getRequest(),
+            responses = listOf(response(429, "Retry-After" to "30"), response(200))
+        )
+
+        interceptor.intercept(chain)
+
+        assertEquals(listOf(2_000L), delays)
+    }
+
+    @Test
+    fun honorsRetryAfterHeaderDate() {
+        val delays = mutableListOf<Long>()
+        val interceptor = ApiRetryInterceptor(sleeper = delays::add)
+        val retryAt = ZonedDateTime.now().minusSeconds(1).format(DateTimeFormatter.RFC_1123_DATE_TIME)
+        val chain = retryChain(
+            request = getRequest(),
+            responses = listOf(response(429, "Retry-After" to retryAt), response(200))
+        )
+
+        interceptor.intercept(chain)
+
+        assertEquals(listOf(0L), delays)
+    }
+
+    @Test
+    fun invalidRetryAfterHeaderFallsBackToExponentialDelay() {
+        val delays = mutableListOf<Long>()
+        val interceptor = ApiRetryInterceptor(sleeper = delays::add)
+        val chain = retryChain(
+            request = getRequest(),
+            responses = listOf(response(429, "Retry-After" to "later"), response(200))
+        )
+
+        interceptor.intercept(chain)
+
+        assertEquals(listOf(1_000L), delays)
     }
 }
 

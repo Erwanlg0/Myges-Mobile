@@ -363,7 +363,7 @@ fun DashboardScreen(
                     project.deadline?.takeIf { it.isAfter(now) }
                         ?: project.steps.mapNotNull { it.deadline }.filter { it.isAfter(now) }.minOrNull()
                 }
-                CompactCard(modifier = Modifier.clickable { onNavigateToTab("projects") }) {
+                CompactCard(modifier = Modifier.clickable { onNavigateToTab("projects?id=${project.id}") }) {
                     Text(
                         text = project.name,
                         style = MaterialTheme.typography.titleMedium,

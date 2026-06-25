@@ -787,4 +787,79 @@ class JsonParsingTest {
         assertEquals("Microsoft Campus", news.first().title)
         assertEquals("Offres campus", news.first().body)
     }
+
+    @Test
+    fun classIdsParseIdsAndSelfLinks() {
+        val classIds = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                { "puid": "class-1" },
+                { "links": [{ "rel": "self", "href": "https://example.com/classes/class-2" }] },
+                { "id": "class-1" }
+              ]
+            }
+            """.trimIndent()
+        ).toClassIds()
+
+        assertEquals(listOf("class-1", "class-2"), classIds)
+    }
+
+    @Test
+    fun eventsParseHtmlDescriptionAndSubscriptionDates() {
+        val events = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "event_id": 42,
+                  "event_title": "Forum",
+                  "event_type": "career",
+                  "location": "Paris",
+                  "organizer": "School",
+                  "description": "<p>Hello&nbsp;world</p>",
+                  "event_date": 1781222400000,
+                  "start_subscription_date": 1781136000000,
+                  "end_subscription_date": 1781308800000,
+                  "is_participant_subscribed": "yes",
+                  "links": [{ "href": "https://example.com/events/42" }]
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toEvents()
+
+        assertEquals("42", events.first().id)
+        assertEquals("Hello world", events.first().description)
+        assertEquals(true, events.first().subscribed)
+        assertEquals("https://example.com/events/42", events.first().detailUrl)
+    }
+
+    @Test
+    fun projectMessagesParseAuthorFallbackAndMineFlag() {
+        val messages = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "pm_id": 12,
+                  "u_id": "me",
+                  "firstname": "Alice",
+                  "name": "Martin",
+                  "message": "Bonjour",
+                  "date": 1781222400000
+                },
+                {
+                  "pm_id": 13
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toProjectMessages(currentUserId = "me")
+
+        assertEquals(1, messages.size)
+        assertEquals("Alice Martin", messages.first().author)
+        assertEquals(true, messages.first().mine)
+        assertEquals(Instant.ofEpochMilli(1781222400000), messages.first().sentAt)
+    }
 }

@@ -6,6 +6,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class UiStateTest {
+    @Test
+    fun featureUiStateExposesDefaults() {
+        val state = FeatureUiState(data = "ready")
+
+        assertEquals("ready", state.data)
+        assertEquals(true, state.loading)
+        assertEquals(false, state.refreshing)
+        assertEquals(null, state.error)
+        assertEquals(true, state.online)
+    }
 
     @Test
     fun testAppErrorMessageRes() {

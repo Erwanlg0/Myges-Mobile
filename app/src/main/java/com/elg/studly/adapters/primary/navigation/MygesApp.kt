@@ -331,11 +331,12 @@ private fun StudentRoute(
 }
 
 private fun androidx.navigation.NavHostController.navigateTo(route: String) {
+    val isDeepLink = route.contains('?')
     navigate(route) {
         launchSingleTop = true
-        restoreState = true
+        restoreState = !isDeepLink
         popUpTo(destinations.first().route) {
-            saveState = true
+            saveState = !isDeepLink
         }
     }
 }

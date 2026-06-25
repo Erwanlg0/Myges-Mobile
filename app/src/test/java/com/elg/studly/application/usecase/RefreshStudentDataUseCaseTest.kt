@@ -16,6 +16,7 @@ import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.NotificationPreferences
 import com.elg.studly.domain.model.Practical
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ProjectStep
 import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.StudentEvent
 import com.elg.studly.domain.model.SyncFeature
@@ -35,7 +36,7 @@ class RefreshStudentDataUseCaseTest {
         val repository = RecordingStudentDataRepository(events)
         val settingsRepository = RecordingSettingsRepository(events)
         val calendarSyncPort = RecordingCalendarSyncPort(events)
-        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, StubNotificationScheduler())
+        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, RefreshStubNotificationScheduler())
 
         useCase()
 
@@ -48,7 +49,7 @@ class RefreshStudentDataUseCaseTest {
         val repository = RecordingStudentDataRepository(events)
         val settingsRepository = RecordingSettingsRepository(events, calendarSyncEnabled = true)
         val calendarSyncPort = RecordingCalendarSyncPort(events)
-        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, StubNotificationScheduler())
+        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, RefreshStubNotificationScheduler())
         val agenda = listOf(sampleAgendaEvent())
         repository.agenda.value = agenda
 
@@ -56,6 +57,83 @@ class RefreshStudentDataUseCaseTest {
 
         assertEquals(listOf("sync", "calendar:1", "markSynced"), events)
         assertEquals(agenda, calendarSyncPort.syncedEvents)
+    }
+
+    @Test
+    fun refreshSchedulesReminderTargets() = runTest {
+        val events = mutableListOf<String>()
+        val repository = RecordingStudentDataRepository(events)
+        val settingsRepository = RecordingSettingsRepository(events)
+        val notificationScheduler = RefreshRecordingNotificationScheduler()
+        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, RecordingCalendarSyncPort(events), notificationScheduler)
+        repository.agenda.value = listOf(sampleAgendaEvent())
+        repository.projects.value = listOf(sampleProject())
+        repository.practicals.value = listOf(samplePractical())
+
+        useCase()
+
+        assertEquals(
+            listOf("agenda:event-1", "project-step:step-1", "practical:practical-1", "practical-step:practical-step-1"),
+            notificationScheduler.targets.map { it.id }
+        )
+    }
+
+    @Test
+    fun refreshKeepsMarkingSyncedWhenCalendarAndReminderSchedulingFail() = runTest {
+        val events = mutableListOf<String>()
+        val repository = RecordingStudentDataRepository(events)
+        val settingsRepository = RecordingSettingsRepository(events, calendarSyncEnabled = true)
+        val calendarSyncPort = RecordingCalendarSyncPort(events).apply { failure = IllegalStateException("calendar") }
+        val notificationScheduler = RefreshRecordingNotificationScheduler().apply { failure = IllegalStateException("notifications") }
+        val useCase = RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, notificationScheduler)
+
+        useCase()
+
+        assertEquals(listOf("sync", "markSynced"), events)
+    }
+
+    @Test
+    fun buildReminderTargetsUsesProjectDeadlineWhenProjectHasNoStepDeadline() {
+        val deadline = Instant.parse("2026-06-30T12:00:00Z")
+        val targets = buildReminderTargets(
+            agenda = emptyList(),
+            projects = listOf(
+                Project(
+                    id = "project-1",
+                    name = "Project",
+                    courseName = null,
+                    groupName = null,
+                    status = null,
+                    deadline = deadline,
+                    steps = emptyList(),
+                    fileCount = 0
+                ),
+                Project(
+                    id = "project-2",
+                    name = "Project 2",
+                    courseName = null,
+                    groupName = null,
+                    status = null,
+                    deadline = null,
+                    steps = listOf(ProjectStep("step-2", "Todo", null, null)),
+                    fileCount = 0
+                )
+            ),
+            practicals = listOf(
+                Practical(
+                    id = "practical-1",
+                    name = "Lab",
+                    courseName = null,
+                    startsAt = null,
+                    endsAt = null,
+                    room = null,
+                    status = null,
+                    steps = listOf(ProjectStep("practical-step-2", "Todo", null, null))
+                )
+            )
+        )
+
+        assertEquals(listOf("project:project-1"), targets.map { it.id })
     }
 
     @Test
@@ -75,14 +153,16 @@ private class RecordingStudentDataRepository(
     private val events: MutableList<String>
 ) : StudentDataRepository {
     val agenda = MutableStateFlow(emptyList<AgendaEvent>())
+    val projects = MutableStateFlow(emptyList<Project>())
+    val practicals = MutableStateFlow(emptyList<Practical>())
 
     override fun observeDashboard(): Flow<DashboardSummary> = flowOf(DashboardSummary(null, null, emptyList(), emptyList(), emptyList(), null))
     override fun observeAgenda(): Flow<List<AgendaEvent>> = agenda
     override fun observeGrades(): Flow<List<Grade>> = flowOf(emptyList())
     override fun observeAbsences(): Flow<List<Absence>> = flowOf(emptyList())
     override fun observeCourses(): Flow<List<Course>> = flowOf(emptyList())
-    override fun observeProjects(): Flow<List<Project>> = flowOf(emptyList())
-    override fun observePracticals(): Flow<List<Practical>> = flowOf(emptyList())
+    override fun observeProjects(): Flow<List<Project>> = projects
+    override fun observePracticals(): Flow<List<Practical>> = practicals
     override fun observeDocuments(): Flow<List<AcademicDocument>> = flowOf(emptyList())
     override fun observeDirectory(): Flow<List<DirectoryPerson>> = flowOf(emptyList())
     override fun observeNews(): Flow<List<NewsItem>> = flowOf(emptyList())
@@ -143,8 +223,10 @@ private class RecordingCalendarSyncPort(
     private val events: MutableList<String>
 ) : CalendarSyncPort {
     var syncedEvents = emptyList<AgendaEvent>()
+    var failure: Throwable? = null
 
     override suspend fun sync(events: List<AgendaEvent>) {
+        failure?.let { throw it }
         syncedEvents = events
         this.events += "calendar:${events.size}"
     }
@@ -154,7 +236,7 @@ private class RecordingCalendarSyncPort(
     override suspend fun selectCalendar(id: Long) = Unit
 }
 
-private class StubNotificationScheduler : NotificationScheduler {
+private open class RefreshStubNotificationScheduler : NotificationScheduler {
     override fun ensureChannels() = Unit
     override suspend fun scheduleStudentSync(intervalMinutes: Long) = Unit
     override suspend fun runStudentSyncNow() = Unit
@@ -165,7 +247,17 @@ private class StubNotificationScheduler : NotificationScheduler {
     override suspend fun showAgendaChange(event: AgendaEvent) = Unit
     override suspend fun showProjectDeadline(project: Project) = Unit
     override suspend fun showNewDocument(document: AcademicDocument) = Unit
-    override suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int) = Unit
+    override open suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int) = Unit
+}
+
+private class RefreshRecordingNotificationScheduler : RefreshStubNotificationScheduler() {
+    var targets = emptyList<ReminderTarget>()
+    var failure: Throwable? = null
+
+    override suspend fun scheduleReminders(targets: List<ReminderTarget>, classLeadMinutes: Int, deadlineLeadMinutes: Int) {
+        failure?.let { throw it }
+        this.targets = targets
+    }
 }
 
 private fun sampleAgendaEvent(): AgendaEvent {
@@ -180,5 +272,34 @@ private fun sampleAgendaEvent(): AgendaEvent {
         type = "Course",
         modality = "Présentiel",
         courseId = "course-1"
+    )
+}
+
+private fun sampleProject(): Project {
+    val deadline = Instant.parse("2026-06-30T12:00:00Z")
+    return Project(
+        id = "project-1",
+        name = "Project",
+        courseName = null,
+        groupName = null,
+        status = null,
+        deadline = null,
+        steps = listOf(ProjectStep("step-1", "Submit", deadline, null)),
+        fileCount = 0
+    )
+}
+
+private fun samplePractical(): Practical {
+    val start = Instant.parse("2026-06-13T08:00:00Z")
+    val deadline = Instant.parse("2026-06-20T12:00:00Z")
+    return Practical(
+        id = "practical-1",
+        name = "Lab",
+        courseName = null,
+        startsAt = start,
+        endsAt = start.plusSeconds(3600),
+        room = null,
+        status = null,
+        steps = listOf(ProjectStep("practical-step-1", "", deadline, null))
     )
 }

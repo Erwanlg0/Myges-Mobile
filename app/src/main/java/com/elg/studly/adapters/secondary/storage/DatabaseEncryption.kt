@@ -11,10 +11,7 @@ fun deletePlaintextDatabaseIfPresent(context: Context, databaseName: String) {
 
 internal fun File.hasPlaintextSqliteHeader(): Boolean {
     if (length() < SQLITE_HEADER.size) return false
-    return inputStream().use { input ->
-        val header = ByteArray(SQLITE_HEADER.size)
-        input.read(header) == SQLITE_HEADER.size && header.contentEquals(SQLITE_HEADER)
-    }
+    return readBytes().copyOf(SQLITE_HEADER.size).contentEquals(SQLITE_HEADER)
 }
 
 private val SQLITE_HEADER = "SQLite format 3\u0000".toByteArray(Charsets.US_ASCII)

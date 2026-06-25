@@ -22,5 +22,6 @@ class NotificationGroupingTest {
     @Test
     fun stableNotificationIdAlwaysReturnsPositiveIdentifier() {
         assertTrue(stableNotificationId("grade:123") > 0)
+        assertEquals(Int.MAX_VALUE, stableNotificationId("polygenelubricants"))
     }
 }

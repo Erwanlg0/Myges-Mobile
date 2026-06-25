@@ -186,4 +186,13 @@ class StudentViewModelTest {
         
         assertEquals(date, viewModel.agendaDateToNavigate.first())
     }
+
+    @Test
+    fun requestDepositEmitsGroupId() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.requestDeposit("groupId")
+
+        assertEquals("groupId", viewModel.depositRequests.first())
+    }
 }
