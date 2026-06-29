@@ -30,8 +30,8 @@ android {
         applicationId = "com.elg.studly"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "beta-0.0.9"
+        versionCode = 10
+        versionName = "beta-0.0.10"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

@@ -1084,6 +1084,17 @@ class JsonParsingTest {
         assertEquals("11", event.colorId)
     }
 
+    @Test
+    fun projectDocumentsParseTopLevelDeliverables() {
+        val documents = json.parseToJsonElement(
+            """{"result":[{"project_id":42,"deliverables":[{"pf_id":7,"pf_title":"rendu.zip","psf_file_type":"application/zip"}]}]}"""
+        ).toProjectDocuments()
+        assertEquals(1, documents.size)
+        assertEquals("7", documents.first().id)
+        assertEquals("me/projectFiles/7", documents.first().downloadUrl)
+        assertEquals(null, documents.first().groupId)
+    }
+
     private fun parseStart(raw: String): Instant? =
         json.parseToJsonElement("""{"items":[{"start":$raw}]}""")
             .toAgendaEvents().single().startsAt
