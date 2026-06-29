@@ -23,20 +23,33 @@ import com.elg.studly.domain.model.AcademicDocument
 import com.elg.studly.domain.model.AgendaEvent
 import com.elg.studly.domain.model.AppError
 import com.elg.studly.domain.model.AppException
+import com.elg.studly.domain.model.Course
 import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.NotificationPreferences
 import com.elg.studly.domain.model.Project
+import com.elg.studly.domain.model.ProjectGroup
+import com.elg.studly.domain.model.ProjectStep
 import com.elg.studly.domain.model.ReminderTarget
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.UserSettings
+import android.net.Uri
+import androidx.core.content.FileProvider
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import okhttp3.Protocol
+import okhttp3.Request
+import retrofit2.HttpException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
+import okhttp3.MediaType.Companion.toMediaType
 import retrofit2.Response
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -126,11 +139,267 @@ class OfflineFirstStudentDataRepositoryTest {
         assertEquals(listOf("cached-document"), dao.documentState.value.map { it.id })
     }
 
+    @Test
+    fun observesStoredEntitiesAndSyncsRequestedFeatureOnly() = runTest {
+        val dao = RepositoryDao().apply {
+            agendaState.value = listOf(agendaEntity("agenda"))
+            gradeState.value = listOf(gradeEntity("grade"))
+            absenceState.value = listOf(absenceEntity("absence"))
+            courseState.value = listOf(CourseEntity("course", "Course", null, null, null, null, 0, null))
+            projectState.value = listOf(projectEntity("project"))
+            practicalState.value = listOf(PracticalEntity("practical", "Practical", null, null, null, null, null, null, null))
+            documentState.value = listOf(documentEntity("document"))
+        }
+        val repository = repository(createTempDir(), RepositoryApi(), dao, RepositoryNotificationScheduler())
+
+        assertEquals("agenda", repository.observeAgenda().first().single().id)
+        assertEquals("grade", repository.observeGrades().first().single().id)
+        assertEquals("absence", repository.observeAbsences().first().single().id)
+        assertEquals("course", repository.observeCourses().first().single().id)
+        assertEquals("project", repository.observeProjects().first().single().id)
+        assertEquals("practical", repository.observePracticals().first().single().id)
+        assertEquals("document", repository.observeDocuments().first().single().id)
+
+        repository.syncAll(force = true, features = setOf(SyncFeature.Agenda))
+
+        assertEquals(listOf("agenda-1"), dao.agendaState.value.map { it.id })
+        assertEquals(listOf("grade"), dao.gradeState.value.map { it.id })
+    }
+
+    @Test
+    fun observesDashboardAndEmptyFeatureCollections() = runTest {
+        val repository = repository(createTempDir(), RepositoryApi(), RepositoryDao(), RepositoryNotificationScheduler())
+
+        assertEquals(null, repository.observeDashboard().first().profile)
+        assertTrue(repository.observeDirectory().first().isEmpty())
+        assertTrue(repository.observeNews().first().isEmpty())
+        assertTrue(repository.observeEvents().first().isEmpty())
+    }
+
+    @Test
+    fun projectMessagesAndGroupCommandsUseApiResponses() = runTest {
+        val api = RepositoryApi().apply {
+            projectMessagesResponse = jsonElement(
+                """{"result":[{"id":"message","uid":"student","message":"Hello","date":"2026-06-12"}]}"""
+            )
+        }
+        val dao = RepositoryDao().apply {
+            profileState.value = StudentProfileEntity("student", "Student", null, null, null, null, null)
+            projectGroupState.value = listOf(
+                ProjectGroupEntity("project", "group", "Group", "Student\nOther", false),
+                ProjectGroupEntity("project", "other", "Other", "Student\nOther", true)
+            )
+        }
+        val repository = repository(createTempDir(), api, dao, RepositoryNotificationScheduler())
+
+        assertEquals("message", repository.projectMessages("group").single().id)
+        repository.sendProjectMessage("group", "Hello")
+        repository.joinGroup("course", "project", "group")
+        assertEquals(true, dao.projectGroupState.value.first { it.id == "group" }.isMine)
+        assertEquals(false, dao.projectGroupState.value.first { it.id == "other" }.isMine)
+        repository.leaveGroup("course", "project", "group")
+
+        assertEquals(listOf("{\"message\":\"Hello\"}"), api.sentMessages)
+        assertEquals(false, dao.projectGroupState.value.first { it.id == "group" }.isMine)
+
+        api.groupResponse = Response.error(401, "denied".toResponseBody())
+        val failure = runCatching { repository.joinGroup("course", "project", "group") }.exceptionOrNull() as AppException
+        assertEquals(AppError.Unauthorized, failure.error)
+
+        api.groupResponse = Response.error(500, "{\"message\":\"unavailable\"}".toResponseBody())
+        val remoteFailure = runCatching { repository.leaveGroup("course", "project", "group") }.exceptionOrNull() as AppException
+        assertEquals(AppError.Remote(500, "unavailable"), remoteFailure.error)
+    }
+
+    @Test
+    fun agendaWindowsAndAcademicYearCandidatesUseExpectedBounds() {
+        val day = java.time.LocalDate.of(2026, 6, 12)
+
+        assertEquals(java.time.LocalDate.of(2023, 9, 1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli(), AgendaWindow.firstSync(day).start)
+        assertEquals(day.minusDays(1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli(), AgendaWindow.subsequentSync(day).start)
+        assertEquals(day.atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli(), AgendaWindow.fromToday(day).start)
+        assertEquals(listOf("2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018", "2017", "2016", "2026-2027", "2020-2021"), academicYearCandidates(listOf("2020-2021"), "2026-2027", 2025))
+    }
+
+    @Test
+    fun documentHelpersNormalizeNamesUrlsMimeTypesAndErrors() {
+        val repository = repository(createTempDir(), RepositoryApi(), RepositoryDao(), RepositoryNotificationScheduler())
+
+        with(repository) {
+            assertEquals("me/annualDocuments/document", AcademicDocument("document", "Document", null, null, null, "doc", null, null).normalizedDownloadUrl())
+            assertEquals("me/course/files/document", AcademicDocument("document", "Document", null, null, null, "doc", "https://ges-dl.example/file?courseId=course", null).normalizedDownloadUrl())
+            assertEquals("remote", AcademicDocument("document", "Document", null, null, null, "doc", "remote", null).normalizedDownloadUrl())
+            assertEquals("unsafe_name_.pdf", "unsafe name?.pdf".sanitizedFileName())
+            assertEquals("document", "".sanitizedFileName())
+            assertEquals("document.pdf", "document".withExtension("application/pdf".toMediaType()))
+            assertEquals("document.pdf", "document.pdf".withExtension("text/plain".toMediaType()))
+            assertEquals("zip", "application/zip".toMediaType().toFileExtension())
+            assertEquals(null, "application/octet-stream".toMediaType().toFileExtension())
+            assertEquals("report name.pdf", "attachment; filename*=UTF-8''report%20name.pdf".contentDispositionFileName())
+            assertEquals("report.pdf", "attachment; filename=\"report.pdf\"".contentDispositionFileName())
+            assertEquals(null, "attachment".contentDispositionFileName())
+            assertEquals(AppError.Network, IOException().toRepositoryException().error)
+            assertEquals(AppError.Unexpected("broken"), IllegalStateException("broken").toRepositoryException().error)
+        }
+    }
+
+    @Test
+    fun projectAndSyllabusHelpersMergeRemoteData() {
+        val repository = repository(createTempDir(), RepositoryApi(), RepositoryDao(), RepositoryNotificationScheduler())
+        val base = Project("project", "", null, null, null, null, listOf(ProjectStep("one", "One", null, null)), 1)
+        val upcoming = Project("project", "Project", "Course", "Group", "open", Instant.now(), listOf(ProjectStep("two", "Two", null, null)), 2, "2026", "course", listOf(ProjectGroup("group", "Group", listOf("Student"), true)))
+        val added = upcoming.copy(id = "added")
+
+        with(repository) {
+            val merged = listOf(base).withNextProjectSteps(listOf(upcoming, added))
+            assertEquals(setOf("one", "two"), merged.first { it.id == "project" }.steps.map { it.id }.toSet())
+            assertEquals(setOf("project", "added"), merged.map { it.id }.toSet())
+            assertEquals(2, listOf(base, upcoming).mergeProjects().single().fileCount)
+            assertEquals(true, mergeGroups(emptyList(), upcoming.groups).single().isMine)
+            assertEquals("syllabus-course", syllabusDocuments(listOf(Course("course", "Course", null, "2026", null, "Text", 0))).single().id)
+        }
+    }
+
+    @Test
+    fun dueFeaturesSkipFreshFeaturesUnlessForced() = runTest {
+        val api = RepositoryApi()
+        val dao = RepositoryDao()
+        val settings = RepositorySettingsRepository().apply { lastFetched = Instant.now() }
+        val repository = repository(createTempDir(), api, dao, RepositoryNotificationScheduler(), settings)
+
+        repository.syncAll()
+        assertEquals(null, dao.profileState.value)
+
+        repository.syncAll(force = true)
+        assertEquals("student-1", dao.profileState.value?.id)
+    }
+
+    @Test
+    fun directoryAggregatesTeachersStudentsAndRecoversClassStudents() = runTest {
+        val api = RepositoryApi().apply {
+            teachersJson = """{"result":[{"teacher_id":"t1","firstname":"Ada","name":"Lovelace"}]}"""
+            studentsJson = """{"result":[{"student_id":"s1","firstname":"Alan","name":"Turing"}]}"""
+            classesJson = """{"result":[{"puid":"class-1"}]}"""
+            classStudentsJson = """{"result":[{"student_id":"s2","firstname":"Grace","name":"Hopper"}]}"""
+            classStudentsSingleFailure = IOException("legacy endpoint")
+        }
+        val dao = RepositoryDao()
+        val repository = repository(createTempDir(), api, dao, RepositoryNotificationScheduler())
+
+        repository.syncAll(force = true, features = setOf(SyncFeature.Directory))
+
+        val ids = dao.directoryState.value.map { it.id }
+        assertTrue(ids.any { it.endsWith("t1") })
+        assertTrue(ids.any { it.endsWith("s1") })
+        assertTrue(ids.any { it.endsWith("s2") })
+    }
+
+    @Test
+    fun toRepositoryExceptionParsesHttpErrorBodies() {
+        val repository = repository(createTempDir(), RepositoryApi(), RepositoryDao(), RepositoryNotificationScheduler())
+        fun httpError(code: Int, body: String) =
+            HttpException(Response.error<ResponseBody>(code, body.toResponseBody("application/json".toMediaType())))
+
+        with(repository) {
+            assertEquals(AppError.Unauthorized, httpError(403, "{}").toRepositoryException().error)
+            assertEquals(AppError.Remote(400, "boom"), httpError(400, """{"error":"boom"}""").toRepositoryException().error)
+            assertEquals(AppError.Remote(400, "bad field"), httpError(400, """{"detail":"bad field"}""").toRepositoryException().error)
+            assertEquals(AppError.Remote(422, """{"foo":"bar"}"""), httpError(422, """{"foo":"bar"}""").toRepositoryException().error)
+            assertEquals(AppError.Remote(500, "<html>nope</html>"), httpError(500, "<html>nope</html>").toRepositoryException().error)
+        }
+    }
+
+    @Test
+    fun toFileExtensionMapsAllSupportedMediaTypes() {
+        val repository = repository(createTempDir(), RepositoryApi(), RepositoryDao(), RepositoryNotificationScheduler())
+        val expected = mapOf(
+            "application/pdf" to "pdf", "application/zip" to "zip", "text/plain" to "txt",
+            "text/markdown" to "md", "text/csv" to "csv", "text/html" to "html",
+            "image/png" to "png", "image/jpeg" to "jpg", "image/gif" to "gif",
+            "application/msword" to "doc",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" to "docx",
+            "application/vnd.ms-excel" to "xls",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" to "xlsx",
+            "application/vnd.ms-powerpoint" to "ppt",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation" to "pptx"
+        )
+        with(repository) {
+            expected.forEach { (mime, ext) ->
+                assertEquals(ext, mime.toMediaType().toFileExtension())
+            }
+        }
+    }
+
+    @Test
+    fun downloadDocumentHandlesInlineRemoteAndUnavailablePaths() = runTest {
+        mockkStatic(FileProvider::class)
+        every { FileProvider.getUriForFile(any(), any(), any()) } returns mockk<Uri>()
+        try {
+            val api = RepositoryApi()
+            val dao = RepositoryDao()
+            val repository = repository(createTempDir(), api, dao, RepositoryNotificationScheduler())
+
+            val inlineDoc = AcademicDocument("inline", "Notes", null, null, "text/plain", "notes.txt", null, null, null, null, "Hello body")
+            val progress = mutableListOf<Float?>()
+            repository.downloadDocument(inlineDoc) { progress += it }
+            assertEquals(listOf(0f, 1f), progress)
+
+            val remoteDoc = AcademicDocument("remote", "Doc", null, null, null, "doc", "remote", null)
+            api.downloadResponse = Response.success(
+                "data".toResponseBody("application/pdf".toMediaType()),
+                rawResponse("https://example.com/file.pdf")
+            )
+            repository.downloadDocument(remoteDoc) {}
+
+            api.downloadResponse = Response.success(
+                "x".toResponseBody("application/pdf".toMediaType()),
+                rawResponse("https://cas.example.com/login")
+            )
+            assertEquals(
+                AppError.DocumentUnavailable,
+                (runCatching { repository.downloadDocument(remoteDoc) {} }.exceptionOrNull() as AppException).error
+            )
+
+            api.downloadResponse = Response.success(
+                "<html></html>".toResponseBody("text/html".toMediaType()),
+                rawResponse("https://example.com/file")
+            )
+            assertEquals(
+                AppError.DocumentUnavailable,
+                (runCatching { repository.downloadDocument(remoteDoc) {} }.exceptionOrNull() as AppException).error
+            )
+
+            api.downloadResponse = Response.success(null, rawResponse("https://example.com/file"))
+            assertEquals(
+                AppError.EmptyResponse,
+                (runCatching { repository.downloadDocument(remoteDoc) {} }.exceptionOrNull() as AppException).error
+            )
+
+            api.downloadResponse = Response.error(404, "missing".toResponseBody("text/plain".toMediaType()))
+            assertEquals(
+                AppError.Remote(404, "missing"),
+                (runCatching { repository.downloadDocument(remoteDoc) {} }.exceptionOrNull() as AppException).error
+            )
+        } finally {
+            unmockkStatic(FileProvider::class)
+        }
+    }
+
+    private fun rawResponse(url: String, headers: Map<String, String> = emptyMap()): okhttp3.Response =
+        okhttp3.Response.Builder()
+            .request(Request.Builder().url(url).build())
+            .protocol(Protocol.HTTP_1_1)
+            .code(200)
+            .message("OK")
+            .apply { headers.forEach { (key, value) -> header(key, value) } }
+            .build()
+
     private fun repository(
         cacheDir: File,
         api: RepositoryApi,
         dao: RepositoryDao,
-        notificationScheduler: RepositoryNotificationScheduler
+        notificationScheduler: RepositoryNotificationScheduler,
+        settings: RepositorySettingsRepository = RepositorySettingsRepository()
     ): OfflineFirstStudentDataRepository {
         val context = mockk<Context> {
             every { this@mockk.cacheDir } returns cacheDir
@@ -140,7 +409,7 @@ class OfflineFirstStudentDataRepositoryTest {
             context = context,
             api = api,
             dao = dao,
-            settingsRepository = RepositorySettingsRepository(),
+            settingsRepository = settings,
             notificationScheduler = notificationScheduler
         )
     }
@@ -149,6 +418,15 @@ class OfflineFirstStudentDataRepositoryTest {
 private class RepositoryApi : MyGesApiService {
     val courseFileRequests = mutableListOf<String>()
     var profileFailure: Throwable? = null
+    var groupResponse: Response<ResponseBody> = Response.success(null)
+    var projectMessagesResponse: JsonElement = jsonElement("""{"result":[]}""")
+    val sentMessages = mutableListOf<String>()
+    var teachersJson = """{"result":[]}"""
+    var studentsJson = """{"result":[]}"""
+    var classesJson = """{"result":[]}"""
+    var classStudentsJson = """{"result":[]}"""
+    var classStudentsSingleFailure: Throwable? = null
+    var downloadResponse: Response<ResponseBody>? = null
 
     override suspend fun profile(): JsonElement {
         profileFailure?.let { throw it }
@@ -183,15 +461,18 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"id":"course-1","name":"Algorithms","teacher":"Teacher","year":"2026","has_documents":true}]}"""
     )
 
-    override suspend fun classes(year: String): JsonElement = jsonElement("""{"result":[]}""")
+    override suspend fun classes(year: String): JsonElement = jsonElement(classesJson)
 
-    override suspend fun students(year: String): JsonElement = jsonElement("""{"result":[]}""")
+    override suspend fun students(year: String): JsonElement = jsonElement(studentsJson)
 
-    override suspend fun teachers(year: String): JsonElement = jsonElement("""{"result":[]}""")
+    override suspend fun teachers(year: String): JsonElement = jsonElement(teachersJson)
 
-    override suspend fun classStudents(puid: String, year: String): JsonElement = jsonElement("""{"result":[]}""")
+    override suspend fun classStudents(puid: String, year: String): JsonElement = jsonElement(classStudentsJson)
 
-    override suspend fun classStudents(puid: String): JsonElement = jsonElement("""{"result":[]}""")
+    override suspend fun classStudents(puid: String): JsonElement {
+        classStudentsSingleFailure?.let { throw it }
+        return jsonElement(classStudentsJson)
+    }
 
     override suspend fun courseFiles(rcId: String): JsonElement {
         courseFileRequests += rcId
@@ -271,24 +552,25 @@ private class RepositoryApi : MyGesApiService {
     override suspend fun events(): JsonElement = jsonElement("""{"result":[]}""")
 
     override suspend fun download(url: String): Response<ResponseBody> {
-        error("unused")
+        return downloadResponse ?: error("unused")
     }
 
     override suspend fun joinGroup(rcId: String, projectId: String, groupId: String): Response<ResponseBody> {
-        error("unused")
+        return groupResponse
     }
 
     override suspend fun leaveGroup(rcId: String, projectId: String, groupId: String): Response<ResponseBody> {
-        error("unused")
+        return groupResponse
     }
 
-    override suspend fun projectGroupMessages(projectGroupId: String): JsonElement = jsonElement("""{"result":[]}""")
+    override suspend fun projectGroupMessages(projectGroupId: String): JsonElement = projectMessagesResponse
 
     override suspend fun sendProjectGroupMessage(
         projectGroupId: String,
         message: JsonElement
     ): Response<ResponseBody> {
-        error("unused")
+        sentMessages += message.toString()
+        return groupResponse
     }
 }
 
@@ -459,7 +741,8 @@ private class RepositorySettingsRepository : SettingsRepository {
     override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
     override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
     override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit
-    override suspend fun lastFetchedAt(feature: SyncFeature): Instant? = null
+    var lastFetched: Instant? = null
+    override suspend fun lastFetchedAt(feature: SyncFeature): Instant? = lastFetched
     override suspend fun markFeatureFetched(feature: SyncFeature) = Unit
     override suspend fun markSynced() = Unit
     override suspend fun clearSyncMetadata() = Unit

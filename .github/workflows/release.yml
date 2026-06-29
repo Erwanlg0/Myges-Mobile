@@ -51,6 +51,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
         if: steps.version.outputs.changed == 'true'
 
+      - name: Run unit tests
+        if: steps.version.outputs.changed == 'true'
+        run: ./gradlew :app:testDebugUnitTest --quiet
+
       - name: Prepare signing
         if: steps.version.outputs.changed == 'true'
         shell: bash

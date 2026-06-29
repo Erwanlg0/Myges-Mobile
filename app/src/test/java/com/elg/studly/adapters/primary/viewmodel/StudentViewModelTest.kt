@@ -195,4 +195,158 @@ class StudentViewModelTest {
 
         assertEquals("groupId", viewModel.depositRequests.first())
     }
+
+    @Test
+    fun downloadDocumentEmitsDownloadRequest() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        val document = AcademicDocument("id", "Doc", null, null, "application/pdf", "doc.pdf", "url", Instant.now())
+        val uri = mockk<Uri>()
+        coEvery { downloadDocumentUseCase(document, any()) } returns uri
+        val requests = mutableListOf<DocumentOpenRequest>()
+        val job = backgroundScope.launch { viewModel.documentOpenRequests.collect { requests += it } }
+
+        viewModel.downloadDocument(document)
+        advanceUntilIdle()
+
+        assertEquals(true, requests.single().downloadOnly)
+        assertTrue(viewModel.downloadingDocumentIds.value.isEmpty())
+        assertTrue(viewModel.documentDownloadProgress.value.isEmpty())
+        job.cancel()
+    }
+
+    @Test
+    fun downloadDocumentReportsNonAuthenticationFailure() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", Instant.now())
+        coEvery { downloadDocumentUseCase(document, any()) } throws AppException(AppError.Network)
+
+        viewModel.openDocument(document)
+        advanceUntilIdle()
+
+        assertEquals(AppError.Network, viewModel.documentError.value)
+    }
+
+    @Test
+    fun downloadDocumentLogsOutForUnauthorizedFailure() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", Instant.now())
+        coEvery { downloadDocumentUseCase(document, any()) } throws AppException(AppError.Unauthorized)
+
+        viewModel.openDocument(document)
+        advanceUntilIdle()
+
+        io.mockk.coVerify { logoutUseCase() }
+    }
+
+    @Test
+    fun syncAgendaToCalendarEmitsCompletion() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        val events = listOf(mockk<AgendaEvent>())
+        val completions = mutableListOf<Unit>()
+        val job = backgroundScope.launch { viewModel.calendarSyncCompleted.collect { completions += it } }
+
+        viewModel.syncAgendaToCalendar(events)
+        advanceUntilIdle()
+
+        assertEquals(1, completions.size)
+        job.cancel()
+    }
+
+    @Test
+    fun projectMessagesLoadAndSendCoverSuccessAndFailure() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        val message = ProjectMessage("message", "Alice", "Hello", Instant.now(), false)
+        coEvery { projectMessagesUseCase("group") } returns listOf(message)
+
+        viewModel.loadProjectMessages("group")
+        advanceUntilIdle()
+
+        assertEquals(listOf(message), viewModel.projectMessages.value.getValue("group").data)
+        viewModel.sendProjectMessage("group", "  hello  ")
+        advanceUntilIdle()
+        io.mockk.coVerify { sendProjectMessageUseCase("group", "hello") }
+        viewModel.sendProjectMessage("group", "   ")
+        advanceUntilIdle()
+        io.mockk.coVerify(exactly = 1) { sendProjectMessageUseCase(any(), any()) }
+
+        coEvery { projectMessagesUseCase("failure") } throws AppException(AppError.Network)
+        viewModel.loadProjectMessages("failure")
+        advanceUntilIdle()
+        assertEquals(AppError.Network, viewModel.projectMessages.value.getValue("failure").error)
+    }
+
+    @Test
+    fun featureStatesReflectObservedData() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        val jobs = listOf(
+            backgroundScope.launch { viewModel.dashboard.collect {} },
+            backgroundScope.launch { viewModel.agenda.collect {} },
+            backgroundScope.launch { viewModel.grades.collect {} },
+            backgroundScope.launch { viewModel.absences.collect {} },
+            backgroundScope.launch { viewModel.courses.collect {} },
+            backgroundScope.launch { viewModel.projects.collect {} },
+            backgroundScope.launch { viewModel.practicals.collect {} },
+            backgroundScope.launch { viewModel.documents.collect {} },
+            backgroundScope.launch { viewModel.directory.collect {} },
+            backgroundScope.launch { viewModel.news.collect {} },
+            backgroundScope.launch { viewModel.events.collect {} }
+        )
+
+        advanceUntilIdle()
+
+        assertFalse(viewModel.agenda.value.loading)
+        assertTrue(viewModel.agenda.value.online)
+        jobs.forEach { it.cancel() }
+    }
+
+    @Test
+    fun failuresAndFeatureRefreshUpdateState() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        coEvery { refreshStudentDataUseCase(true, setOf(SyncFeature.Agenda)) } throws AppException(AppError.Unauthorized)
+        coEvery { syncAgendaToCalendarUseCase(any()) } throws AppException(AppError.Network)
+        coEvery { sendProjectMessageUseCase("failure", "message") } throws AppException(AppError.Unauthorized)
+        coEvery { logoutUseCase() } throws IllegalStateException()
+
+        viewModel.refresh(SyncFeature.Agenda)
+        advanceUntilIdle()
+        io.mockk.coVerify { refreshStudentDataUseCase(true, setOf(SyncFeature.Agenda)) }
+        io.mockk.coVerify { logoutUseCase() }
+
+        viewModel.syncAgendaToCalendar(emptyList())
+        advanceUntilIdle()
+        viewModel.sendProjectMessage("failure", "message")
+        advanceUntilIdle()
+
+        assertEquals(AppError.Unauthorized, viewModel.projectMessages.value.getValue("failure").error)
+    }
+
+    @Test
+    fun documentOpenRequestKeepsConstructorValues() {
+        val uri = mockk<Uri>()
+
+        val request = DocumentOpenRequest(uri, null)
+
+        assertEquals(uri, request.uri)
+        assertEquals(null, request.mimeType)
+        assertFalse(request.downloadOnly)
+    }
+
+    @Test
+    fun openDocumentResolvesMimeTypeFromFileNameWhenMissing() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", Instant.now())
+        val extensionlessDocument = document.copy(id = "extensionless", fileName = "document")
+        coEvery { downloadDocumentUseCase(document, any()) } returns mockk<Uri>()
+        coEvery { downloadDocumentUseCase(extensionlessDocument, any()) } returns mockk<Uri>()
+        val requests = mutableListOf<DocumentOpenRequest>()
+        val job = backgroundScope.launch { viewModel.documentOpenRequests.collect { requests += it } }
+
+        viewModel.openDocument(document)
+        viewModel.openDocument(extensionlessDocument)
+        advanceUntilIdle()
+
+        assertEquals(2, requests.size)
+        assertEquals(null, requests.last().mimeType)
+        job.cancel()
+    }
 }

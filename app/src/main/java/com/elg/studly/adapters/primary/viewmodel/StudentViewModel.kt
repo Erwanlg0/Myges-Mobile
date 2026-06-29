@@ -1,11 +1,11 @@
 package com.elg.studly.adapters.primary.viewmodel
 
 import android.net.Uri
-import android.webkit.MimeTypeMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elg.studly.adapters.primary.state.FeatureUiState
 import java.time.LocalDate
+import java.net.URLConnection
 import com.elg.studly.application.ports.NetworkMonitor
 import com.elg.studly.application.usecase.DownloadDocumentUseCase
 import com.elg.studly.application.usecase.JoinGroupUseCase
@@ -328,8 +328,8 @@ class StudentViewModel @Inject constructor(
 }
 
 private fun AcademicDocument.resolvedMimeType(): String? {
-    mimeType?.takeIf { it.isNotBlank() }?.let { return it }
+    if (!mimeType.isNullOrBlank()) return mimeType
     val extension = fileName.substringAfterLast('.', missingDelimiterValue = "")
-        .takeIf { it.isNotBlank() }
-    return extension?.let { MimeTypeMap.getSingleton().getMimeTypeFromExtension(it.lowercase()) }
+    if (extension.isBlank()) return null
+    return URLConnection.guessContentTypeFromName("file.$extension")
 }

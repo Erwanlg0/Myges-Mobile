@@ -180,6 +180,7 @@ jacoco {
 val coverageExclusions = listOf(
     "**/BuildConfig.*",
     "**/Hilt_*.*",
+    "**/*\$*.*",
     "**/*\$Companion.*",
     "**/*\$DefaultImpls.*",
     "**/StudentDataRepository.class",
@@ -205,43 +206,11 @@ val coverageExclusions = listOf(
     "**/config/DependencyModule*.*"
 )
 
-val coverageIncludes = listOf(
-    "**/ApiRetryInterceptor*.*",
-    "**/AppConfig*.*",
-    "**/AppError*.*",
-    "**/DomainModels*.*",
-    "**/GradeSummary*.*",
-    "**/InMemoryCookieJar*.*",
-    "**/MygesCertificatePins*.*",
-    "**/MygesAuthInterceptor*.*",
-    "**/MygesSessionRepository*.*",
-    "**/NoContentAsEmptyJsonInterceptor*.*",
-    "**/DatabaseEncryption*.*",
-    "**/DocumentCachePolicy*.*",
-    "**/Entities*.*",
-    "**/EntityMappers*.*",
-    "**/EntitySyncPlan*.*",
-    "**/StudentDao*.*",
-    "**/NotificationGrouping*.*",
-    "**/ProjectProgress*.*",
-    "**/UiState*.*",
-    "**/UseCases*.*",
-    "**/AppViewModel*.*",
-    "**/AuthViewModel.class",
-    "**/AuthUiState.class",
-    "**/SettingsViewModel.class",
-    "**/SettingsUiState.class"
-)
-
 val coverageClassDirectories = files(
-fileTree(layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")) {
-
-        include(coverageIncludes)
+    fileTree(layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")) {
         exclude(coverageExclusions)
     },
     fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes")) {
-
-        include(coverageIncludes)
         exclude(coverageExclusions)
     }
 )

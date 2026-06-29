@@ -507,7 +507,7 @@ fun JsonElement.toPracticalDocuments(fallbackYear: String? = null): List<Academi
                     parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"),
                     parentYear = practicalYear,
                     ownerId = practicalId,
-                    groupId = fileRoot.text("pgr_id", "project_group_id", "group_id")
+                    groupId = fileRoot.text("project_group_id", "pgr_id", "group_id")
                 )
                 document.copy(downloadUrl = document.downloadUrl ?: "me/projectStepFiles/${document.id}")
             }
@@ -554,7 +554,7 @@ fun JsonElement.toProjectDocuments(fallbackYear: String? = null): List<AcademicD
                     parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"),
                     parentYear = projectYear,
                     ownerId = projectId,
-                    groupId = root.text("pgr_id", "project_group_id", "group_id")
+                    groupId = root.text("project_group_id", "pgr_id", "group_id")
                 )
                 document.copy(downloadUrl = document.downloadUrl ?: "me/projectStepFiles/${document.id}")
             }
@@ -922,11 +922,6 @@ private fun JsonObject.localDate(vararg keys: String): LocalDate? {
         }
     }
     return null
-}
-
-private fun JsonElement.numberOrNull(): Double? {
-    val primitive = this as? JsonPrimitive ?: return null
-    return primitive.doubleOrNull ?: primitive.contentOrNull?.replace(',', '.')?.toDoubleOrNull()
 }
 
 private fun JsonObject.toGrade(
