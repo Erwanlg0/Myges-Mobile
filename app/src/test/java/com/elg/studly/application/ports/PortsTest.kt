@@ -74,4 +74,6 @@ private class TestStudentDataRepository : StudentDataRepository {
     override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): Uri = uri
     override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) = Unit
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) = Unit
+    override suspend fun subscribeEvent(eventId: String) = Unit
+    override suspend fun unsubscribeEvent(eventId: String) = Unit
 }

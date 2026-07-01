@@ -25,6 +25,8 @@ import com.elg.studly.application.usecase.ObserveProjectsUseCase
 import com.elg.studly.application.usecase.ProjectMessagesUseCase
 import com.elg.studly.application.usecase.RefreshStudentDataUseCase
 import com.elg.studly.application.usecase.SendProjectMessageUseCase
+import com.elg.studly.application.usecase.SubscribeEventUseCase
+import com.elg.studly.application.usecase.UnsubscribeEventUseCase
 import com.elg.studly.application.usecase.SyncAgendaToCalendarUseCase
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
@@ -79,6 +81,8 @@ class StudentViewModel @Inject constructor(
     private val downloadDocumentUseCase: DownloadDocumentUseCase,
     private val joinGroupUseCase: JoinGroupUseCase,
     private val leaveGroupUseCase: LeaveGroupUseCase,
+    private val subscribeEventUseCase: SubscribeEventUseCase,
+    private val unsubscribeEventUseCase: UnsubscribeEventUseCase,
     private val projectMessagesUseCase: ProjectMessagesUseCase,
     private val sendProjectMessageUseCase: SendProjectMessageUseCase,
     private val logoutUseCase: LogoutUseCase,
@@ -232,6 +236,14 @@ class StudentViewModel @Inject constructor(
 
     fun leaveGroup(courseId: String, projectId: String, groupId: String) {
         changeGroupMembership { leaveGroupUseCase(courseId, projectId, groupId) }
+    }
+
+    fun subscribeEvent(eventId: String) {
+        changeGroupMembership { subscribeEventUseCase(eventId) }
+    }
+
+    fun unsubscribeEvent(eventId: String) {
+        changeGroupMembership { unsubscribeEventUseCase(eventId) }
     }
 
     fun loadProjectMessages(groupId: String) {

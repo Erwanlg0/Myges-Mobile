@@ -445,6 +445,30 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         changeGroupMembership(projectId, groupId, join = false) { api.leaveGroup(courseId, projectId, groupId) }
     }
 
+    override suspend fun subscribeEvent(eventId: String) = changeEventSubscription(eventId, subscribed = true) {
+        api.subscribeEvent(eventId)
+    }
+
+    override suspend fun unsubscribeEvent(eventId: String) = changeEventSubscription(eventId, subscribed = false) {
+        api.unsubscribeEvent(eventId)
+    }
+
+    private suspend fun changeEventSubscription(
+        eventId: String,
+        subscribed: Boolean,
+        action: suspend () -> Response<ResponseBody>
+    ) {
+        withContext(Dispatchers.IO) {
+            val response = try {
+                action()
+            } catch (throwable: Throwable) {
+                throw throwable.toRepositoryException()
+            }
+            if (!response.isSuccessful) throw HttpException(response).toRepositoryException()
+            runCatching { dao.updateEventSubscribed(eventId, subscribed) }
+        }
+    }
+
     override suspend fun projectMessages(groupId: String) = withContext(Dispatchers.IO) {
         try {
             api.projectGroupMessages(groupId)?.toProjectMessages(dao.profile()?.id).orEmpty()

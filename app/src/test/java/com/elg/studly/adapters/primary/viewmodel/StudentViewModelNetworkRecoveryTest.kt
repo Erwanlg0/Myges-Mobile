@@ -26,7 +26,9 @@ import com.elg.studly.application.usecase.ObserveProjectsUseCase
 import com.elg.studly.application.usecase.ProjectMessagesUseCase
 import com.elg.studly.application.usecase.RefreshStudentDataUseCase
 import com.elg.studly.application.usecase.SendProjectMessageUseCase
+import com.elg.studly.application.usecase.SubscribeEventUseCase
 import com.elg.studly.application.usecase.SyncAgendaToCalendarUseCase
+import com.elg.studly.application.usecase.UnsubscribeEventUseCase
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
 import com.elg.studly.domain.model.AgendaEvent
@@ -228,6 +230,8 @@ class StudentViewModelNetworkRecoveryTest {
             DownloadDocumentUseCase(repository),
             JoinGroupUseCase(repository),
             LeaveGroupUseCase(repository),
+            SubscribeEventUseCase(repository),
+            UnsubscribeEventUseCase(repository),
             ProjectMessagesUseCase(repository),
             SendProjectMessageUseCase(repository),
             LogoutUseCase(sessionRepository, notificationScheduler),
@@ -279,6 +283,8 @@ private class FakeStudentDataRepository : StudentDataRepository {
     }
     override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {}
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
+    override suspend fun subscribeEvent(eventId: String) {}
+    override suspend fun unsubscribeEvent(eventId: String) {}
 }
 
 private class FakeSettingsRepository : SettingsRepository {

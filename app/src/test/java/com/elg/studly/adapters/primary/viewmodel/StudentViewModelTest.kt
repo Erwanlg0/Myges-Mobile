@@ -30,6 +30,8 @@ class StudentViewModelTest {
     private lateinit var downloadDocumentUseCase: DownloadDocumentUseCase
     private lateinit var joinGroupUseCase: JoinGroupUseCase
     private lateinit var leaveGroupUseCase: LeaveGroupUseCase
+    private lateinit var subscribeEventUseCase: SubscribeEventUseCase
+    private lateinit var unsubscribeEventUseCase: UnsubscribeEventUseCase
     private lateinit var projectMessagesUseCase: ProjectMessagesUseCase
     private lateinit var sendProjectMessageUseCase: SendProjectMessageUseCase
     private lateinit var logoutUseCase: LogoutUseCase
@@ -43,6 +45,8 @@ class StudentViewModelTest {
         downloadDocumentUseCase = mockk(relaxed = true)
         joinGroupUseCase = mockk(relaxed = true)
         leaveGroupUseCase = mockk(relaxed = true)
+        subscribeEventUseCase = mockk(relaxed = true)
+        unsubscribeEventUseCase = mockk(relaxed = true)
         projectMessagesUseCase = mockk(relaxed = true)
         sendProjectMessageUseCase = mockk(relaxed = true)
         logoutUseCase = mockk(relaxed = true)
@@ -74,6 +78,8 @@ class StudentViewModelTest {
             downloadDocumentUseCase = downloadDocumentUseCase,
             joinGroupUseCase = joinGroupUseCase,
             leaveGroupUseCase = leaveGroupUseCase,
+            subscribeEventUseCase = subscribeEventUseCase,
+            unsubscribeEventUseCase = unsubscribeEventUseCase,
             projectMessagesUseCase = projectMessagesUseCase,
             sendProjectMessageUseCase = sendProjectMessageUseCase,
             logoutUseCase = logoutUseCase,

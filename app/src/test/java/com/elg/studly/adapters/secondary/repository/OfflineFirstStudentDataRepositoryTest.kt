@@ -563,6 +563,10 @@ private class RepositoryApi : MyGesApiService {
         return groupResponse
     }
 
+    override suspend fun subscribeEvent(eventId: String): Response<ResponseBody> = groupResponse
+
+    override suspend fun unsubscribeEvent(eventId: String): Response<ResponseBody> = groupResponse
+
     override suspend fun projectGroupMessages(projectGroupId: String): JsonElement = projectMessagesResponse
 
     override suspend fun sendProjectGroupMessage(
@@ -622,6 +626,11 @@ private class RepositoryDao : StudentDao() {
     override suspend fun directoryPeople(): List<DirectoryPersonEntity> = directoryState.value
     override suspend fun news(): List<NewsEntity> = newsState.value
     override suspend fun events(): List<StudentEventEntity> = eventState.value
+    override suspend fun updateEventSubscribed(eventId: String, subscribed: Boolean) {
+        eventState.value = eventState.value.map {
+            if (it.id == eventId) it.copy(subscribed = subscribed) else it
+        }
+    }
     override suspend fun upsertProfile(profile: StudentProfileEntity) {
         profileState.value = profile
     }

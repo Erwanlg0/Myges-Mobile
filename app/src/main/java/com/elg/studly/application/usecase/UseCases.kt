@@ -228,6 +228,18 @@ class LeaveGroupUseCase @Inject constructor(
         repository.leaveGroup(courseId, projectId, groupId)
 }
 
+class SubscribeEventUseCase @Inject constructor(
+    private val repository: StudentDataRepository
+) {
+    suspend operator fun invoke(eventId: String) = repository.subscribeEvent(eventId)
+}
+
+class UnsubscribeEventUseCase @Inject constructor(
+    private val repository: StudentDataRepository
+) {
+    suspend operator fun invoke(eventId: String) = repository.unsubscribeEvent(eventId)
+}
+
 class ProjectMessagesUseCase @Inject constructor(
     private val repository: StudentDataRepository
 ) {

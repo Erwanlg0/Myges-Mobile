@@ -1906,6 +1906,11 @@ fun EventsScreen(
     selectedEvent?.let { event ->
         EventDetailsDialog(
             event = event,
+            onToggleSubscription = {
+                if (event.subscribed) studentViewModel.unsubscribeEvent(event.id)
+                else studentViewModel.subscribeEvent(event.id)
+                selectedEvent = null
+            },
             onDismiss = { selectedEvent = null }
         )
     }
@@ -1976,6 +1981,7 @@ private fun EventCard(event: StudentEvent, onOpen: () -> Unit) {
 @Composable
 private fun EventDetailsDialog(
     event: StudentEvent,
+    onToggleSubscription: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val now = remember { Instant.now() }
@@ -1992,7 +1998,7 @@ private fun EventDetailsDialog(
         },
         confirmButton = {
             if (canSubscribe) {
-                Button(onClick = {}) {
+                Button(onClick = onToggleSubscription) {
                     Text(stringResource(if (event.subscribed) R.string.events_leave else R.string.events_join))
                 }
             }

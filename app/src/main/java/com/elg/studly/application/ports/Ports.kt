@@ -50,6 +50,8 @@ interface StudentDataRepository {
     suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit = {}): Uri
     suspend fun joinGroup(courseId: String, projectId: String, groupId: String)
     suspend fun leaveGroup(courseId: String, projectId: String, groupId: String)
+    suspend fun subscribeEvent(eventId: String)
+    suspend fun unsubscribeEvent(eventId: String)
     suspend fun projectMessages(groupId: String): List<ProjectMessage> = emptyList()
     suspend fun sendProjectMessage(groupId: String, message: String) = Unit
 }

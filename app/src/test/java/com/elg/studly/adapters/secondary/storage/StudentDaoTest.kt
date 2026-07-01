@@ -178,6 +178,9 @@ private class TestStudentDao : StudentDao() {
     override suspend fun directoryPeople(): List<DirectoryPersonEntity> = directoryRows
     override suspend fun news(): List<NewsEntity> = newsRows
     override suspend fun events(): List<StudentEventEntity> = eventRows
+    override suspend fun updateEventSubscribed(eventId: String, subscribed: Boolean) {
+        eventRows = eventRows.map { if (it.id == eventId) it.copy(subscribed = subscribed) else it }
+    }
     override suspend fun upsertProfile(profile: StudentProfileEntity) {
         profileRow = profile
     }
