@@ -3,6 +3,7 @@ package com.elg.studly.adapters.secondary.security
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.util.Base64
 
@@ -31,6 +32,16 @@ class EncryptedPayloadTest {
         assertNull(decoded.version)
         assertArrayEquals(iv, decoded.iv)
         assertArrayEquals(cipherText, decoded.cipherText)
+    }
+
+    @Test
+    fun malformedPayloadThrowsStorageError() {
+        assertThrows(com.elg.studly.domain.model.AppException::class.java) {
+            EncryptedPayload.decode("not-encrypted")
+        }
+        assertThrows(com.elg.studly.domain.model.AppException::class.java) {
+            EncryptedPayload.decode("vX:a:b")
+        }
     }
 
     private fun ByteArray.toBase64(): String {

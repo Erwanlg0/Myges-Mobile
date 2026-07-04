@@ -7,6 +7,8 @@ import com.elg.studly.domain.model.Course
 import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.DirectoryRole
 import com.elg.studly.domain.model.Grade
+import com.elg.studly.domain.model.isToeicExcluded
+import com.elg.studly.domain.model.NOT_COUNTED_COEFFICIENT
 import com.elg.studly.domain.model.combineCcExam
 import com.elg.studly.domain.model.NewsItem
 import com.elg.studly.domain.model.Practical
@@ -489,7 +491,7 @@ fun JsonElement.toPracticalDocuments(fallbackYear: String? = null): List<Academi
         val root = element.objectOrData()
         val practicalId = root.text("id", "practicalId", "project_id", "uid") ?: stableId(root)
         val practicalYear = root.text("year", "academicYear") ?: fallbackYear
-        val files = root.array("project_files").map { file ->
+        val files = root.array("files", "project_files", "documents", "deliverables").map { file ->
             val fileRoot = file.objectOrData()
             val document = fileRoot.toDocument(
                 parentTitle = root.text("name", "title"),
@@ -506,7 +508,7 @@ fun JsonElement.toPracticalDocuments(fallbackYear: String? = null): List<Academi
                     parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"),
                     parentYear = practicalYear,
                     ownerId = practicalId,
-                    groupId = fileRoot.text("pgr_id", "project_group_id", "group_id")
+                    groupId = fileRoot.text("project_group_id", "pgr_id", "group_id")
                 )
                 document.copy(downloadUrl = document.downloadUrl ?: "me/projectStepFiles/${document.id}")
             }
@@ -536,7 +538,7 @@ fun JsonElement.toProjectDocuments(fallbackYear: String? = null): List<AcademicD
         val projectRoot = element.objectOrData()
         val projectId = projectRoot.text("id", "projectId", "project_id", "uid") ?: stableId(projectRoot)
         val projectYear = projectRoot.text("year", "academicYear") ?: fallbackYear
-        val projectFiles = projectRoot.array("project_files").map { file ->
+        val projectFiles = projectRoot.array("files", "project_files", "documents", "deliverables").map { file ->
             val root = file.objectOrData()
             val document = root.toDocument(
                 parentTitle = projectRoot.text("name", "title"),
@@ -553,7 +555,7 @@ fun JsonElement.toProjectDocuments(fallbackYear: String? = null): List<AcademicD
                     parentTitle = stepRoot.text("title", "name", "psp_desc", "psp_type"),
                     parentYear = projectYear,
                     ownerId = projectId,
-                    groupId = root.text("pgr_id", "project_group_id", "group_id")
+                    groupId = root.text("project_group_id", "pgr_id", "group_id")
                 )
                 document.copy(downloadUrl = document.downloadUrl ?: "me/projectStepFiles/${document.id}")
             }
@@ -714,6 +716,14 @@ private fun JsonObject.text(vararg keys: String): String? {
         }
     }
     return null
+}
+
+private val NOT_COUNTED_REGEX = Regex("^n\\.?\\s*c\\.?$", RegexOption.IGNORE_CASE)
+
+private fun JsonObject.coefficientValue(): Double? {
+    val raw = ((this["coefficient"] ?: this["coef"]) as? JsonPrimitive)?.contentOrNull?.trim()
+    if (raw != null && NOT_COUNTED_REGEX.matches(raw)) return NOT_COUNTED_COEFFICIENT
+    return number("coefficient", "coef")
 }
 
 private fun JsonObject.number(vararg keys: String): Double? {
@@ -915,11 +925,6 @@ private fun JsonObject.localDate(vararg keys: String): LocalDate? {
     return null
 }
 
-private fun JsonElement.numberOrNull(): Double? {
-    val primitive = this as? JsonPrimitive ?: return null
-    return primitive.doubleOrNull ?: primitive.contentOrNull?.replace(',', '.')?.toDoubleOrNull()
-}
-
 private fun JsonObject.toGrade(
     idSuffix: String? = null,
     subject: String? = null,
@@ -952,11 +957,11 @@ private fun JsonObject.toGrade(
         subject = subject ?: text("subject", "title", "name", "evaluation", "trimester_name") ?: "",
         value = value,
         scale = scale ?: number("scale", "outOf", "bareme") ?: 20.0,
-        coefficient = number("coefficient", "coef"),
+        coefficient = coefficientValue(),
         average = number("average", "moyenne", "ccaverage"),
         date = date ?: localDate(*dateKeys),
         period = resolvedPeriod
-    )
+    ).let { if (it.isToeicExcluded()) it.copy(scale = 990.0) else it }
 }
 
 private fun parseInstant(value: JsonElement?): Instant? {

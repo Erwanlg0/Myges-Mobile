@@ -1,7 +1,7 @@
 package com.elg.studly.config
 
-import android.net.Uri
 import com.elg.studly.BuildConfig
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,15 +13,15 @@ class AppConfig @Inject constructor() {
     val userAgent: String = BuildConfig.MYGES_USER_AGENT
 }
 
-private fun String.ensureTrailingSlash(): String {
+internal fun String.ensureTrailingSlash(): String {
     return if (endsWith('/')) this else "$this/"
 }
 
-private fun String.withRedirectUri(redirectUri: String): String {
-    val uri = Uri.parse(this)
-    if (uri.getQueryParameter("redirect_uri") != null) return this
-    return uri.buildUpon()
-        .appendQueryParameter("redirect_uri", redirectUri)
+internal fun String.withRedirectUri(redirectUri: String): String {
+    val url = toHttpUrl()
+    if (url.queryParameter("redirect_uri") != null) return this
+    return url.newBuilder()
+        .addQueryParameter("redirect_uri", redirectUri)
         .build()
         .toString()
 }

@@ -8,20 +8,34 @@ data class GradeSummary(
     val incomplete: Boolean
 )
 
+const val NOT_COUNTED_COEFFICIENT = -1.0
+
+fun Grade.isToeicExcluded(): Boolean =
+    (courseName.contains("TOEIC", ignoreCase = true) || subject.contains("TOEIC", ignoreCase = true)) &&
+        (value ?: 0.0) > 20.0
+
+fun Grade.isNotCounted(): Boolean = coefficient == NOT_COUNTED_COEFFICIENT
+
+fun Grade.isExcludedFromAverage(): Boolean = isToeicExcluded() || isNotCounted()
+
+fun Grade.isPerfectScore(): Boolean =
+    value != null && scale != null && scale > 0.0 && value >= scale && !isToeicExcluded()
+
 fun List<Grade>.toGradeSummary(): GradeSummary {
-    val graded = filter { it.value != null && it.scale != null && it.scale > 0.0 }
+    val relevant = filterNot { it.isExcludedFromAverage() }
+    val graded = relevant.filter { it.value != null && it.scale != null && it.scale > 0.0 }
     val weightedGrades = graded.map { grade ->
         val coefficient = grade.coefficient?.takeIf { it > 0.0 }
         GradeWeight(
             normalizedValue = grade.value!! / grade.scale!! * 20.0,
-            coefficient = coefficient
+            coefficient = coefficient ?: 1.0,
+            missingCoefficient = coefficient == null
         )
     }
-    val missingCoefficientCount = weightedGrades.count { it.coefficient == null }
-    val usableWeights = weightedGrades.map { it.copy(coefficient = it.coefficient ?: 1.0) }
-    val coefficientSum = usableWeights.sumOf { it.coefficient ?: 0.0 }
+    val missingCoefficientCount = weightedGrades.count { it.missingCoefficient }
+    val coefficientSum = weightedGrades.sumOf { it.coefficient }
     val weightedAverage = if (coefficientSum > 0.0) {
-        usableWeights.sumOf { it.normalizedValue * (it.coefficient ?: 0.0) } / coefficientSum
+        weightedGrades.sumOf { it.normalizedValue * it.coefficient } / coefficientSum
     } else {
         null
     }
@@ -30,7 +44,7 @@ fun List<Grade>.toGradeSummary(): GradeSummary {
         gpa = weightedAverage?.let { (it / 20.0 * 4.0).coerceIn(0.0, 4.0) },
         gradedCount = graded.size,
         missingCoefficientCount = missingCoefficientCount,
-        incomplete = missingCoefficientCount > 0 || graded.size < size
+        incomplete = missingCoefficientCount > 0 || graded.size < relevant.size
     )
 }
 
@@ -58,5 +72,6 @@ fun List<Grade>.mainGrades(): List<Grade> {
 
 private data class GradeWeight(
     val normalizedValue: Double,
-    val coefficient: Double?
+    val coefficient: Double,
+    val missingCoefficient: Boolean
 )

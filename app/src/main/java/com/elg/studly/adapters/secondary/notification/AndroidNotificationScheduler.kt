@@ -7,10 +7,12 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -51,6 +53,10 @@ import javax.inject.Singleton
 class AndroidNotificationScheduler @Inject constructor(
     @ApplicationContext private val context: Context
 ) : NotificationScheduler {
+    private val appIcon: Bitmap? by lazy {
+        ContextCompat.getDrawable(context, R.mipmap.ic_launcher)?.toBitmap()
+    }
+
     override fun ensureChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -72,7 +78,6 @@ class AndroidNotificationScheduler @Inject constructor(
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .setRequiresBatteryNotLow(true)
                     .build()
             )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
@@ -260,6 +265,7 @@ class AndroidNotificationScheduler @Inject constructor(
         val intent = contentIntent(id, route)
         val notification = NotificationCompat.Builder(context, CHANNEL_STUDENT)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(appIcon)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

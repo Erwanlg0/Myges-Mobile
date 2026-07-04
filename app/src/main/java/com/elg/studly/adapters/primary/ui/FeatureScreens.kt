@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -129,6 +131,7 @@ import com.elg.studly.adapters.primary.viewmodel.SettingsViewModel
 import com.elg.studly.adapters.primary.viewmodel.StudentViewModel
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
+import com.elg.studly.domain.model.AgendaColorMode
 import com.elg.studly.domain.model.AgendaEvent
 import com.elg.studly.domain.model.CalendarAccount
 import com.elg.studly.domain.model.Course
@@ -152,7 +155,19 @@ import com.elg.studly.domain.model.SyncFeature
 import androidx.compose.material3.Slider
 import kotlin.math.roundToInt
 import com.elg.studly.domain.model.progress
+import com.elg.studly.domain.model.isToeicExcluded
+import com.elg.studly.domain.model.isExcludedFromAverage
+import com.elg.studly.domain.model.isNotCounted
 import com.elg.studly.domain.model.toGradeSummary
+import com.elg.studly.domain.model.isPerfectScore
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.rotate
+import kotlin.random.Random
 import coil.compose.AsyncImage
 import kotlin.time.Instant
 import com.elg.studly.adapters.time.*
@@ -349,7 +364,7 @@ fun DashboardScreen(
                     project.deadline?.takeIf { it.isAfter(now) }
                         ?: project.steps.mapNotNull { it.deadline }.filter { it.isAfter(now) }.minOrNull()
                 }
-                CompactCard(modifier = Modifier.clickable { onNavigateToTab("projects") }) {
+                CompactCard(modifier = Modifier.clickable { onNavigateToTab("projects?id=${project.id}") }) {
                     Text(
                         text = project.name,
                         style = MaterialTheme.typography.titleMedium,
@@ -605,6 +620,7 @@ fun AgendaScreen(
                     AgendaWeekGrid(
                         weekStart = startOfWeek,
                         events = events,
+                        colorMode = settingsState.settings?.agendaColorMode ?: AgendaColorMode.Course,
                         onOpen = { ev -> selectedEvent = ev }
                     )
                 }
@@ -735,6 +751,22 @@ fun GradesScreen(
     
     val gradesList = state.data.orEmpty()
 
+    val celebrationPrefs = remember(context) {
+        context.getSharedPreferences("grade_celebrations", Context.MODE_PRIVATE)
+    }
+    var showConfetti by remember { mutableStateOf(false) }
+    LaunchedEffect(gradesList) {
+        if (gradesList.isEmpty()) return@LaunchedEffect
+        val perfectIds = gradesList.filter { it.isPerfectScore() }.map { it.id }.toSet()
+        val celebrated = celebrationPrefs.getStringSet("celebrated", null)
+        if (celebrated == null) {
+            celebrationPrefs.edit().putStringSet("celebrated", perfectIds).apply()
+        } else if ((perfectIds - celebrated).isNotEmpty()) {
+            showConfetti = true
+            celebrationPrefs.edit().putStringSet("celebrated", celebrated + perfectIds).apply()
+        }
+    }
+
     val years = remember(gradesList) {
         gradesList.mapNotNull { it.academicYearLabel().takeIf(String::isNotBlank) }
             .distinct()
@@ -836,6 +868,7 @@ fun GradesScreen(
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     FeatureStateContent(
         state = state,
         empty = List<Grade>::isEmpty,
@@ -1013,6 +1046,62 @@ fun GradesScreen(
         } else {
             items(mainGrades, key = { it.id }) { grade ->
                 GradeCard(grade = grade, onOpen = { selectedGrade = grade })
+            }
+        }
+    }
+    if (showConfetti) {
+        ConfettiOverlay(onFinished = { showConfetti = false })
+    }
+    }
+}
+
+private data class ConfettiPiece(
+    val xFraction: Float,
+    val color: Color,
+    val widthPx: Float,
+    val spin: Float,
+    val delay: Float,
+    val drift: Float
+)
+
+@Composable
+private fun ConfettiOverlay(onFinished: () -> Unit) {
+    val colors = listOf(
+        Color(0xFFE53935), Color(0xFFFFB300), Color(0xFF43A047),
+        Color(0xFF1E88E5), Color(0xFF8E24AA), Color(0xFFF06292)
+    )
+    val pieces = remember {
+        List(90) {
+            ConfettiPiece(
+                xFraction = Random.nextFloat(),
+                color = colors[Random.nextInt(colors.size)],
+                widthPx = Random.nextFloat() * 6f + 6f,
+                spin = Random.nextFloat() * 6f - 3f,
+                delay = Random.nextFloat() * 0.25f,
+                drift = Random.nextFloat() * 0.3f - 0.15f
+            )
+        }
+    }
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(durationMillis = 2600, easing = LinearEasing))
+        onFinished()
+    }
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val fallHeight = size.height + 80f
+        pieces.forEach { p ->
+            val span = (1f - p.delay).coerceAtLeast(0.0001f)
+            val t = (progress.value - p.delay) / span
+            if (t <= 0f) return@forEach
+            val x = (p.xFraction + p.drift * t) * size.width
+            val y = t * fallHeight - 40f
+            val alpha = (1f - t * t).coerceIn(0f, 1f)
+            rotate(degrees = p.spin * t * 360f, pivot = Offset(x, y)) {
+                drawRect(
+                    color = p.color.copy(alpha = alpha),
+                    topLeft = Offset(x, y),
+                    size = Size(p.widthPx, p.widthPx * 1.8f)
+                )
             }
         }
     }
@@ -1818,6 +1907,11 @@ fun EventsScreen(
     selectedEvent?.let { event ->
         EventDetailsDialog(
             event = event,
+            onToggleSubscription = {
+                if (event.subscribed) studentViewModel.unsubscribeEvent(event.id)
+                else studentViewModel.subscribeEvent(event.id)
+                selectedEvent = null
+            },
             onDismiss = { selectedEvent = null }
         )
     }
@@ -1888,6 +1982,7 @@ private fun EventCard(event: StudentEvent, onOpen: () -> Unit) {
 @Composable
 private fun EventDetailsDialog(
     event: StudentEvent,
+    onToggleSubscription: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val now = remember { kotlin.time.Clock.System.now() }
@@ -1904,7 +1999,7 @@ private fun EventDetailsDialog(
         },
         confirmButton = {
             if (canSubscribe) {
-                Button(onClick = {}) {
+                Button(onClick = onToggleSubscription) {
                     Text(stringResource(if (event.subscribed) R.string.events_leave else R.string.events_join))
                 }
             }
@@ -2006,6 +2101,13 @@ fun SettingsScreen(
                         onCheckedChange = settingsViewModel::setDynamicColor
                     )
                 }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.settings_agenda_color_mode),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                AgendaColorModeSelector(settings.agendaColorMode, settingsViewModel::setAgendaColorMode)
             }
         }
         item {
@@ -2025,6 +2127,34 @@ fun SettingsScreen(
                         Icon(Icons.Rounded.Notifications, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.notifications_grant_permission))
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val powerManager = context.getSystemService(PowerManager::class.java)
+                    val ignoringBatteryOptimizations =
+                        powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+                    if (!ignoringBatteryOptimizations) {
+                        OutlinedButton(onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val intent = Intent(
+                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:${context.packageName}")
+                            )
+                            runCatching { context.startActivity(intent) }.onFailure {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Rounded.Notifications, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.settings_background_reliability))
+                        }
+                        Text(
+                            text = stringResource(R.string.settings_background_reliability_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
                 NotificationPreferences(settings, settingsViewModel)
@@ -2547,6 +2677,35 @@ internal fun ThemeSelector(
 }
 
 @Composable
+private fun AgendaColorModeSelector(
+    selectedMode: AgendaColorMode,
+    onModeSelected: (AgendaColorMode) -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        AgendaColorMode.entries.forEach { mode ->
+            FilterChip(
+                selected = selectedMode == mode,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onModeSelected(mode)
+                },
+                label = {
+                    Text(
+                        stringResource(
+                            when (mode) {
+                                AgendaColorMode.Course -> R.string.settings_agenda_color_course
+                                AgendaColorMode.Location -> R.string.settings_agenda_color_location
+                            }
+                        )
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
 internal fun SwitchRow(
     @StringRes title: Int,
     checked: Boolean,
@@ -2695,7 +2854,7 @@ private fun GradeCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
+        LabelValue(R.string.grades_coefficient, if (grade.isNotCounted()) stringResource(R.string.grades_not_counted) else formatNumber(grade.coefficient))
         LabelValue(R.string.common_date, formatDate(grade.date))
         if (!grade.period.isNullOrBlank()) {
             LabelValue(R.string.common_period, grade.period!!)
@@ -2735,10 +2894,10 @@ internal fun GradeSummaryCard(
 ) {
     val summary = remember(grades) { grades.toGradeSummary() }
     val ccAverage = remember(allGrades) {
-        allGrades.filter { it.id.contains("-cc-") }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
+        allGrades.filter { it.id.contains("-cc-") && !it.isExcludedFromAverage() }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
     }
     val examAverage = remember(allGrades) {
-        allGrades.filter { it.id.contains("-exam") }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
+        allGrades.filter { it.id.contains("-exam") && !it.isExcludedFromAverage() }.mapNotNull { it.value }.takeIf { it.isNotEmpty() }?.average()
     }
     DataCard {
         Text(
@@ -2843,7 +3002,7 @@ private fun GradeSimulationEditCard(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
+        LabelValue(R.string.grades_coefficient, if (grade.isNotCounted()) stringResource(R.string.grades_not_counted) else formatNumber(grade.coefficient))
         if (!grade.period.isNullOrBlank()) {
             LabelValue(R.string.common_period, grade.period!!)
         }
@@ -2990,7 +3149,7 @@ private fun GradeDetailsDialog(
                     R.string.grades_general_average,
                     if (grade.value != null) stringResource(R.string.grades_value_format, formatNumber(grade.value), formatNumber(grade.scale)) else stringResource(R.string.grades_no_grade)
                 )
-                LabelValue(R.string.grades_coefficient, formatNumber(grade.coefficient))
+                LabelValue(R.string.grades_coefficient, if (grade.isNotCounted()) stringResource(R.string.grades_not_counted) else formatNumber(grade.coefficient))
                 LabelValue(R.string.common_date, formatDate(grade.date))
             }
         },
@@ -4019,13 +4178,19 @@ private val GRID_TIME_GUTTER = 44.dp
 private val GRID_DAY_MIN_WIDTH = 96.dp
 
 private val EVENT_PALETTE = listOf(
-    Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFE53935),
-    Color(0xFF8E24AA), Color(0xFFF4511E), Color(0xFF00897B),
-    Color(0xFF3949AB), Color(0xFF6D4C41)
+    Color(0xFF039BE5), Color(0xFF0B8043), Color(0xFFD50000),
+    Color(0xFF8E24AA), Color(0xFFF4511E), Color(0xFF33B679),
+    Color(0xFF3F51B5), Color(0xFF7986CB), Color(0xFFF6BF26),
+    Color(0xFFE67C73), Color(0xFF616161)
 )
 
-private fun eventColor(event: AgendaEvent): Color {
-    val key = event.courseId?.takeIf { it.isNotBlank() } ?: event.title.ifBlank { event.id }
+private fun eventColor(event: AgendaEvent, mode: AgendaColorMode): Color {
+    val key = when (mode) {
+        AgendaColorMode.Course -> event.courseId?.takeIf { it.isNotBlank() } ?: event.title.ifBlank { event.id }
+        AgendaColorMode.Location -> event.address?.takeIf { it.isNotBlank() }
+            ?: event.room?.takeIf { it.isNotBlank() }
+            ?: event.title.ifBlank { event.id }
+    }
     val idx = (key.hashCode() and 0x7fffffff) % EVENT_PALETTE.size
     return EVENT_PALETTE[idx]
 }
@@ -4090,12 +4255,14 @@ private fun layoutDayEvents(events: List<AgendaEvent>, zone: ZoneId): List<DayLa
 private fun AgendaWeekGrid(
     weekStart: LocalDate,
     events: List<AgendaEvent>,
+    colorMode: AgendaColorMode,
     onOpen: (AgendaEvent) -> Unit
 ) {
     val zone = remember { ZoneId.systemDefault() }
     val days = remember(weekStart) { (0 until 6).map { weekStart.plusDays(it.toLong()) } }
     val eventsByDay = remember(events, days) {
-        days.associateWith { day -> events.filter { it.startsAt.atZone(zone).toLocalDate() == day } }
+        val byDate = events.groupBy { it.startsAt.atZone(zone).toLocalDate() }
+        days.associateWith { byDate[it].orEmpty() }
     }
     val allDayEvents = remember(eventsByDay) { eventsByDay.values.flatten() }
     val startHour = remember(allDayEvents) {
@@ -4183,6 +4350,7 @@ private fun AgendaWeekGrid(
                                     EventBlock(
                                         event = le.event,
                                         zone = zone,
+                                        colorMode = colorMode,
                                         modifier = Modifier
                                             .offset(x = laneW * le.lane, y = topDp)
                                             .width(laneW)
@@ -4204,6 +4372,7 @@ private fun AgendaWeekGrid(
 private fun EventBlock(
     event: AgendaEvent,
     zone: ZoneId,
+    colorMode: AgendaColorMode,
     modifier: Modifier,
     onOpen: () -> Unit
 ) {
@@ -4216,7 +4385,7 @@ private fun EventBlock(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(eventColor(event))
+            .background(eventColor(event, colorMode))
             .clickable(onClick = onOpen, role = Role.Button)
             .semantics(mergeDescendants = true) { contentDescription = description }
             .padding(horizontal = 4.dp, vertical = 2.dp)

@@ -143,7 +143,7 @@ object DependencyModule {
 }
 
 
-private class InMemoryCookieJar : CookieJar {
+internal class InMemoryCookieJar : CookieJar {
     private val store = ConcurrentHashMap<String, MutableList<Cookie>>()
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {

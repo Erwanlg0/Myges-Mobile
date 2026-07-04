@@ -7,13 +7,15 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalView
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,7 +41,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         requestNotificationPermissionIfNeeded()
         handleIntent(intent)
         setContent {
@@ -48,6 +50,12 @@ class MainActivity : AppCompatActivity() {
                 ThemeMode.Light -> false
                 ThemeMode.Dark -> true
                 else -> isSystemInDarkTheme()
+            }
+            val view = LocalView.current
+            SideEffect {
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = !darkTheme
+                controller.isAppearanceLightNavigationBars = !darkTheme
             }
             MygesTheme(
                 darkTheme = darkTheme,
@@ -87,10 +95,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_VIEW) {
-            if (intent.data.isOAuthCallback()) oauthCallbackUri = intent.data
-        } else {
-            notificationRoute = intent?.getStringExtra(EXTRA_NOTIFICATION_ROUTE)
+        when {
+            intent?.action == Intent.ACTION_VIEW && intent.data.isOAuthCallback() ->
+                oauthCallbackUri = intent.data
+            intent?.action == Intent.ACTION_VIEW && intent.data?.scheme == SHORTCUT_SCHEME ->
+                notificationRoute = intent.data?.host
+            else ->
+                notificationRoute = intent?.getStringExtra(EXTRA_NOTIFICATION_ROUTE)
         }
     }
 
@@ -103,5 +114,6 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_NOTIFICATION_ROUTE = "com.elg.studly.extra.NOTIFICATION_ROUTE"
+        private const val SHORTCUT_SCHEME = "myges"
     }
 }

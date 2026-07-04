@@ -88,6 +88,7 @@
     <string name="grades_average">Moyenne</string>
     <string name="grades_component">Composant</string>
     <string name="grades_coefficient">Coefficient</string>
+    <string name="grades_not_counted">N.C</string>
     <string name="grades_count">Notes prises en compte</string>
     <string name="grades_detail_title">Détails de la matière</string>
     <string name="grades_gpa">GPA estimé</string>
@@ -228,6 +229,8 @@
     <string name="notifications_empty_title">Aucune actualité</string>
     <string name="notifications_empty_body">Les actualités et alertes synchronisées apparaîtront ici.</string>
     <string name="notifications_grant_permission">Autoriser les notifications</string>
+    <string name="settings_background_reliability">Autoriser en arrière-plan</string>
+    <string name="settings_background_reliability_hint">Sans cette autorisation, Xiaomi/MIUI bloque la synchro en arrière-plan et les notifications n\'arrivent pas.</string>
     <string name="notifications_channel_student">Suivi étudiant</string>
     <string name="notifications_channel_student_description">Notes, absences, agenda, documents et projets.</string>
     <string name="notifications_sync_failed_title">Synchronisation impossible</string>
@@ -257,6 +260,9 @@
     <string name="settings_theme_light">Clair</string>
     <string name="settings_theme_dark">Sombre</string>
     <string name="settings_dynamic_color">Couleurs dynamiques (Material You)</string>
+    <string name="settings_agenda_color_mode">Couleur des cours dans l\'agenda</string>
+    <string name="settings_agenda_color_course">Par cours</string>
+    <string name="settings_agenda_color_location">Par lieu</string>
     <string name="settings_language_english">Anglais</string>
     <string name="settings_language_french">Français</string>
     <string name="settings_language_system">Système</string>

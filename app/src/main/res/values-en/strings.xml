@@ -88,6 +88,7 @@
     <string name="grades_average">Average</string>
     <string name="grades_component">Component</string>
     <string name="grades_coefficient">Coefficient</string>
+    <string name="grades_not_counted">N.C</string>
     <string name="grades_count">Included grades</string>
     <string name="grades_detail_title">Course details</string>
     <string name="grades_gpa">Estimated GPA</string>
@@ -228,6 +229,8 @@
     <string name="notifications_empty_title">No news</string>
     <string name="notifications_empty_body">Synced news and alerts will appear here.</string>
     <string name="notifications_grant_permission">Allow notifications</string>
+    <string name="settings_background_reliability">Allow in background</string>
+    <string name="settings_background_reliability_hint">Without this, the system may block background sync and notifications won\'t arrive.</string>
     <string name="notifications_channel_student">Student tracking</string>
     <string name="notifications_channel_student_description">Grades, absences, agenda, documents, and projects.</string>
     <string name="notifications_sync_failed_title">Unable to sync</string>
@@ -257,6 +260,9 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_dynamic_color">Dynamic color (Material You)</string>
+    <string name="settings_agenda_color_mode">Agenda event color</string>
+    <string name="settings_agenda_color_course">By course</string>
+    <string name="settings_agenda_color_location">By location</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_french">French</string>
     <string name="settings_language_system">System</string>

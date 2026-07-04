@@ -45,4 +45,31 @@ class DocumentCachePolicyTest {
 
         assertFalse(nested.exists())
     }
+
+    @Test
+    fun purgeExpiredDocumentCacheIgnoresMissingDirectory() {
+        val directory = File(createTempDir(), "missing")
+
+        purgeExpiredDocumentCache(directory)
+
+        assertFalse(directory.exists())
+    }
+
+    @Test
+    fun purgeExpiredDocumentCacheKeepsNonEmptyDirectories() {
+        val directory = createTempDir()
+        val nested = File(directory, "nested").apply { mkdirs() }
+        File(nested, "current.pdf").apply {
+            writeText("current")
+            setLastModified(Instant.parse("2026-06-11T12:00:00Z").toEpochMilli())
+        }
+
+        purgeExpiredDocumentCache(
+            directory = directory,
+            now = Instant.parse("2026-06-12T12:00:00Z"),
+            maxAge = Duration.ofDays(30)
+        )
+
+        assertTrue(nested.exists())
+    }
 }

@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 2
 
@@ -42,14 +42,18 @@ jobs:
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "tag=android-v${version_name}-${version_code}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         if: steps.version.outputs.changed == 'true'
         with:
           distribution: temurin
           java-version: 21
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
         if: steps.version.outputs.changed == 'true'
+
+      - name: Run unit tests
+        if: steps.version.outputs.changed == 'true'
+        run: ./gradlew :app:testDebugUnitTest --quiet
 
       - name: Prepare signing
         if: steps.version.outputs.changed == 'true'

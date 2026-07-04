@@ -112,6 +112,50 @@ class MygesSessionRepositoryTest {
     }
 
     @Test
+    fun authenticateWithTokenUsesDefaultExpiry() = runTest {
+        val secureStore = mockk<SecureSessionStore>(relaxed = true) {
+            every { read() } returns null
+        }
+        val repository = MygesSessionRepository(secureStore)
+
+        repository.authenticateWithToken("new_token", null, true)
+
+        val newSession = repository.session.first()
+        assertEquals("new_token", newSession?.accessToken)
+        assertTrue(newSession?.biometricEnabled ?: false)
+        assertEquals(false, repository.hasLockedBiometricSession.first())
+    }
+
+    @Test
+    fun authenticateWithBlankTokenThrowsUnauthorized() = runTest {
+        val secureStore = mockk<SecureSessionStore>(relaxed = true) {
+            every { read() } returns null
+        }
+        val repository = MygesSessionRepository(secureStore)
+
+        val failure = runCatching {
+            repository.authenticateWithToken(" ", null, false)
+        }.exceptionOrNull()
+
+        assertEquals(AppError.Unauthorized, (failure as AppException).error)
+    }
+
+    @Test
+    fun authenticateStoreFailureBecomesUnexpectedError() = runTest {
+        val secureStore = mockk<SecureSessionStore> {
+            every { read() } returns null
+            every { save(any()) } throws IllegalStateException("disk")
+        }
+        val repository = MygesSessionRepository(secureStore)
+
+        val failure = runCatching {
+            repository.authenticateWithToken("token", null, false)
+        }.exceptionOrNull()
+
+        assertEquals(AppError.Unexpected("disk"), (failure as AppException).error)
+    }
+
+    @Test
     fun unlockWithBiometricsExposesSession() = runTest {
         val session = Session(
             username = "user",
@@ -134,6 +178,77 @@ class MygesSessionRepositoryTest {
 
         assertFalse(repository.hasLockedBiometricSession.first())
         assertEquals(session, repository.session.first())
+    }
+
+    @Test
+    fun unlockWithBiometricsWithoutStoredSessionFails() = runTest {
+        val secureStore = mockk<SecureSessionStore>(relaxed = true) {
+            every { read() } returns null
+        }
+        val repository = MygesSessionRepository(secureStore)
+
+        val failure = runCatching { repository.unlockWithBiometrics() }.exceptionOrNull()
+
+        assertEquals(AppError.Unauthorized, (failure as AppException).error)
+    }
+
+    @Test
+    fun unlockWithBiometricsClearsExpiredStoredSession() = runTest {
+        val session = Session(
+            username = "user",
+            accessToken = "token",
+            refreshToken = null,
+            expiresAt = Instant.now().minusSeconds(1),
+            biometricEnabled = true,
+            issuedAt = Instant.now(),
+            refreshAfter = Instant.now().plusSeconds(1800)
+        )
+        val secureStore = mockk<SecureSessionStore>(relaxed = true) {
+            every { read() } returnsMany listOf(null, session)
+        }
+        val repository = MygesSessionRepository(secureStore)
+
+        val failure = runCatching { repository.unlockWithBiometrics() }.exceptionOrNull()
+
+        assertEquals(AppError.Unauthorized, (failure as AppException).error)
+        assertEquals(null, repository.session.first())
+        verify { secureStore.clear() }
+    }
+
+    @Test
+    fun invalidateSessionClearsSession() = runTest {
+        val session = Session(
+            username = "user",
+            accessToken = "token",
+            refreshToken = null,
+            expiresAt = Instant.now().plusSeconds(3600),
+            biometricEnabled = false,
+            issuedAt = Instant.now(),
+            refreshAfter = Instant.now().plusSeconds(1800)
+        )
+        val secureStore = mockk<SecureSessionStore>(relaxed = true) {
+            every { read() } returns session
+        }
+        val repository = MygesSessionRepository(secureStore)
+
+        repository.invalidateSession()
+
+        assertEquals(null, repository.currentSession())
+        assertEquals(null, repository.session.first())
+        assertFalse(repository.hasLockedBiometricSession.first())
+        verify { secureStore.clear() }
+    }
+
+    @Test
+    fun readFailureClearsStoreAndInitializesEmpty() = runTest {
+        val secureStore = mockk<SecureSessionStore> {
+            every { read() } throws IllegalStateException("disk")
+            every { clear() } returns Unit
+        }
+        val repository = MygesSessionRepository(secureStore)
+
+        assertEquals(null, repository.session.first())
+        verify { secureStore.clear() }
     }
 
     @Test

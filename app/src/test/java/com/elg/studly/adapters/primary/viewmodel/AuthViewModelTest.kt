@@ -76,6 +76,88 @@ class AuthViewModelTest {
         assertEquals(true, notificationScheduler.syncScheduled)
         assertFalse(viewModel.state.value.loading)
         assertEquals(null, viewModel.state.value.error)
+        assertEquals("https://authentication.example/oauth", viewModel.state.value.authorizationUrl)
+        stateCollection.cancel()
+    }
+
+    @Test
+    fun completeOAuthCallbackReadsQueryParameters() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository()
+        val viewModel = authViewModel(sessionRepository)
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(queryOauthUri("access_token" to "token-1", "token_type" to "Bearer"))
+        advanceUntilIdle()
+
+        assertEquals("bearer token-1", sessionRepository.accessToken)
+        assertEquals(null, sessionRepository.expiresAt)
+        stateCollection.cancel()
+    }
+
+    @Test
+    fun completeOAuthCallbackKeepsTokenWithWhitespaceOrBlankType() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository()
+        val viewModel = authViewModel(sessionRepository)
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token=already%20typed&token_type="))
+        advanceUntilIdle()
+
+        assertEquals("already typed", sessionRepository.accessToken)
+        stateCollection.cancel()
+    }
+
+    @Test
+    fun completeOAuthCallbackKeepsTokenWithoutType() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository()
+        val viewModel = authViewModel(sessionRepository)
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token=token-1"))
+        advanceUntilIdle()
+
+        assertEquals("token-1", sessionRepository.accessToken)
+        stateCollection.cancel()
+    }
+
+    @Test
+    fun completeOAuthCallbackWithInvalidExpiresInStoresNoExpiry() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository()
+        val viewModel = authViewModel(sessionRepository)
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token=token-1&expires_in=soon"))
+        advanceUntilIdle()
+
+        assertEquals(null, sessionRepository.expiresAt)
+        stateCollection.cancel()
+    }
+
+    @Test
+    fun completeOAuthCallbackFailureIsExposedAsUiError() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository().apply {
+            authenticateFailure = AppException(AppError.Unauthorized)
+        }
+        val viewModel = authViewModel(sessionRepository)
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token=token-1"))
+        advanceUntilIdle()
+
+        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        assertFalse(viewModel.state.value.loading)
+        stateCollection.cancel()
+    }
+
+    @Test
+    fun completeOAuthCallbackWithoutFragmentExposesUnauthorizedError() = runTest(dispatcher) {
+        val viewModel = authViewModel()
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(oauthUri(null))
+        advanceUntilIdle()
+
+        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
         stateCollection.cancel()
     }
 
@@ -85,6 +167,30 @@ class AuthViewModelTest {
         val stateCollection = collectState(viewModel)
 
         viewModel.completeOAuthCallback(oauthUri("error=access_denied"))
+        advanceUntilIdle()
+
+        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        stateCollection.cancel()
+    }
+
+    @Test
+    fun completeOAuthCallbackWithBlankAccessTokenExposesUnauthorizedError() = runTest(dispatcher) {
+        val viewModel = authViewModel()
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(queryOauthUri("access_token" to ""))
+        advanceUntilIdle()
+
+        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        stateCollection.cancel()
+    }
+
+    @Test
+    fun completeOAuthCallbackReadsEmptyFragmentParameter() = runTest(dispatcher) {
+        val viewModel = authViewModel()
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token"))
         advanceUntilIdle()
 
         assertEquals(AppError.Unauthorized, viewModel.state.value.error)
@@ -151,10 +257,18 @@ class AuthViewModelTest {
         )
     }
 
-    private fun oauthUri(fragment: String): Uri {
+    private fun oauthUri(fragment: String?): Uri {
         return mockk {
             every { getQueryParameter(any()) } returns null
             every { encodedFragment } returns fragment
+        }
+    }
+
+    private fun queryOauthUri(vararg parameters: Pair<String, String>): Uri {
+        val values = parameters.toMap()
+        return mockk {
+            every { getQueryParameter(any()) } answers { values[firstArg()] }
+            every { encodedFragment } returns null
         }
     }
 }
@@ -164,6 +278,7 @@ private class AuthRecordingSessionRepository : SessionRepository {
     var expiresAt: Instant? = null
     var enableBiometric = false
     var unlockCount = 0
+    var authenticateFailure: Throwable? = null
     var unlockFailure: Throwable? = null
     override val session: Flow<Session?> = MutableStateFlow(null)
     val lockedBiometricSession = MutableStateFlow(false)
@@ -173,6 +288,7 @@ private class AuthRecordingSessionRepository : SessionRepository {
     override fun invalidateSession() = Unit
 
     override suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) {
+        authenticateFailure?.let { throw it }
         this.accessToken = accessToken
         this.expiresAt = expiresAt
         this.enableBiometric = enableBiometric
@@ -229,6 +345,7 @@ private class AuthStubSettingsRepository : SettingsRepository {
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
     override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
+    override suspend fun setAgendaColorMode(mode: com.elg.studly.domain.model.AgendaColorMode) = Unit
     override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
     override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
     override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit

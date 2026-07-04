@@ -446,6 +446,30 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         changeGroupMembership(projectId, groupId, join = false) { api.leaveGroup(courseId, projectId, groupId) }
     }
 
+    override suspend fun subscribeEvent(eventId: String) = changeEventSubscription(eventId, subscribed = true) {
+        api.subscribeEvent(eventId)
+    }
+
+    override suspend fun unsubscribeEvent(eventId: String) = changeEventSubscription(eventId, subscribed = false) {
+        api.unsubscribeEvent(eventId)
+    }
+
+    private suspend fun changeEventSubscription(
+        eventId: String,
+        subscribed: Boolean,
+        action: suspend () -> Response<ResponseBody>
+    ) {
+        withContext(Dispatchers.IO) {
+            val response = try {
+                action()
+            } catch (throwable: Throwable) {
+                throw throwable.toRepositoryException()
+            }
+            if (!response.isSuccessful) throw HttpException(response).toRepositoryException()
+            runCatching { dao.updateEventSubscribed(eventId, subscribed) }
+        }
+    }
+
     override suspend fun projectMessages(groupId: String) = withContext(Dispatchers.IO) {
         try {
             api.projectGroupMessages(groupId)?.toProjectMessages(dao.profile()?.id).orEmpty()
@@ -507,7 +531,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         }
     }
 
-    private fun AcademicDocument.normalizedDownloadUrl(): String {
+    internal fun AcademicDocument.normalizedDownloadUrl(): String {
         val url = downloadUrl ?: return "me/annualDocuments/$id"
         
         
@@ -520,7 +544,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return url
     }
 
-    private fun Throwable.toRepositoryException(): AppException {
+    internal fun Throwable.toRepositoryException(): AppException {
         return when (this) {
             is AppException -> this
             is HttpException -> if (code() == 401 || code() == 403) {
@@ -545,16 +569,16 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         }
     }
 
-    private fun String.sanitizedFileName(): String {
+    internal fun String.sanitizedFileName(): String {
         return replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "document" }
     }
 
-    private fun String.withExtension(contentType: MediaType?): String {
+    internal fun String.withExtension(contentType: MediaType?): String {
         if (substringAfterLast('.', missingDelimiterValue = "").isNotBlank()) return this
         return contentType?.toFileExtension()?.let { "$this.$it" } ?: this
     }
 
-    private fun MediaType.toFileExtension(): String? {
+    internal fun MediaType.toFileExtension(): String? {
         return when (toString().substringBefore(';').trim().lowercase()) {
             "application/pdf" -> "pdf"
             "application/zip" -> "zip"
@@ -575,7 +599,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         }
     }
 
-    private fun String.contentDispositionFileName(): String? {
+    internal fun String.contentDispositionFileName(): String? {
         return split(';')
             .map { it.trim() }
             .firstNotNullOfOrNull { part ->
@@ -651,7 +675,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         )
     }
 
-    private fun List<Project>.withNextProjectSteps(nextProjectStepProjects: List<Project>): List<Project> {
+    internal fun List<Project>.withNextProjectSteps(nextProjectStepProjects: List<Project>): List<Project> {
         if (nextProjectStepProjects.isEmpty()) return this
         val upcomingByProjectId = nextProjectStepProjects.associateBy { it.id }
         val mergedProjects = map { project ->
@@ -690,7 +714,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             }
     }
 
-    private fun syllabusDocuments(courses: List<Course>): List<AcademicDocument> {
+    internal fun syllabusDocuments(courses: List<Course>): List<AcademicDocument> {
         return courses.mapNotNull { course ->
             val syllabus = course.syllabus?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             AcademicDocument(
@@ -723,7 +747,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return (teachers + students + classStudents).distinctBy { it.id }
     }
 
-    private fun List<Project>.mergeProjects(): List<Project> {
+    internal fun List<Project>.mergeProjects(): List<Project> {
         return groupBy { it.id }.values.map { projects ->
             projects.reduce { current, next ->
                 current.copy(
@@ -745,7 +769,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
     }
 
     
-    private fun mergeGroups(a: List<ProjectGroup>, b: List<ProjectGroup>): List<ProjectGroup> {
+    internal fun mergeGroups(a: List<ProjectGroup>, b: List<ProjectGroup>): List<ProjectGroup> {
         return (a + b).groupBy { it.id }.values.map { duplicates ->
             duplicates.reduce { current, next ->
                 current.copy(

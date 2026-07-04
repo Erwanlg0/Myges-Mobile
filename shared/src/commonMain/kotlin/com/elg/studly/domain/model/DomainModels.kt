@@ -208,6 +208,11 @@ enum class ThemeMode {
     Dark
 }
 
+enum class AgendaColorMode {
+    Course,
+    Location
+}
+
 data class UserSettings(
     val languageTag: String?,
     val notifications: NotificationPreferences,
@@ -215,6 +220,7 @@ data class UserSettings(
     val biometricEnabled: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColorEnabled: Boolean = false,
+    val agendaColorMode: AgendaColorMode = AgendaColorMode.Course,
     val refreshIntervals: RefreshIntervals = RefreshIntervals(),
     
     val classReminderLeadMinutes: Int = NO_REMINDER_MINUTES,

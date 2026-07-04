@@ -26,7 +26,9 @@ import com.elg.studly.application.usecase.ObserveProjectsUseCase
 import com.elg.studly.application.usecase.ProjectMessagesUseCase
 import com.elg.studly.application.usecase.RefreshStudentDataUseCase
 import com.elg.studly.application.usecase.SendProjectMessageUseCase
+import com.elg.studly.application.usecase.SubscribeEventUseCase
 import com.elg.studly.application.usecase.SyncAgendaToCalendarUseCase
+import com.elg.studly.application.usecase.UnsubscribeEventUseCase
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
 import com.elg.studly.domain.model.AgendaEvent
@@ -232,6 +234,8 @@ class StudentViewModelNetworkRecoveryTest {
             DownloadDocumentUseCase(repository),
             JoinGroupUseCase(repository),
             LeaveGroupUseCase(repository),
+            SubscribeEventUseCase(repository),
+            UnsubscribeEventUseCase(repository),
             ProjectMessagesUseCase(repository),
             SendProjectMessageUseCase(repository),
             LogoutUseCase(sessionRepository, notificationScheduler),
@@ -283,6 +287,8 @@ private class FakeStudentDataRepository : StudentDataRepository {
     }
     override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {}
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
+    override suspend fun subscribeEvent(eventId: String) {}
+    override suspend fun unsubscribeEvent(eventId: String) {}
 }
 
 private class FakeSettingsRepository : SettingsRepository {
@@ -311,6 +317,7 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setDocumentNotificationsEnabled(enabled: Boolean) = Unit
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) = Unit
     override suspend fun setDynamicColorEnabled(enabled: Boolean) = Unit
+    override suspend fun setAgendaColorMode(mode: com.elg.studly.domain.model.AgendaColorMode) = Unit
     override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) = Unit
     override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
     override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit

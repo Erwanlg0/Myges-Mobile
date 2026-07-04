@@ -788,4 +788,348 @@ class JsonParsingTest {
         assertEquals("Microsoft Campus", news.first().title)
         assertEquals("Offres campus", news.first().body)
     }
+
+    @Test
+    fun classIdsParseIdsAndSelfLinks() {
+        val classIds = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                { "puid": "class-1" },
+                { "links": [{ "rel": "self", "href": "https://example.com/classes/class-2" }] },
+                { "id": "class-1" }
+              ]
+            }
+            """.trimIndent()
+        ).toClassIds()
+
+        assertEquals(listOf("class-1", "class-2"), classIds)
+    }
+
+    @Test
+    fun eventsParseHtmlDescriptionAndSubscriptionDates() {
+        val events = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "event_id": 42,
+                  "event_title": "Forum",
+                  "event_type": "career",
+                  "location": "Paris",
+                  "organizer": "School",
+                  "description": "<p>Hello&nbsp;world</p>",
+                  "event_date": 1781222400000,
+                  "start_subscription_date": 1781136000000,
+                  "end_subscription_date": 1781308800000,
+                  "is_participant_subscribed": "yes",
+                  "links": [{ "href": "https://example.com/events/42" }]
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toEvents()
+
+        assertEquals("42", events.first().id)
+        assertEquals("Hello world", events.first().description)
+        assertEquals(true, events.first().subscribed)
+        assertEquals("https://example.com/events/42", events.first().detailUrl)
+    }
+
+    @Test
+    fun projectMessagesParseAuthorFallbackAndMineFlag() {
+        val messages = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "pm_id": 12,
+                  "u_id": "me",
+                  "firstname": "Alice",
+                  "name": "Martin",
+                  "message": "Bonjour",
+                  "date": 1781222400000
+                },
+                {
+                  "pm_id": 13
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toProjectMessages(currentUserId = "me")
+
+        assertEquals(1, messages.size)
+        assertEquals("Alice Martin", messages.first().author)
+        assertEquals(true, messages.first().mine)
+        assertEquals(Instant.ofEpochMilli(1781222400000), messages.first().sentAt)
+    }
+
+    @Test
+    fun parsersHandleFallbackFieldsAndEmptyPayloads() {
+        val profile = json.parseToJsonElement("{}").toProfile()
+        assertEquals("profile", profile.id)
+        assertEquals("profile", profile.displayName)
+
+        val years = json.parseToJsonElement("[\"\", 2026, {}]").toYears()
+        assertEquals(listOf("2026"), years)
+
+        val agenda = json.parseToJsonElement(
+            """
+            {"items":[
+              {"start":1781222400000,"rooms":["broken"],"campus":"Remote campus"},
+              {"start":1781222400000,"modality":"NATION1"}
+            ]}
+            """.trimIndent()
+        ).toAgendaEvents()
+        assertEquals(2, agenda.size)
+        assertEquals("Remote campus", agenda.first().address)
+        assertEquals("242 rue du Faubourg Saint Antoine, 75012 Paris", agenda.last().address)
+        assertEquals(3600, agenda.first().endsAt.epochSecond - agenda.first().startsAt.epochSecond)
+
+        val absences = json.parseToJsonElement(
+            """{"items":[{"date":"2026-04-01","semester":"x","justified":"yes"},{"id":"missing"}]}"""
+        ).toAbsences()
+        assertEquals(1, absences.size)
+        assertEquals(true, absences.first().justified)
+        assertEquals("2025-2026 - Semestre 2", absences.first().period)
+
+        val courses = json.parseToJsonElement(
+            """{"items":[{"id":"files","files":[{}]},{"id":"count","file_count":2},{"id":"flag","has_documents":true}]}"""
+        ).toCourses()
+        assertEquals(listOf(1, 2, 1), courses.map { it.fileCount })
+        assertEquals(null, json.parseToJsonElement("{}").toCourseSyllabus())
+    }
+
+    @Test
+    fun parsersHandleGroupsDocumentsDirectoryAndContentFallbacks() {
+        val projects = json.parseToJsonElement(
+            """
+            {"items":[{
+              "id":"project","year":"2026","project_group_logs":[{"user_id":"me","pgr_id":"group"}],
+              "groups":[{"id":"group","students":[{"firstname":"Ada","name":"Lovelace"}]}],
+              "steps":[{"id":"step","psp_limit_date":"2026-06-12","files":[{}]}]
+            }]}
+            """.trimIndent()
+        ).toProjects("me")
+        assertEquals(true, projects.first().groups.single().isMine)
+        assertEquals("Ada Lovelace", projects.first().groups.single().students.single())
+        assertEquals(1, projects.first().fileCount)
+        assertTrue(json.parseToJsonElement("[]").toProjects().isEmpty())
+        assertTrue(json.parseToJsonElement("[{\"name\":\"step\"}]").toNextProjectStepProjects().isEmpty())
+
+        val practical = json.parseToJsonElement(
+            """{"items":[{"id":"practical","project_files":[{"id":"project-file","psf_file_type":"text/plain"}],"steps":[{"files":[{"id":"step-file","group_id":"group"}]}]}]}"""
+        )
+        assertEquals(2, practical.toPracticalDocuments("2026").size)
+        assertEquals(1, practical.toPracticals(fallbackYear = "2026").size)
+
+        val documents = json.parseToJsonElement(
+            """{"annualDocuments":[{"id":"annual","filename":"annual","extension":"pdf"}],"documents":[{"id":"document","filename":"document","extension":"application/zip"}]}"""
+        ).toDocuments("2026")
+        assertEquals(listOf("annual.pdf", "document.zip"), documents.map { it.fileName })
+
+        val person = json.parseToJsonElement(
+            """{"students":[{"student_id":"student","firstname":"Ada","name":"Lovelace","_links":{"photo":{"href":"photo"}}}]}"""
+        ).toDirectoryPeople(com.elg.studly.domain.model.DirectoryRole.Student, "2026").single()
+        assertEquals("Ada Lovelace", person.displayName)
+        assertEquals("photo", person.avatarUrl)
+    }
+
+    @Test
+    fun parsersHandleNewsEventsMessagesAndDateFormats() {
+        val news = json.parseToJsonElement(
+            """{"items":[{"id":"html","title":"News","content":"<p>One<br>Two &amp; &#33;</p>","photo":"default-logo.png"},{"id":"fallback","corporate_name":"Company","location":"Paris","offers":[{"offer":"Job"}]}]}"""
+        ).toNews()
+        assertEquals("One\nTwo & !", news.first().body)
+        assertEquals(null, news.first().imageUrl)
+        assertEquals("Company - Paris - Job", news.last().body)
+
+        val event = json.parseToJsonElement(
+            """{"items":[{"id":"event","description":"Plain","is_participant_subscribed":"no","event_date":"12/06/2026 12:30"}]}"""
+        ).toEvents().single()
+        assertEquals("Plain", event.description)
+        assertEquals(false, event.subscribed)
+        assertTrue(event.date != null)
+
+        val messages = json.parseToJsonElement(
+            """{"items":[{"id":"message","uid":"me","content":"Body","created_at":"2026-06-12"},{"id":"missing"},"invalid"]}"""
+        ).toProjectMessages("me")
+        assertEquals(1, messages.size)
+        assertEquals("me", messages.single().author)
+        assertEquals(true, messages.single().mine)
+    }
+
+    @Test
+    fun documentAndDateVariantsUseSupportedMappings() {
+        val extensions = listOf("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip", "txt", "md", "csv", "html", "png", "jpg", "gif")
+        val documents = json.parseToJsonElement(
+            """{"items":[${extensions.joinToString { "{\"id\":\"$it\",\"filename\":\"$it\",\"extension\":\"$it\"}" }}]}"""
+        ).toDocuments()
+        assertEquals(extensions.size, documents.size)
+        assertEquals("application/pdf", documents.first().mimeType)
+        assertEquals("image/gif", documents.last().mimeType)
+
+        val contentTypes = listOf(
+            "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/zip", "text/plain", "text/markdown", "text/csv", "text/html", "image/png", "image/jpeg", "image/gif"
+        )
+        val projectDocuments = json.parseToJsonElement(
+            """{"items":[{"id":"project","project_files":[${contentTypes.joinToString { "{\"id\":\"${it.substringAfter('/')}\",\"psf_file_type\":\"$it\"}" }}]}]}"""
+        ).toProjectDocuments()
+        assertEquals(listOf("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip", "txt", "md", "csv", "html", "png", "jpg", "gif"), projectDocuments.map { it.fileName.substringAfterLast('.') })
+
+        val dates = listOf("12/06/2026 12h30", "12/06/2026 12:30", "12/06/2026", "2026-06-12T12:30:00+02:00")
+        val events = json.parseToJsonElement(
+            """{"items":[${dates.joinToString { "{\"id\":\"$it\",\"event_date\":\"$it\"}" }}]}"""
+        ).toEvents()
+        assertTrue(events.all { it.date != null })
+    }
+
+    @Test
+    fun practicalGroupsAndMissingOptionalValuesUseFallbacks() {
+        val practical = json.parseToJsonElement(
+            """
+            {"items":[{
+              "project_id":"practical","project_group_logs":[{"uid":"me","group_id":"group"}],
+              "groups":[{"group_id":"group","group_name":"Team","students":[{"uid":"me"},{"email":"student@example.com"}]}],
+              "steps":[{"psp_id":"step","psp_desc":"Step","psp_limit_date":"2026-06-12"}]
+            }]}
+            """.trimIndent()
+        ).toPracticals("me", "2026").single()
+        assertEquals("2026", practical.year)
+        assertEquals(true, practical.groups.single().isMine)
+        assertEquals(listOf("student@example.com"), practical.groups.single().students)
+        assertEquals("step", practical.steps.single().id)
+
+        val event = json.parseToJsonElement("""{"items":[{}]}""").toEvents().single()
+        assertEquals("", event.title)
+        assertEquals(false, event.subscribed)
+        assertEquals(null, event.description)
+    }
+
+    @Test
+    fun gradesHandleMixedComponentsAndPeriodFallbacks() {
+        val grades = json.parseToJsonElement(
+            """
+            {"items":[{
+              "rc_id":"course","course":"Course","grades":[{"value":"12,5","date":"12/06/2026"},null,"broken"],
+              "exam":14,"date_exam":"2026-06-13","average":0,"coef":"n.c.","period":"Semestre 1"
+            }]}
+            """.trimIndent()
+        ).toGrades("2025")
+        assertEquals(3, grades.size)
+        assertEquals(12.5, grades[1].value ?: 0.0, 0.0)
+        assertEquals(14.0, grades.last().value ?: 0.0, 0.0)
+        assertEquals("2025-2026 - Semestre 1", grades.first().period)
+    }
+
+    @Test
+    fun htmlTextKeepsInvalidEntitiesAndNormalizesWhitespace() {
+        assertEquals("A\nB & &#xZZ; &#999999999999; &unknown;", "<p>A</p><div>B&nbsp;&amp; &#xZZ; &#999999999999; &unknown;</div>".htmlToPlainText())
+    }
+
+    @Test
+    fun helperAliasesAndInstantFormatsAreCovered() {
+        val news = json.parseToJsonElement(
+            """{"items":[
+              {"id":"n1","title":"T","summary":"S","begin_date":1781222400},
+              {"id":"n2","title":"T2","summary":"S2","picture":"avatar-default.png"}
+            ]}"""
+        ).toNews()
+        assertEquals(Instant.ofEpochSecond(1781222400), news.first().publishedAt)
+        assertEquals(null, news[1].imageUrl)
+
+        val grades = json.parseToJsonElement(
+            """{"items":[{"id":"g","course":{"name":"Algo"},"average":13.5,"period":"S1"}]}"""
+        ).toGrades("2025")
+        assertEquals("Algo", grades.first().courseName)
+        assertEquals(13.5, grades.first().value ?: 0.0, 0.0)
+        assertEquals("2025-2026 - S1", grades.first().period)
+
+        val absence = json.parseToJsonElement(
+            """{"items":[{"id":"a","date":1781222400000,"course_name":"C","justified":"1"}]}"""
+        ).toAbsences().single()
+        assertEquals(true, absence.justified)
+    }
+
+    @Test
+    fun groupMembershipViaStudentsAndLinkFallbacks() {
+        val projects = json.parseToJsonElement(
+            """{"items":[{"id":"p","groups":[{"id":"g","group_name":"Team","project_group_students":[{"student_id":"me"}]}]}]}"""
+        ).toProjects("me")
+        assertEquals(true, projects.first().groups.single().isMine)
+
+        val person = json.parseToJsonElement(
+            """{"teachers":[{"teacher_id":"t","firstname":"A","name":"B","links":[{"rel":"photo","href":"pic"}]}]}"""
+        ).toDirectoryPeople(com.elg.studly.domain.model.DirectoryRole.Teacher, "2026").single()
+        assertEquals("pic", person.avatarUrl)
+        assertEquals("A B", person.displayName)
+
+        val document = json.parseToJsonElement(
+            """{"items":[{"id":"d","filename":"report.pdf","extension":"pdf"}]}"""
+        ).toDocuments().single()
+        assertEquals("report.pdf", document.fileName)
+    }
+
+    @Test
+    fun agendaUsesDisciplineFallbacksAndUnknownCampusDefaults() {
+        val event = json.parseToJsonElement(
+            """{"items":[{"start":"2026-06-12T08:00:00Z","discipline":{"name":"Algorithms","teacher":"Teacher","rc_id":"course"},"rooms":[{"campus":"DISTANTIEL"}]}]}"""
+        ).toAgendaEvents().single()
+        assertEquals("Algorithms", event.title)
+        assertEquals("Teacher", event.teacher)
+        assertEquals("course", event.courseId)
+        assertEquals(null, event.address)
+        assertEquals("11", event.colorId)
+    }
+
+    @Test
+    fun projectDocumentsParseTopLevelDeliverables() {
+        val documents = json.parseToJsonElement(
+            """{"result":[{"project_id":42,"deliverables":[{"pf_id":7,"pf_title":"rendu.zip","psf_file_type":"application/zip"}]}]}"""
+        ).toProjectDocuments()
+        assertEquals(1, documents.size)
+        assertEquals("7", documents.first().id)
+        assertEquals("me/projectFiles/7", documents.first().downloadUrl)
+        assertEquals(null, documents.first().groupId)
+    }
+
+    private fun parseStart(raw: String): Instant? =
+        json.parseToJsonElement("""{"items":[{"start":$raw}]}""")
+            .toAgendaEvents().single().startsAt
+
+    @Test
+    fun parseInstantSupportsEveryDateFormat() {
+        val zone = java.time.ZoneId.systemDefault()
+
+        assertEquals(Instant.ofEpochSecond(1700000000L), parseStart("\"1700000000\""))
+        assertEquals(Instant.ofEpochMilli(1700000000000L), parseStart("\"1700000000000\""))
+        assertEquals(Instant.ofEpochSecond(1700000000L), parseStart("1700000000"))
+        assertEquals(Instant.ofEpochMilli(1700000000000L), parseStart("1700000000000"))
+
+        assertEquals(
+            java.time.LocalDateTime.parse("12/06/2026 08h30", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH'h'mm")).atZone(zone).toInstant(),
+            parseStart("\"12/06/2026 08h30\"")
+        )
+        assertEquals(
+            java.time.LocalDateTime.parse("12/06/2026 08:30", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")).atZone(zone).toInstant(),
+            parseStart("\"12/06/2026 08:30\"")
+        )
+        assertEquals(
+            java.time.LocalDate.parse("12/06/2026", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")).atStartOfDay(zone).toInstant(),
+            parseStart("\"12/06/2026\"")
+        )
+
+        assertEquals(Instant.parse("2026-06-12T08:00:00Z"), parseStart("\"2026-06-12T08:00:00Z\""))
+        assertEquals(Instant.parse("2026-06-12T08:00:00Z"), parseStart("\"  2026-06-12T08:00:00Z  \""))
+        assertEquals(
+            java.time.LocalDate.parse("2026-06-12").atStartOfDay().toInstant(java.time.ZoneOffset.UTC),
+            parseStart("\"2026-06-12\"")
+        )
+
+        assertTrue(json.parseToJsonElement("""{"items":[{"start":"not-a-date"}]}""").toAgendaEvents().isEmpty())
+        assertTrue(json.parseToJsonElement("""{"items":[{"start":null}]}""").toAgendaEvents().isEmpty())
+    }
 }

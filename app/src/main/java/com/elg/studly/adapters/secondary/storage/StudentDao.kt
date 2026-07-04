@@ -105,6 +105,9 @@ abstract class StudentDao {
     @Query("SELECT * FROM events")
     abstract suspend fun events(): List<StudentEventEntity>
 
+    @Query("UPDATE events SET subscribed = :subscribed WHERE id = :eventId")
+    abstract suspend fun updateEventSubscribed(eventId: String, subscribed: Boolean)
+
     @Upsert
     abstract suspend fun upsertProfile(profile: StudentProfileEntity)
 

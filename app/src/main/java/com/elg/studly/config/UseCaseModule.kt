@@ -30,8 +30,10 @@ import com.elg.studly.application.usecase.ProjectMessagesUseCase
 import com.elg.studly.application.usecase.RefreshStudentDataUseCase
 import com.elg.studly.application.usecase.RescheduleSyncUseCase
 import com.elg.studly.application.usecase.SendProjectMessageUseCase
+import com.elg.studly.application.usecase.SubscribeEventUseCase
 import com.elg.studly.application.usecase.SyncAgendaToCalendarUseCase
 import com.elg.studly.application.usecase.UnlockWithBiometricsUseCase
+import com.elg.studly.application.usecase.UnsubscribeEventUseCase
 import com.elg.studly.application.usecase.UpdateSettingsUseCase
 import dagger.Module
 import dagger.Provides
@@ -136,6 +138,14 @@ object UseCaseModule {
     @Provides
     fun provideLeaveGroupUseCase(repository: StudentDataRepository): LeaveGroupUseCase =
         LeaveGroupUseCase(repository)
+
+    @Provides
+    fun provideSubscribeEventUseCase(repository: StudentDataRepository): SubscribeEventUseCase =
+        SubscribeEventUseCase(repository)
+
+    @Provides
+    fun provideUnsubscribeEventUseCase(repository: StudentDataRepository): UnsubscribeEventUseCase =
+        UnsubscribeEventUseCase(repository)
 
     @Provides
     fun provideProjectMessagesUseCase(repository: StudentDataRepository): ProjectMessagesUseCase =

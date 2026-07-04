@@ -27,4 +27,22 @@ class DownloadDocumentUseCaseTest {
         assertEquals(expectedUri, result)
         coVerify { repository.downloadDocument(document, onProgress) }
     }
+
+    @Test
+    fun delegatesToRepositoryWithDefaultProgress() = runTest {
+        val repository = mockk<StudentDataRepository>()
+        val document = mockk<AcademicDocument>()
+        val expectedUri = mockk<Uri>()
+
+        coEvery { repository.downloadDocument(document, any()) } coAnswers {
+            secondArg<(Float?) -> Unit>().invoke(null)
+            expectedUri
+        }
+
+        val useCase = DownloadDocumentUseCase(repository)
+        val result = useCase(document)
+
+        assertEquals(expectedUri, result)
+        coVerify { repository.downloadDocument(document, any()) }
+    }
 }

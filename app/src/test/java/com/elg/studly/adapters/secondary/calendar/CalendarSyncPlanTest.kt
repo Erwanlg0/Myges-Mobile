@@ -50,12 +50,50 @@ class CalendarSyncPlanTest {
         assertEquals(listOf(current), plan.deletes)
     }
 
+    @Test
+    fun untaggedOrphanMatchedBySignatureIsReusedNotDuplicated() {
+        val orphan = calendarRow("", title = "Math", rowId = 7L).copy(description = "Salle : A101")
+        val desired = desiredEvent("course-1", title = "Math")
+
+        val plan = calendarSyncPlan(listOf(orphan), listOf(desired))
+
+        assertEquals(emptyList<DesiredCalendarEvent>(), plan.inserts)
+        assertEquals(listOf(CalendarEventUpdate(orphan, desired)), plan.updates)
+        assertEquals(emptyList<CalendarEventRow>(), plan.deletes)
+    }
+
+    @Test
+    fun stackedDuplicatesCollapseToOneKeepingExtrasDeleted() {
+        val first = calendarRow("course-1", title = "Math", rowId = 1L)
+        val dupeTagged = calendarRow("course-1", title = "Math", rowId = 2L)
+        val dupeOrphan = calendarRow("", title = "Math", rowId = 3L)
+        val desired = desiredEvent("course-1", title = "Math")
+
+        val plan = calendarSyncPlan(listOf(first, dupeTagged, dupeOrphan), listOf(desired))
+
+        assertEquals(emptyList<DesiredCalendarEvent>(), plan.inserts)
+        assertEquals(emptyList<CalendarEventUpdate>(), plan.updates)
+        assertEquals(listOf(dupeTagged, dupeOrphan), plan.deletes)
+    }
+
+    @Test
+    fun untaggedUserEventIsLeftUntouched() {
+        val userEvent = calendarRow("", title = "Dentist", rowId = 9L)
+
+        val plan = calendarSyncPlan(listOf(userEvent), emptyList())
+
+        assertEquals(emptyList<DesiredCalendarEvent>(), plan.inserts)
+        assertEquals(emptyList<CalendarEventUpdate>(), plan.updates)
+        assertEquals(emptyList<CalendarEventRow>(), plan.deletes)
+    }
+
     private fun calendarRow(
         id: String,
-        title: String = "Course"
+        title: String = "Course",
+        rowId: Long = 42L
     ): CalendarEventRow {
         return CalendarEventRow(
-            rowId = 42L,
+            rowId = rowId,
             externalId = id,
             calendarId = 1L,
             title = title,

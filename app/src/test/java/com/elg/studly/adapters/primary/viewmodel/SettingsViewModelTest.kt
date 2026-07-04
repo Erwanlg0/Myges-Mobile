@@ -76,6 +76,7 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertEquals("en", settingsRepository.languageTag)
+        assertEquals(settingsRepository.settings.value, viewModel.state.value.settings)
         assertFalse(viewModel.state.value.loading)
         assertEquals(null, viewModel.state.value.error)
         stateCollection.cancel()
@@ -138,10 +139,12 @@ class SettingsViewModelTest {
 
         viewModel.setThemeMode(com.elg.studly.domain.model.ThemeMode.Dark)
         viewModel.setDynamicColor(true)
+        viewModel.setAgendaColorMode(com.elg.studly.domain.model.AgendaColorMode.Location)
         advanceUntilIdle()
 
         assertEquals(com.elg.studly.domain.model.ThemeMode.Dark, settingsRepository.themeMode)
         assertEquals(true, settingsRepository.dynamicColorEnabled)
+        assertEquals(com.elg.studly.domain.model.AgendaColorMode.Location, settingsRepository.agendaColorMode)
     }
 
     @Test
@@ -153,8 +156,36 @@ class SettingsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(30, settingsRepository.refreshIntervals[SyncFeature.Grades])
+        assertEquals(listOf("scheduleStudentSync"), settingsRepository.events)
     }
 
+    @Test
+    fun reminderLeadUpdatesSettingsRepository() = runTest(dispatcher) {
+        val settingsRepository = RecordingSettingsRepository()
+        val viewModel = settingsViewModel(settingsRepository = settingsRepository)
+
+        viewModel.setClassReminderLead(15)
+        viewModel.setDeadlineReminderLead(60)
+        advanceUntilIdle()
+
+        assertEquals(15, settingsRepository.classReminderLeadMinutes)
+        assertEquals(60, settingsRepository.deadlineReminderLeadMinutes)
+    }
+
+    @Test
+    fun loadAndSelectCalendarsDelegateToPort() = runTest(dispatcher) {
+        val calendarSyncPort = RecordingCalendarSyncPort()
+        val viewModel = settingsViewModel(calendarSyncPort = calendarSyncPort)
+
+        viewModel.loadCalendars()
+        advanceUntilIdle()
+        viewModel.selectCalendar(2L)
+        advanceUntilIdle()
+
+        assertEquals(listOf(CalendarAccount(1L, "Primary", "account")), viewModel.calendars.value)
+        assertEquals(2L, viewModel.selectedCalendarId.value)
+        assertEquals(2L, calendarSyncPort.selected)
+    }
 
 
     @Test
@@ -211,28 +242,33 @@ class SettingsViewModelTest {
         settingsRepository: RecordingSettingsRepository = RecordingSettingsRepository(),
         studentDataRepository: RecordingStudentDataRepository = RecordingStudentDataRepository(mutableListOf()),
         sessionRepository: RecordingSessionRepository = RecordingSessionRepository(mutableListOf()),
-        notificationScheduler: RecordingNotificationScheduler = RecordingNotificationScheduler(mutableListOf())
+        notificationScheduler: RecordingNotificationScheduler = RecordingNotificationScheduler(settingsRepository.events),
+        calendarSyncPort: CalendarSyncPort = RecordingCalendarSyncPort()
     ): SettingsViewModel {
         return SettingsViewModel(
             ObserveSettingsUseCase(settingsRepository),
             UpdateSettingsUseCase(settingsRepository, studentDataRepository, notificationScheduler),
             ClearCacheUseCase(studentDataRepository, settingsRepository),
             LogoutUseCase(sessionRepository, notificationScheduler),
-            CalendarAccountsUseCase(StubCalendarSyncPort()),
+            CalendarAccountsUseCase(calendarSyncPort),
             RescheduleSyncUseCase(settingsRepository, notificationScheduler)
         )
     }
 }
 
-private class StubCalendarSyncPort : CalendarSyncPort {
+private class RecordingCalendarSyncPort : CalendarSyncPort {
+    var selected: Long? = 1L
+
     override suspend fun sync(events: List<AgendaEvent>) = Unit
-    override suspend fun availableCalendars(): List<CalendarAccount> = emptyList()
-    override suspend fun selectedCalendarId(): Long? = null
-    override suspend fun selectCalendar(id: Long) = Unit
+    override suspend fun availableCalendars(): List<CalendarAccount> = listOf(CalendarAccount(1L, "Primary", "account"))
+    override suspend fun selectedCalendarId(): Long? = selected
+    override suspend fun selectCalendar(id: Long) {
+        selected = id
+    }
 }
 
 private class RecordingSettingsRepository(
-    private val events: MutableList<String> = mutableListOf()
+    val events: MutableList<String> = mutableListOf()
 ) : SettingsRepository {
     var failure: Throwable? = null
     var languageTag: String? = null
@@ -289,6 +325,7 @@ private class RecordingSettingsRepository(
 
 
     var themeMode: com.elg.studly.domain.model.ThemeMode? = null
+    var agendaColorMode: com.elg.studly.domain.model.AgendaColorMode? = null
     var dynamicColorEnabled: Boolean? = null
     var calendarSyncEnabled: Boolean? = null
     var biometricEnabled: Boolean? = null
@@ -296,6 +333,8 @@ private class RecordingSettingsRepository(
     var absenceNotifications: Boolean? = null
     var agendaNotifications: Boolean? = null
     var projectNotifications: Boolean? = null
+    var classReminderLeadMinutes: Int? = null
+    var deadlineReminderLeadMinutes: Int? = null
     val refreshIntervals = mutableMapOf<SyncFeature, Int>()
 
     override suspend fun setThemeMode(themeMode: com.elg.studly.domain.model.ThemeMode) {
@@ -304,11 +343,18 @@ private class RecordingSettingsRepository(
     override suspend fun setDynamicColorEnabled(enabled: Boolean) {
         this.dynamicColorEnabled = enabled
     }
+    override suspend fun setAgendaColorMode(mode: com.elg.studly.domain.model.AgendaColorMode) {
+        this.agendaColorMode = mode
+    }
     override suspend fun setRefreshInterval(feature: SyncFeature, minutes: Int) {
         refreshIntervals[feature] = minutes
     }
-    override suspend fun setClassReminderLeadMinutes(minutes: Int) = Unit
-    override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) = Unit
+    override suspend fun setClassReminderLeadMinutes(minutes: Int) {
+        classReminderLeadMinutes = minutes
+    }
+    override suspend fun setDeadlineReminderLeadMinutes(minutes: Int) {
+        deadlineReminderLeadMinutes = minutes
+    }
     override suspend fun lastFetchedAt(feature: SyncFeature): Instant? = null
     override suspend fun markFeatureFetched(feature: SyncFeature) = Unit
 
@@ -340,6 +386,8 @@ private class RecordingStudentDataRepository(
     override suspend fun downloadDocument(document: AcademicDocument, onProgress: (Float?) -> Unit): String = ""
     override suspend fun joinGroup(courseId: String, projectId: String, groupId: String) {}
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
+    override suspend fun subscribeEvent(eventId: String) {}
+    override suspend fun unsubscribeEvent(eventId: String) {}
 }
 
 private class RecordingSessionRepository(

@@ -147,6 +147,12 @@ interface MyGesApiService {
     @GET("me/events")
     suspend fun events(): JsonElement?
 
+    @POST("me/events/{eventId}/subscribe")
+    suspend fun subscribeEvent(@Path("eventId") eventId: String): Response<ResponseBody>
+
+    @DELETE("me/events/{eventId}/unsubscribe")
+    suspend fun unsubscribeEvent(@Path("eventId") eventId: String): Response<ResponseBody>
+
     @GET("me/news")
     suspend fun news(): JsonElement?
 
