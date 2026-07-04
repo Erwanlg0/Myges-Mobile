@@ -214,11 +214,11 @@ class OfflineFirstStudentDataRepositoryTest {
 
     @Test
     fun agendaWindowsAndAcademicYearCandidatesUseExpectedBounds() {
-        val day = java.time.LocalDate.of(2026, 6, 12)
+        val day = java.time.LocalDate.of(2026, 6, 12).toKotlinLocalDate()
 
         assertEquals(java.time.LocalDate.of(2023, 9, 1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli(), AgendaWindow.firstSync(day).start)
-        assertEquals(day.minusDays(1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli(), AgendaWindow.subsequentSync(day).start)
-        assertEquals(day.atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli(), AgendaWindow.fromToday(day).start)
+        assertEquals(day.toJavaLocalDate().minusDays(1).atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli(), AgendaWindow.subsequentSync(day).start)
+        assertEquals(day.toJavaLocalDate().atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toEpochMilli(), AgendaWindow.fromToday(day).start)
         assertEquals(listOf("2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019", "2018", "2017", "2016", "2026-2027", "2020-2021"), academicYearCandidates(listOf("2020-2021"), "2026-2027", 2025))
     }
 
@@ -248,7 +248,7 @@ class OfflineFirstStudentDataRepositoryTest {
     fun projectAndSyllabusHelpersMergeRemoteData() {
         val repository = repository(createTempDir(), RepositoryApi(), RepositoryDao(), RepositoryNotificationScheduler())
         val base = Project("project", "", null, null, null, null, listOf(ProjectStep("one", "One", null, null)), 1)
-        val upcoming = Project("project", "Project", "Course", "Group", "open", Instant.now(), listOf(ProjectStep("two", "Two", null, null)), 2, "2026", "course", listOf(ProjectGroup("group", "Group", listOf("Student"), true)))
+        val upcoming = Project("project", "Project", "Course", "Group", "open", kotlin.time.Clock.System.now(), listOf(ProjectStep("two", "Two", null, null)), 2, "2026", "course", listOf(ProjectGroup("group", "Group", listOf("Student"), true)))
         val added = upcoming.copy(id = "added")
 
         with(repository) {
@@ -265,7 +265,7 @@ class OfflineFirstStudentDataRepositoryTest {
     fun dueFeaturesSkipFreshFeaturesUnlessForced() = runTest {
         val api = RepositoryApi()
         val dao = RepositoryDao()
-        val settings = RepositorySettingsRepository().apply { lastFetched = Instant.now() }
+        val settings = RepositorySettingsRepository().apply { lastFetched = kotlin.time.Clock.System.now() }
         val repository = repository(createTempDir(), api, dao, RepositoryNotificationScheduler(), settings)
 
         repository.syncAll()

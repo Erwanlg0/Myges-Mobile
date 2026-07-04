@@ -861,7 +861,7 @@ class JsonParsingTest {
         assertEquals(1, messages.size)
         assertEquals("Alice Martin", messages.first().author)
         assertEquals(true, messages.first().mine)
-        assertEquals(Instant.ofEpochMilli(1781222400000), messages.first().sentAt)
+        assertEquals(Instant.fromEpochMilliseconds(1781222400000), messages.first().sentAt)
     }
 
     @Test
@@ -884,7 +884,7 @@ class JsonParsingTest {
         assertEquals(2, agenda.size)
         assertEquals("Remote campus", agenda.first().address)
         assertEquals("242 rue du Faubourg Saint Antoine, 75012 Paris", agenda.last().address)
-        assertEquals(3600, agenda.first().endsAt.epochSecond - agenda.first().startsAt.epochSecond)
+        assertEquals(3600, agenda.first().endsAt.epochSeconds - agenda.first().startsAt.epochSeconds)
 
         val absences = json.parseToJsonElement(
             """{"items":[{"date":"2026-04-01","semester":"x","justified":"yes"},{"id":"missing"}]}"""
@@ -1038,7 +1038,7 @@ class JsonParsingTest {
               {"id":"n2","title":"T2","summary":"S2","picture":"avatar-default.png"}
             ]}"""
         ).toNews()
-        assertEquals(Instant.ofEpochSecond(1781222400), news.first().publishedAt)
+        assertEquals(Instant.fromEpochSeconds(1781222400), news.first().publishedAt)
         assertEquals(null, news[1].imageUrl)
 
         val grades = json.parseToJsonElement(
@@ -1104,28 +1104,28 @@ class JsonParsingTest {
     fun parseInstantSupportsEveryDateFormat() {
         val zone = java.time.ZoneId.systemDefault()
 
-        assertEquals(Instant.ofEpochSecond(1700000000L), parseStart("\"1700000000\""))
-        assertEquals(Instant.ofEpochMilli(1700000000000L), parseStart("\"1700000000000\""))
-        assertEquals(Instant.ofEpochSecond(1700000000L), parseStart("1700000000"))
-        assertEquals(Instant.ofEpochMilli(1700000000000L), parseStart("1700000000000"))
+        assertEquals(Instant.fromEpochSeconds(1700000000L), parseStart("\"1700000000\""))
+        assertEquals(Instant.fromEpochMilliseconds(1700000000000L), parseStart("\"1700000000000\""))
+        assertEquals(Instant.fromEpochSeconds(1700000000L), parseStart("1700000000"))
+        assertEquals(Instant.fromEpochMilliseconds(1700000000000L), parseStart("1700000000000"))
 
         assertEquals(
-            java.time.LocalDateTime.parse("12/06/2026 08h30", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH'h'mm")).atZone(zone).toInstant(),
+            java.time.LocalDateTime.parse("12/06/2026 08h30", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH'h'mm")).atZone(zone).toInstant().toKotlinInstant(),
             parseStart("\"12/06/2026 08h30\"")
         )
         assertEquals(
-            java.time.LocalDateTime.parse("12/06/2026 08:30", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")).atZone(zone).toInstant(),
+            java.time.LocalDateTime.parse("12/06/2026 08:30", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")).atZone(zone).toInstant().toKotlinInstant(),
             parseStart("\"12/06/2026 08:30\"")
         )
         assertEquals(
-            java.time.LocalDate.parse("12/06/2026", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")).atStartOfDay(zone).toInstant(),
+            java.time.LocalDate.parse("12/06/2026", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")).atStartOfDay(zone).toInstant().toKotlinInstant(),
             parseStart("\"12/06/2026\"")
         )
 
         assertEquals(Instant.parse("2026-06-12T08:00:00Z"), parseStart("\"2026-06-12T08:00:00Z\""))
         assertEquals(Instant.parse("2026-06-12T08:00:00Z"), parseStart("\"  2026-06-12T08:00:00Z  \""))
         assertEquals(
-            java.time.LocalDate.parse("2026-06-12").atStartOfDay().toInstant(java.time.ZoneOffset.UTC),
+            java.time.LocalDate.parse("2026-06-12").atStartOfDay().toInstant(java.time.ZoneOffset.UTC).toKotlinInstant(),
             parseStart("\"2026-06-12\"")
         )
 

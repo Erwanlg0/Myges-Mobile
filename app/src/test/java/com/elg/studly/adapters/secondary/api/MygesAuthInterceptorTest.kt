@@ -155,7 +155,7 @@ class MygesAuthInterceptorTest {
     fun interceptorInvalidatesExpiredSession() {
         val session = sampleSession(
             token = "token",
-            expiresAt = Instant.now().minusSeconds(1)
+            expiresAt = kotlin.time.Clock.System.now().minusSeconds(1)
         )
         val sessionRepository = RecordingSessionRepository(session)
         val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)

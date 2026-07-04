@@ -48,7 +48,7 @@ class AndroidCalendarSyncAdapter @Inject constructor(
                 val timeZone = zone.id
                 val eventColorKeys = eventColorKeysForCalendar(calendarId)
                 val markerPrefix = context.getString(R.string.calendar_event_marker_prefix)
-                val weekStart = LocalDate.now(zone).with(DayOfWeek.MONDAY).atStartOfDay(zone).toInstant()
+                val weekStart = LocalDate.now(zone).with(DayOfWeek.MONDAY).atStartOfDay(zone).toInstant().toKotlinInstant()
                 val desiredEvents = events
                     .filter { it.startsAt >= weekStart }
                     .map { event -> event.toCalendarEvent(calendarId, timeZone, eventColorKeys, markerPrefix) }

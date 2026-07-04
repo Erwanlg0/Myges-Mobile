@@ -67,7 +67,7 @@ class DocumentCachePolicyTest {
         purgeExpiredDocumentCache(
             directory = directory,
             now = Instant.parse("2026-06-12T12:00:00Z"),
-            maxAge = Duration.ofDays(30)
+            maxAge = 30.days
         )
 
         assertTrue(nested.exists())

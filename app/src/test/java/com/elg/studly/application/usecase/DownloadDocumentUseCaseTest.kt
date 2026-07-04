@@ -8,7 +8,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import android.net.Uri
 
 class DownloadDocumentUseCaseTest {
 
@@ -32,7 +31,7 @@ class DownloadDocumentUseCaseTest {
     fun delegatesToRepositoryWithDefaultProgress() = runTest {
         val repository = mockk<StudentDataRepository>()
         val document = mockk<AcademicDocument>()
-        val expectedUri = mockk<Uri>()
+        val expectedUri = "content://documents/expected"
 
         coEvery { repository.downloadDocument(document, any()) } coAnswers {
             secondArg<(Float?) -> Unit>().invoke(null)

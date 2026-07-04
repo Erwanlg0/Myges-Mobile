@@ -165,7 +165,7 @@ class RefreshStudentDataUseCase constructor(
 }
 
 
-internal fun buildReminderTargets(
+fun buildReminderTargets(
     agenda: List<AgendaEvent>,
     projects: List<Project>,
     practicals: List<Practical>

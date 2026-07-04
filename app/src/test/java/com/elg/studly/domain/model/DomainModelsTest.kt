@@ -107,7 +107,7 @@ class DomainModelsTest {
         val message = ProjectMessage("message-1", "Alice", "Hello", now, true)
         val reminder = ReminderTarget("reminder-1", "Deadline", now, ReminderKind.Deadline, "projects")
         val account = CalendarAccount(1L, "Calendar", "account@example.com")
-        val session = Session("user", "token", null, null, false, now, Instant.now().plusSeconds(60))
+        val session = Session("user", "token", null, null, false, now, kotlin.time.Clock.System.now().plusSeconds(60))
         val settings = UserSettings(null, NotificationPreferences(true, false, true, false, true), false, lastSyncAt = now)
 
         assertEquals(null, news.html)

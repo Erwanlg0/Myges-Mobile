@@ -198,10 +198,10 @@ class MygesSessionRepositoryTest {
             username = "user",
             accessToken = "token",
             refreshToken = null,
-            expiresAt = Instant.now().minusSeconds(1),
+            expiresAt = kotlin.time.Clock.System.now().minusSeconds(1),
             biometricEnabled = true,
-            issuedAt = Instant.now(),
-            refreshAfter = Instant.now().plusSeconds(1800)
+            issuedAt = kotlin.time.Clock.System.now(),
+            refreshAfter = kotlin.time.Clock.System.now().plusSeconds(1800)
         )
         val secureStore = mockk<SecureSessionStore>(relaxed = true) {
             every { read() } returnsMany listOf(null, session)
@@ -221,10 +221,10 @@ class MygesSessionRepositoryTest {
             username = "user",
             accessToken = "token",
             refreshToken = null,
-            expiresAt = Instant.now().plusSeconds(3600),
+            expiresAt = kotlin.time.Clock.System.now().plusSeconds(3600),
             biometricEnabled = false,
-            issuedAt = Instant.now(),
-            refreshAfter = Instant.now().plusSeconds(1800)
+            issuedAt = kotlin.time.Clock.System.now(),
+            refreshAfter = kotlin.time.Clock.System.now().plusSeconds(1800)
         )
         val secureStore = mockk<SecureSessionStore>(relaxed = true) {
             every { read() } returns session

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d6f63">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Studly">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Studly</title>
+  <link rel="manifest" href="app.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Studly</p>
+        <h1 id="screen-title">Tableau de bord</h1>
+      </div>
+      <button id="sync-button" class="icon-button" type="button" aria-label="Synchroniser">
+        <span aria-hidden="true">↻</span>
+      </button>
+    </header>
+
+    <main id="content" class="content" aria-live="polite"></main>
+
+    <nav class="tabbar" aria-label="Navigation principale">
+      <button class="tab is-active" type="button" data-route="dashboard">Accueil</button>
+      <button class="tab" type="button" data-route="agenda">Agenda</button>
+      <button class="tab" type="button" data-route="grades">Notes</button>
+      <button class="tab" type="button" data-route="absences">Absences</button>
+      <button class="tab" type="button" data-route="projects">Projets</button>
+      <button class="tab" type="button" data-route="news">Actus</button>
+    </nav>
+  </div>
+  <script src="app.js" defer></script>
+</body>
+</html>

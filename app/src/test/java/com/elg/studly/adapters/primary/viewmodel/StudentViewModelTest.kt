@@ -208,9 +208,11 @@ class StudentViewModelTest {
     @Test
     fun downloadDocumentEmitsDownloadRequest() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        val document = AcademicDocument("id", "Doc", null, null, "application/pdf", "doc.pdf", "url", Instant.now())
+        val document = AcademicDocument("id", "Doc", null, null, "application/pdf", "doc.pdf", "url", kotlin.time.Clock.System.now())
         val uri = mockk<Uri>()
-        coEvery { downloadDocumentUseCase(document, any()) } returns uri
+        io.mockk.mockkStatic(android.net.Uri::class)
+        io.mockk.every { android.net.Uri.parse(any()) } returns uri
+        coEvery { downloadDocumentUseCase(document, any()) } returns "content://documents/id"
         val requests = mutableListOf<DocumentOpenRequest>()
         val job = backgroundScope.launch { viewModel.documentOpenRequests.collect { requests += it } }
 
@@ -226,7 +228,7 @@ class StudentViewModelTest {
     @Test
     fun downloadDocumentReportsNonAuthenticationFailure() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", Instant.now())
+        val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", kotlin.time.Clock.System.now())
         coEvery { downloadDocumentUseCase(document, any()) } throws AppException(AppError.Network)
 
         viewModel.openDocument(document)
@@ -238,7 +240,7 @@ class StudentViewModelTest {
     @Test
     fun downloadDocumentLogsOutForUnauthorizedFailure() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", Instant.now())
+        val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", kotlin.time.Clock.System.now())
         coEvery { downloadDocumentUseCase(document, any()) } throws AppException(AppError.Unauthorized)
 
         viewModel.openDocument(document)
@@ -264,7 +266,7 @@ class StudentViewModelTest {
     @Test
     fun projectMessagesLoadAndSendCoverSuccessAndFailure() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        val message = ProjectMessage("message", "Alice", "Hello", Instant.now(), false)
+        val message = ProjectMessage("message", "Alice", "Hello", kotlin.time.Clock.System.now(), false)
         coEvery { projectMessagesUseCase("group") } returns listOf(message)
 
         viewModel.loadProjectMessages("group")
@@ -343,10 +345,13 @@ class StudentViewModelTest {
     @Test
     fun openDocumentResolvesMimeTypeFromFileNameWhenMissing() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", Instant.now())
+        val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", kotlin.time.Clock.System.now())
         val extensionlessDocument = document.copy(id = "extensionless", fileName = "document")
-        coEvery { downloadDocumentUseCase(document, any()) } returns mockk<Uri>()
-        coEvery { downloadDocumentUseCase(extensionlessDocument, any()) } returns mockk<Uri>()
+        val uri = mockk<Uri>()
+        io.mockk.mockkStatic(android.net.Uri::class)
+        io.mockk.every { android.net.Uri.parse(any()) } returns uri
+        coEvery { downloadDocumentUseCase(document, any()) } returns "content://documents/id"
+        coEvery { downloadDocumentUseCase(extensionlessDocument, any()) } returns "content://documents/extensionless"
         val requests = mutableListOf<DocumentOpenRequest>()
         val job = backgroundScope.launch { viewModel.documentOpenRequests.collect { requests += it } }
 

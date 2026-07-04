@@ -152,8 +152,8 @@ class ProjectProgressTest {
 
     @Test
     fun practicalProgressCountsCompletedSteps() {
-        val past = java.time.Instant.now().minusSeconds(3600)
-        val future = java.time.Instant.now().plusSeconds(3600)
+        val past = kotlin.time.Clock.System.now().minusSeconds(3600)
+        val future = kotlin.time.Clock.System.now().plusSeconds(3600)
         val progress = practical(
             ProjectStep("one", "Draft", past, "todo"),
             ProjectStep("two", "Final", future, "todo"),
@@ -167,7 +167,7 @@ class ProjectProgressTest {
 
     @Test
     fun practicalProgressIsFullWhenStatusCompleted() {
-        val future = java.time.Instant.now().plusSeconds(3600)
+        val future = kotlin.time.Clock.System.now().plusSeconds(3600)
         val progress = practical(
             ProjectStep("one", "Draft", future, "todo"),
             ProjectStep("two", "Final", future, "todo"),
