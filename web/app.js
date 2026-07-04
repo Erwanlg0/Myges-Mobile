@@ -182,12 +182,12 @@ async function refresh() {
     const profile = await api('me/profile')
     const years = await resolveYears()
     const now = Date.now()
-    const agenda = await api(`me/agenda?start=${Math.floor((now - 7 * 86400000) / 1000)}&end=${Math.floor((now + 45 * 86400000) / 1000)}`)
+    const agenda = await safeList(`me/agenda?start=${now - 86400000}&end=${now + 365 * 86400000}`)
     const [grades, absences, projects, news] = await Promise.all([
       collectYears(years, year => api(`me/${encodeURIComponent(year)}/grades`)),
       collectYears(years, year => api(`me/${encodeURIComponent(year)}/absences`)),
       collectYears(years, year => api(`me/${encodeURIComponent(year)}/projects`)),
-      api('me/news').then(normalizeList)
+      safeList('me/news')
     ])
     state.snapshot = {
       profile,
@@ -222,6 +222,10 @@ async function resolveYears() {
 async function collectYears(years, loader) {
   const settled = await Promise.allSettled(years.map(year => loader(year).then(normalizeList)))
   return settled.flatMap(result => result.status === 'fulfilled' ? result.value : [])
+}
+
+async function safeList(path) {
+  return api(path).then(normalizeList).catch(() => [])
 }
 
 async function api(path) {
