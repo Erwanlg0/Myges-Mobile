@@ -85,15 +85,15 @@ function renderLogin() {
         <input id="redirect-uri" autocomplete="url" inputmode="url" placeholder="${escapeHtml(location.href.split('#')[0])}" value="${escapeHtml(configuredRedirectUri())}">
       </div>
       <div class="field">
-        <label for="token-input">Jeton d'acces</label>
-        <input id="token-input" autocomplete="off" inputmode="text" placeholder="Bearer ou access_token">
+        <label for="token-input">Jeton d'acces ou URL callback</label>
+        <input id="token-input" autocomplete="off" inputmode="text" placeholder="Bearer, access_token ou comreseaugesskolae:/oauth2redirect#...">
       </div>
       <div class="actions">
         <button class="ghost-button" id="save-redirect" type="button">Enregistrer URL</button>
         <button class="ghost-button" id="save-token" type="button">Utiliser le jeton</button>
       </div>
       ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ''}
-      <p class="muted">L'URL de retour doit etre autorisee cote Kordis. Laisser vide evite le 403 localhost, mais le retour automatique vers la PWA necessite une URL web whitelistee.</p>
+      <p class="muted">Sans URL web whitelistee, Kordis renvoie vers comreseaugesskolae:/oauth2redirect. Colle l'URL callback complete ici pour extraire le token.</p>
     </section>
   `
   document.querySelector('#login-button').addEventListener('click', startOAuth)
@@ -104,9 +104,9 @@ function renderLogin() {
     startOAuth()
   })
   document.querySelector('#save-token').addEventListener('click', () => {
-    const value = document.querySelector('#token-input').value.trim().replace(/^Bearer\s+/i, '')
-    if (!value) return
-    saveSession({ accessToken: value, expiresAt: null })
+    const parsed = parseTokenInput(document.querySelector('#token-input').value)
+    if (!parsed.accessToken) return
+    saveSession(parsed)
     refresh()
   })
 }
@@ -250,16 +250,32 @@ function startOAuth() {
 }
 
 function consumeOAuthHash() {
-  const hash = new URLSearchParams(location.hash.replace(/^#/, ''))
-  const token = hash.get('access_token')
-  if (!token) return
-  const expiresIn = Number(hash.get('expires_in') || 0)
-  saveSession({
-    accessToken: token,
-    expiresAt: expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : null
-  })
+  const parsed = parseOAuthParams(location.hash)
+  if (!parsed.accessToken) return
+  saveSession(parsed)
   history.replaceState(null, '', location.pathname + location.search)
   refresh()
+}
+
+function parseTokenInput(input) {
+  const value = input.trim()
+  const parsed = parseOAuthParams(value)
+  if (parsed.accessToken) return parsed
+  return {
+    accessToken: value.replace(/^Bearer\s+/i, ''),
+    expiresAt: null
+  }
+}
+
+function parseOAuthParams(value) {
+  const rawParams = value.includes('#') ? value.substring(value.indexOf('#') + 1) : value
+  const params = new URLSearchParams(rawParams.replace(/^\?/, ''))
+  const accessToken = params.get('access_token')
+  const expiresIn = Number(params.get('expires_in') || 0)
+  return {
+    accessToken: accessToken || '',
+    expiresAt: accessToken && expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : null
+  }
 }
 
 function saveSession(session) {
