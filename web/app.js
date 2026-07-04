@@ -294,13 +294,13 @@ function redirectUri() {
 
 function configuredRedirectUri() {
   const value = localStorage.getItem('studly.pwa.redirectUri') || ''
-  return isLocalRedirectUri(value) ? '' : value
+  return isBlockedRedirectUri(value) ? '' : value
 }
 
-function isLocalRedirectUri(value) {
+function isBlockedRedirectUri(value) {
   try {
     const url = new URL(value)
-    return ['localhost', '127.0.0.1', '::1'].includes(url.hostname)
+    return ['localhost', '127.0.0.1', '::1', 'authentication.kordis.fr'].includes(url.hostname)
   } catch {
     return false
   }
