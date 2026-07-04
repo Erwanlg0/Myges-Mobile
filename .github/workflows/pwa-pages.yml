@@ -24,9 +24,19 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    env:
+      PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/configure-pages@v5
+      - name: Configure GitHub Pages
+        if: ${{ env.PAGES_TOKEN == '' }}
+        uses: actions/configure-pages@v6
+      - name: Enable and configure GitHub Pages
+        if: ${{ env.PAGES_TOKEN != '' }}
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+          token: ${{ env.PAGES_TOKEN }}
       - uses: actions/upload-pages-artifact@v4
         with:
           path: web
