@@ -23,4 +23,4 @@ Open `http://localhost:8087`.
 
 Deploy the `web/` folder over HTTPS, open the URL in Safari, then use Share > Add to Home Screen.
 
-OAuth uses the current page URL as `redirect_uri` by default. If Kordis rejects that URL, register the deployed URL with the OAuth client or paste a valid access token in the login screen.
+OAuth only sends `redirect_uri` when one is explicitly configured. The URL must be allowlisted by Kordis for the `skolae-app` OAuth client; otherwise Kordis returns 403. For local testing, leave it empty and paste an access token manually, or register the deployed HTTPS URL with the OAuth client.

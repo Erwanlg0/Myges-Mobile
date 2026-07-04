@@ -80,7 +80,7 @@ function renderLogin() {
     <section class="card grid">
       <div class="field">
         <label for="redirect-uri">URL de retour OAuth</label>
-        <input id="redirect-uri" autocomplete="url" inputmode="url" value="${escapeHtml(redirectUri())}">
+        <input id="redirect-uri" autocomplete="url" inputmode="url" placeholder="${escapeHtml(location.href.split('#')[0])}" value="${escapeHtml(configuredRedirectUri())}">
       </div>
       <div class="field">
         <label for="token-input">Jeton d'acces</label>
@@ -91,11 +91,14 @@ function renderLogin() {
         <button class="ghost-button" id="save-token" type="button">Utiliser le jeton</button>
       </div>
       ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ''}
+      <p class="muted">L'URL de retour doit etre autorisee cote Kordis. Laisser vide evite le 403 localhost, mais le retour automatique vers la PWA necessite une URL web whitelistee.</p>
     </section>
   `
   document.querySelector('#login-button').addEventListener('click', startOAuth)
   document.querySelector('#save-redirect').addEventListener('click', () => {
-    localStorage.setItem('studly.pwa.redirectUri', document.querySelector('#redirect-uri').value.trim())
+    const value = document.querySelector('#redirect-uri').value.trim()
+    if (value) localStorage.setItem('studly.pwa.redirectUri', value)
+    else localStorage.removeItem('studly.pwa.redirectUri')
     startOAuth()
   })
   document.querySelector('#save-token').addEventListener('click', () => {
@@ -239,7 +242,8 @@ function startOAuth() {
   const url = new URL(CONFIG.authorizeUrl)
   url.searchParams.set('response_type', 'token')
   url.searchParams.set('client_id', CONFIG.clientId)
-  url.searchParams.set('redirect_uri', redirectUri())
+  const configured = configuredRedirectUri()
+  if (configured) url.searchParams.set('redirect_uri', configured)
   location.href = url.toString()
 }
 
@@ -267,7 +271,21 @@ function logout() {
 }
 
 function redirectUri() {
-  return localStorage.getItem('studly.pwa.redirectUri') || location.href.split('#')[0]
+  return configuredRedirectUri() || location.href.split('#')[0]
+}
+
+function configuredRedirectUri() {
+  const value = localStorage.getItem('studly.pwa.redirectUri') || ''
+  return isLocalRedirectUri(value) ? '' : value
+}
+
+function isLocalRedirectUri(value) {
+  try {
+    const url = new URL(value)
+    return ['localhost', '127.0.0.1', '::1'].includes(url.hostname)
+  } catch {
+    return false
+  }
 }
 
 function readJson(key) {
