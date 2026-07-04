@@ -1,9 +1,9 @@
-const CACHE_NAME = 'studly-pwa-v1'
+const CACHE_NAME = 'studly-pwa-v2'
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
-  './app.js',
+  './app.js?v=2',
   './app.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

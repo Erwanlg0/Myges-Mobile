@@ -6,6 +6,8 @@ const CONFIG = {
   cacheKey: 'studly.pwa.snapshot'
 }
 
+resetLocalSessionIfRequested()
+
 const state = {
   route: 'dashboard',
   loading: false,
@@ -294,6 +296,15 @@ function readJson(key) {
   } catch {
     return null
   }
+}
+
+function resetLocalSessionIfRequested() {
+  const params = new URLSearchParams(location.search)
+  if (!params.has('reset')) return
+  localStorage.removeItem(CONFIG.storageKey)
+  localStorage.removeItem(CONFIG.cacheKey)
+  localStorage.removeItem('studly.pwa.redirectUri')
+  history.replaceState(null, '', location.pathname)
 }
 
 function emptySnapshot() {
