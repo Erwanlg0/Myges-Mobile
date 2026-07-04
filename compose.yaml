@@ -1,0 +1,5 @@
+services:
+  pwa:
+    build: .
+    ports:
+      - "8087:80"

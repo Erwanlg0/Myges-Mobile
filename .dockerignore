@@ -1,0 +1,10 @@
+.git
+.gradle
+.idea
+.kotlin
+.codex
+build
+app/build
+shared/build
+iosApp
+local.properties

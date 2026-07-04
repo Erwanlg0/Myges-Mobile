@@ -11,6 +11,14 @@ python -m http.server 4173
 
 Open `http://localhost:4173` in Safari or Chrome.
 
+## Docker
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:8087`.
+
 ## iOS install
 
 Deploy the `web/` folder over HTTPS, open the URL in Safari, then use Share > Add to Home Screen.
