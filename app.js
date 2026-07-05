@@ -37,6 +37,7 @@ const loginForm = document.querySelector('#login-form')
 const loginButton = document.querySelector('.login-button')
 const tokenInput = document.querySelector('#token-input')
 const loginError = document.querySelector('#login-error')
+const loginStatus = document.querySelector('#login-status')
 const view = document.querySelector('#view')
 const pageTitle = document.querySelector('#page-title')
 const breadcrumb = document.querySelector('#breadcrumb')
@@ -68,6 +69,7 @@ async function login() {
   }
 
   loginForm.classList.add('is-loading')
+  showLoginStatus('Connexion a Kordis...')
   try {
     await loadRealData(token)
     sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(data))
@@ -77,8 +79,29 @@ async function login() {
   } catch (error) {
     showLoginError("Connexion impossible avec ce bearer. Verifie le token ou l'acces CORS de l'API Kordis.")
   } finally {
+    hideLoginStatus()
     loginForm.classList.remove('is-loading')
   }
+}
+
+function showLoginError(message) {
+  loginError.textContent = message
+  loginError.hidden = false
+}
+
+function hideLoginError() {
+  loginError.hidden = true
+  loginError.textContent = ''
+}
+
+function showLoginStatus(message) {
+  loginStatus.textContent = message
+  loginStatus.hidden = false
+}
+
+function hideLoginStatus() {
+  loginStatus.hidden = true
+  loginStatus.textContent = ''
 }
 
 async function loadRealData(token) {
