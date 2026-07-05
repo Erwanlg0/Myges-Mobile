@@ -1,5 +1,6 @@
 const API_BASE = 'https://api.kordis.fr/'
 const SNAPSHOT_KEY = 'myges.real.snapshot'
+const TOKEN_KEY = 'myges.real.token'
 
 const { createApp, computed, reactive, ref, provide, proxyRefs } = Vue
 
@@ -7,6 +8,7 @@ createApp({
   setup() {
     const token = ref('')
     const error = ref('')
+    const syncError = ref('')
     const loading = ref(false)
     const route = ref(routeFromHash())
     const state = reactive({
@@ -52,6 +54,20 @@ createApp({
     const filteredDocuments = computed(() => data.documents.filter(document => state.documentType === 'all' || documentType(document) === state.documentType))
     const eventTypes = computed(() => ['all', ...unique(data.events.map(eventType))])
     const filteredEvents = computed(() => data.events.filter(event => state.eventFilter === 'all' || eventType(event) === state.eventFilter))
+    const hasContent = computed(() => hasAnyData(data))
+    const syncLabel = computed(() => {
+      if (loading.value) return 'Chargement API...'
+      if (syncError.value) return 'Erreur API'
+      if (hasContent.value) return 'Donnees API chargees'
+      if (data.profile) return 'Profil charge, donnees vides'
+      return 'Non connecte'
+    })
+    const syncDotClass = computed(() => {
+      if (loading.value) return 'bg-amber-400'
+      if (syncError.value) return 'bg-red-500'
+      if (hasContent.value) return 'bg-emerald-500'
+      return 'bg-slate-300'
+    })
     const currentView = computed(() => ({
       dashboard: 'dashboard-view',
       agenda: 'agenda-view',
@@ -70,6 +86,7 @@ createApp({
 
     async function login() {
       error.value = ''
+      syncError.value = ''
       const cleanToken = token.value.trim().replace(/^bearer\s+/i, '')
       if (!cleanToken) {
         error.value = 'Colle ton bearer Kordis/MyGES pour charger de vraies donnees.'
@@ -79,11 +96,36 @@ createApp({
       loading.value = true
       try {
         await loadRealData(cleanToken)
+        sessionStorage.setItem(TOKEN_KEY, cleanToken)
         sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot()))
         if (!location.hash || route.value === 'login') location.hash = '#dashboard'
         route.value = routeFromHash()
       } catch {
         error.value = "Connexion impossible avec ce bearer. Verifie le token ou l'acces CORS de l'API Kordis."
+        syncError.value = error.value
+      } finally {
+        loading.value = false
+      }
+    }
+
+    async function refresh() {
+      error.value = ''
+      syncError.value = ''
+      const savedToken = sessionStorage.getItem(TOKEN_KEY)
+      if (!savedToken) {
+        data.profile = null
+        route.value = 'login'
+        location.hash = '#login'
+        error.value = 'Reconnecte-toi pour relancer le fetch API.'
+        return
+      }
+
+      loading.value = true
+      try {
+        await loadRealData(savedToken)
+        sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot()))
+      } catch {
+        syncError.value = "Rechargement impossible depuis l'API Kordis."
       } finally {
         loading.value = false
       }
@@ -142,23 +184,34 @@ createApp({
 
     function restoreSnapshot() {
       const saved = sessionStorage.getItem(SNAPSHOT_KEY)
-      if (!saved) return
-      try {
-        Object.assign(data, JSON.parse(saved))
-      } catch {
-        sessionStorage.removeItem(SNAPSHOT_KEY)
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed.profile && hasAnyData(parsed)) {
+            Object.assign(data, parsed)
+          } else {
+            sessionStorage.removeItem(SNAPSHOT_KEY)
+          }
+        } catch {
+          sessionStorage.removeItem(SNAPSHOT_KEY)
+        }
+      }
+      if (sessionStorage.getItem(TOKEN_KEY) && (!data.profile || !hasAnyData(data))) {
+        refresh()
       }
     }
 
     function resetSessionIfRequested() {
       if (!new URLSearchParams(location.search).has('reset')) return
       sessionStorage.removeItem(SNAPSHOT_KEY)
+      sessionStorage.removeItem(TOKEN_KEY)
       history.replaceState(null, '', location.pathname)
     }
 
     const ctx = {
       token,
       error,
+      syncError,
       loading,
       route,
       state,
@@ -177,8 +230,12 @@ createApp({
       filteredDocuments,
       eventTypes,
       filteredEvents,
+      hasContent,
+      syncLabel,
+      syncDotClass,
       currentView,
       login,
+      refresh,
       firstName,
       formatDateTime,
       formatTime,
@@ -222,6 +279,7 @@ createApp({
           <article class="rounded-lg bg-myges-700 p-6 text-white shadow-lg shadow-myges-900/10">
             <p class="text-xs font-black uppercase tracking-wide text-white/70">Bonjour {{ firstName(profile.name) }}</p>
             <h2 class="mt-2 text-2xl font-black">{{ profile.program || 'Espace etudiant' }}</h2>
+            <p v-if="!hasContent" class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-black text-amber-800">Profil charge, mais aucun endpoint de donnees n'a encore renvoye de contenu. Relance avec Recharger.</p>
             <p class="mt-2 text-sm font-medium leading-6 text-white/80">{{ profile.school || 'MyGES' }} · donnees chargees depuis ton compte Kordis.</p>
             <div class="mt-5 flex flex-wrap gap-2">
               <span class="rounded-full bg-white/15 px-3 py-2 text-xs font-black">{{ sortedAgenda[0] ? 'Prochain cours ' + formatDateTime(eventStart(sortedAgenda[0])) : 'Aucun cours renvoye' }}</span>
@@ -419,6 +477,7 @@ function viewContextMixin() {
     'filteredDocuments',
     'eventTypes',
     'filteredEvents',
+    'hasContent',
     'firstName',
     'formatDateTime',
     'formatTime',
@@ -460,6 +519,11 @@ function toArray(value) {
   if (Array.isArray(value)) return value
   if (value && typeof value === 'object') return Object.values(value).flat().filter(item => item && typeof item === 'object')
   return []
+}
+
+function hasAnyData(source) {
+  return ['agenda', 'grades', 'absences', 'projects', 'documents', 'events', 'news']
+    .some(key => Array.isArray(source?.[key]) && source[key].length > 0)
 }
 
 function profileFromApi(payload) {
