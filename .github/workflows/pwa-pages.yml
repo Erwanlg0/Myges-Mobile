@@ -4,8 +4,14 @@ on:
   push:
     branches:
       - PWA
+      - gh-pages
     paths:
       - web/**
+      - index.html
+      - styles.css
+      - app.js
+      - app.webmanifest
+      - .nojekyll
       - .github/workflows/pwa-pages.yml
   workflow_dispatch:
 
@@ -59,10 +65,15 @@ jobs:
         with:
           enablement: true
           token: ${{ env.PAGES_TOKEN }}
+      - name: Prepare GitHub Pages artifact
+        if: ${{ steps.pages.outputs.enabled == 'true' }}
+        run: |
+          mkdir -p _site
+          cp index.html styles.css app.js app.webmanifest .nojekyll _site/
       - uses: actions/upload-pages-artifact@v4
         if: ${{ steps.pages.outputs.enabled == 'true' }}
         with:
-          path: web
+          path: _site
       - id: deployment
         if: ${{ steps.pages.outputs.enabled == 'true' }}
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
