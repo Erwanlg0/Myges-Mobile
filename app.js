@@ -1,7 +1,7 @@
 const API_BASE = 'https://api.kordis.fr/'
 const SNAPSHOT_KEY = 'myges.real.snapshot'
 
-const { createApp, computed, reactive, ref } = Vue
+const { createApp, computed, reactive, ref, provide, proxyRefs } = Vue
 
 createApp({
   setup() {
@@ -65,6 +65,7 @@ createApp({
     window.addEventListener('hashchange', () => {
       route.value = routeFromHash()
     })
+    resetSessionIfRequested()
     restoreSnapshot()
 
     async function login() {
@@ -99,23 +100,25 @@ createApp({
 
       data.profile = profileFromApi(await get('me/profile'))
       data.years = toArray(await get('me/years')).map(yearValue).filter(Boolean)
-      const year = data.years[0] || String(new Date().getFullYear())
+      const years = data.years.length ? data.years : [String(new Date().getFullYear())]
       const start = Math.floor((Date.now() - 7 * 86400000) / 1000)
       const end = Math.floor((Date.now() + 28 * 86400000) / 1000)
-      const [agenda, grades, absences, projects, documents, news, events] = await Promise.all([
+      const [agenda, documents, news, events, yearData] = await Promise.all([
         get(`me/agenda?start=${start}&end=${end}`).catch(() => []),
-        get(`me/${year}/grades`).catch(() => []),
-        get(`me/${year}/absences`).catch(() => []),
-        get(`me/${year}/projects`).catch(() => []),
         get('me/annualDocuments').catch(() => []),
         get('me/news').catch(() => []),
-        get('me/events').catch(() => [])
+        get('me/events').catch(() => []),
+        Promise.all(years.map(year => Promise.all([
+          get(`me/${year}/grades`).catch(() => []),
+          get(`me/${year}/absences`).catch(() => []),
+          get(`me/${year}/projects`).catch(() => [])
+        ])))
       ])
 
       data.agenda = toArray(agenda)
-      data.grades = toArray(grades)
-      data.absences = toArray(absences)
-      data.projects = toArray(projects)
+      data.grades = yearData.flatMap(([grades]) => toArray(grades))
+      data.absences = yearData.flatMap(([, absences]) => toArray(absences))
+      data.projects = yearData.flatMap(([, , projects]) => toArray(projects))
       data.documents = toArray(documents)
       data.news = toArray(news)
       data.events = toArray(events)
@@ -147,7 +150,13 @@ createApp({
       }
     }
 
-    return {
+    function resetSessionIfRequested() {
+      if (!new URLSearchParams(location.search).has('reset')) return
+      sessionStorage.removeItem(SNAPSHOT_KEY)
+      history.replaceState(null, '', location.pathname)
+    }
+
+    const ctx = {
       token,
       error,
       loading,
@@ -188,8 +197,11 @@ createApp({
       valueOf,
       sum
     }
+    provide('ctx', proxyRefs(ctx))
+    return ctx
   }
 })
+  .mixin(viewContextMixin())
   .component('metric-card', {
     props: ['label', 'value', 'detail'],
     template: `
@@ -392,6 +404,49 @@ createApp({
     `
   })
   .mount('#app')
+
+function viewContextMixin() {
+  const keys = [
+    'state',
+    'data',
+    'profile',
+    'sortedAgenda',
+    'gradePeriods',
+    'filteredGrades',
+    'filteredAbsences',
+    'filteredProjects',
+    'documentTypes',
+    'filteredDocuments',
+    'eventTypes',
+    'filteredEvents',
+    'firstName',
+    'formatDateTime',
+    'formatTime',
+    'eventStart',
+    'eventEnd',
+    'eventTitle',
+    'eventRoom',
+    'eventType',
+    'gradeTitle',
+    'gradeEcts',
+    'teacherName',
+    'absenceStatus',
+    'projectTitle',
+    'documentType',
+    'valueOf',
+    'sum'
+  ]
+  return {
+    inject: {
+      ctx: {
+        default: null
+      }
+    },
+    computed: Object.fromEntries(keys.map(key => [key, function () {
+      return this.ctx?.[key]
+    }]))
+  }
+}
 
 function routeFromHash() {
   return location.hash.replace('#', '') || 'login'
