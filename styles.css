@@ -142,6 +142,12 @@ body.is-authenticated .login-shell {
   padding: 28px;
 }
 
+.login-note {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .login-card label {
   display: grid;
   gap: 7px;
@@ -468,6 +474,74 @@ h3 {
   color: #ffffff;
 }
 
+.filter-bar {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: var(--shadow);
+}
+
+.filter-field {
+  display: grid;
+  gap: 6px;
+  min-width: min(280px, 100%);
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.filter-field select,
+.filter-field input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  font: inherit;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.action-button {
+  min-height: 42px;
+  padding: 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--brand-2);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+}
+
+.action-button.is-primary {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #ffffff;
+}
+
+.notice-panel,
+.notice-line {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.notice-line {
+  margin-bottom: 14px;
+  font-style: italic;
+}
+
 .metric {
   display: grid;
   gap: 8px;
@@ -584,6 +658,7 @@ h3 {
 
 .data-table {
   width: 100%;
+  min-width: 680px;
   border-collapse: collapse;
   overflow: hidden;
   border-radius: 8px;

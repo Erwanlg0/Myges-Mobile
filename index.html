@@ -30,6 +30,7 @@
       </article>
       <form id="login-form" class="login-card">
         <h2>Authentification</h2>
+        <p class="login-note">Mode demo : aucun identifiant reel n'est envoye.</p>
         <label>
           Identifiant
           <input type="text" autocomplete="username" placeholder="prenom.nom">
@@ -38,8 +39,8 @@
           Mot de passe
           <input type="password" autocomplete="current-password" placeholder="••••••••">
         </label>
-        <button class="login-button" type="submit">Connexion</button>
-        <button id="demo-button" class="demo-button" type="button">Voir la demo moderne</button>
+        <button class="login-button" type="submit" data-login>Entrer dans la demo</button>
+        <button id="demo-button" class="demo-button" type="button" data-login>Voir le portail sans compte</button>
         <div class="login-links">
           <a href="#">Mot de passe oublie</a>
           <a href="#">Changer mon mot de passe</a>

@@ -31,15 +31,24 @@ const data = {
     ['Convention de stage', 'A compléter', 'Action']
   ],
   events: [
-    ['Forum alternance', 'Campus Paris', '10 juil.'],
-    ['Workshop IA produit', 'En ligne', '16 juil.'],
-    ['Conférence cybersécurité', 'Amphi 2', '22 juil.']
+    ['Forum alternance', 'Campus Paris', '10 juil.', 'Entreprise'],
+    ['Workshop IA produit', 'En ligne', '16 juil.', 'En ligne'],
+    ['Conférence cybersécurité', 'Amphi 2', '22 juil.', 'Campus']
   ],
   news: [
     ['Ouverture des inscriptions électives', 'Choix des modules jusqu’au 15 juillet.'],
     ['Maintenance MyGES', 'Accès perturbé dimanche entre 8h et 10h.'],
     ['Forum entreprises', 'Prépare ton profil et tes disponibilités.']
   ]
+}
+
+const state = {
+  gradePeriod: '2025-2026 - ESGI - BCH_SE3_000_ALT - Semestre 3',
+  absenceStatus: 'all',
+  projectYear: '2025-2026',
+  projectQuery: '',
+  documentType: 'all',
+  eventFilter: 'all'
 }
 
 const routes = {
@@ -64,12 +73,27 @@ loginForm.addEventListener('submit', event => {
   openPortal()
 })
 demoButton.addEventListener('click', openPortal)
+document.addEventListener('click', event => {
+  if (!event.target.closest('[data-login]')) return
+  event.preventDefault()
+  openPortal()
+})
+view.addEventListener('change', updateFilter)
+view.addEventListener('input', updateFilter)
 window.addEventListener('hashchange', render)
 render()
 
 function openPortal() {
+  sessionStorage.setItem('myges.demo.authenticated', 'true')
   if (!location.hash || location.hash === '#login') location.hash = '#dashboard'
   document.body.classList.add('is-authenticated')
+  render()
+}
+
+function updateFilter(event) {
+  const key = event.target.dataset.filter
+  if (!key) return
+  state[key] = event.target.value
   render()
 }
 
@@ -137,14 +161,16 @@ function renderDashboard() {
 function renderAgenda() {
   return `
     <section class="stack">
-      <div class="pill-row">
-        <button class="pill-button" type="button">Aujourd'hui</button>
-        <button class="pill-button is-active" type="button">Semaine</button>
-        <button class="pill-button" type="button">Mois</button>
-        <button class="pill-button" type="button">Actualiser</button>
+      <div class="filter-bar">
+        <button class="action-button" type="button">◄</button>
+        <button class="action-button is-primary" type="button">Maintenant</button>
+        <strong>6 juillet - 12 juillet 2026</strong>
+        <button class="action-button" type="button">►</button>
+        <span class="muted">Mise a jour le 5 juillet 2026 a 16:29</span>
       </div>
       <section class="panel">
         <h2>6 juillet - 12 juillet 2026</h2>
+        <p class="notice-line">Cliquer sur un element du planning pour obtenir plus d'informations.</p>
         ${weekPlanner()}
       </section>
     </section>
@@ -153,9 +179,22 @@ function renderAgenda() {
 
 function renderGrades() {
   return `
+    <section class="filter-bar">
+      ${selectField('Période', 'gradePeriod', [
+        '2026-2027 - ESGI - MAS_SE1_000_ALT - Semestre 1',
+        '2025-2026 - ESGI - BCH_SE3_000_ALT - Semestre 3',
+        '2025-2026 - ESGI - BCH_SE3_000_ALT - Semestre 2',
+        '2024-2025 - ESGI - 2ESGIi - Semestre 1'
+      ])}
+      <button class="action-button is-primary" type="button">Exporter Excel</button>
+      <button class="action-button" type="button">Modifier notes & coefs</button>
+    </section>
     <section class="grid cols-2">
       ${metric('Moyenne semestre', '15,8', '8 notes publiées')}
       ${metric('Meilleure matière', 'Projet annuel', '18,0 / 20')}
+    </section>
+    <section class="panel notice-panel">
+      Les notes de 0/20 sont affichees provisoirement dans l'attente de verification des justificatifs d'absence.
     </section>
     <section class="panel">
       <h2>Notes</h2>
@@ -165,22 +204,33 @@ function renderGrades() {
 }
 
 function renderProjects() {
+  const projects = projectRows().filter(project =>
+    project.year === state.projectYear &&
+    project.name.toLowerCase().includes(state.projectQuery.toLowerCase())
+  )
   return `
-    <section class="grid cols-3">
-      ${data.projects.map(([title, desc, progress, due]) => `
-        <article class="metric">
-          <small>${due}</small>
-          <h3>${title}</h3>
-          <p class="muted">${desc}</p>
-          <div class="progress"><span style="width:${progress}%"></span></div>
-        </article>
-      `).join('')}
+    <section class="filter-bar">
+      ${selectField('Année', 'projectYear', ['2026-2027', '2025-2026', '2024-2025', '2023-2024'])}
+      <label class="filter-field">
+        Recherche
+        <input data-filter="projectQuery" value="${escapeHtml(state.projectQuery)}" placeholder="matiere, projet...">
+      </label>
+    </section>
+    <section class="panel">
+      <h2>Projets pédagogiques</h2>
+      ${projectsTable(projects)}
     </section>
   `
 }
 
 function renderAbsences() {
+  const absences = data.absences.filter(([, , , status]) =>
+    state.absenceStatus === 'all' || status === state.absenceStatus
+  )
   return `
+    <section class="filter-bar">
+      ${selectField('Justifié', 'absenceStatus', ['all', 'Justifié', 'À régulariser'])}
+    </section>
     <section class="grid cols-3">
       ${metric('Absences', '5', 'Année 2025')}
       ${metric('À régulariser', '1', 'Action requise')}
@@ -189,13 +239,13 @@ function renderAbsences() {
     <section class="panel">
       <h2>Historique</h2>
       <div class="list">
-        ${data.absences.map(([course, detail, date, state]) => `
+        ${absences.map(([course, detail, date, status]) => `
           <article class="table-row">
             <div>
               <h3>${course}</h3>
               <span class="muted">${detail} · ${date}</span>
             </div>
-            <span class="tag">${state}</span>
+            <span class="tag">${status}</span>
           </article>
         `).join('')}
       </div>
@@ -204,18 +254,24 @@ function renderAbsences() {
 }
 
 function renderDocuments() {
+  const documents = documentRows().filter(doc =>
+    state.documentType === 'all' || doc.type === state.documentType
+  )
   return `
+    <section class="filter-bar">
+      ${selectField('Type', 'documentType', ['all', 'Annuel', 'Cours', 'Stage'])}
+    </section>
     <section class="panel">
       <h2>Documents utiles</h2>
       <div class="list">
-        ${data.documents.map(([title, desc, state]) => `
+        ${documents.map(({ title, desc, status, type }) => `
           <article class="table-row doc-row">
             <span class="doc-icon">PDF</span>
             <div>
               <h3>${title}</h3>
-              <span class="muted">${desc}</span>
+              <span class="muted">${type} · ${desc}</span>
             </div>
-            <span class="tag">${state}</span>
+            <span class="tag">${status}</span>
           </article>
         `).join('')}
       </div>
@@ -224,7 +280,13 @@ function renderDocuments() {
 }
 
 function renderEvents() {
+  const events = data.events.filter(([, , , tag = 'Campus']) =>
+    state.eventFilter === 'all' || tag === state.eventFilter
+  )
   return `
+    <section class="filter-bar">
+      ${selectField('Catégorie', 'eventFilter', ['all', 'Campus', 'Entreprise', 'En ligne'])}
+    </section>
     <section class="grid cols-2">
       ${metric('Événements ouverts', '26', 'Inscriptions disponibles')}
       ${metric('Cette semaine', '3', 'À ne pas manquer')}
@@ -232,7 +294,7 @@ function renderEvents() {
     <section class="panel">
       <h2>Vie étudiante</h2>
       <div class="list">
-        ${data.events.map(([title, place, date]) => `
+        ${events.map(([title, place, date]) => `
           <article class="table-row">
             <div>
               <h3>${title}</h3>
@@ -254,6 +316,74 @@ function metric(label, value, detail) {
       <em>${detail}</em>
     </article>
   `
+}
+
+function selectField(label, key, options) {
+  return `
+    <label class="filter-field">
+      ${label}
+      <select data-filter="${key}">
+        ${options.map(option => `<option value="${escapeHtml(option)}"${state[key] === option ? ' selected' : ''}>${escapeHtml(option === 'all' ? 'Tous' : option)}</option>`).join('')}
+      </select>
+    </label>
+  `
+}
+
+function projectRows() {
+  return [
+    { year: '2025-2026', date: '16/12/2025 23h59', name: 'T3 - projet annuel', teacher: 'M. SANANES', status: 'Groupe actif' },
+    { year: '2025-2026', date: '08/12/2025 20h35', name: 'T1 - tests unitaires et logiciels', teacher: 'M. MILANO', status: 'A rendre' },
+    { year: '2025-2026', date: '21/11/2025 09h44', name: 'T1 - Langage Java avancé', teacher: 'Mme FILIOL', status: 'Suivi groupe' },
+    { year: '2024-2025', date: '04/06/2025 18h00', name: 'Projet mobile Kotlin', teacher: 'M. RAYNAL', status: 'Terminé' },
+    { year: '2026-2027', date: '12/10/2026 12h00', name: 'Architecture distribuée', teacher: 'M. IFERGANE', status: 'Brouillon' }
+  ]
+}
+
+function projectsTable(projects) {
+  if (!projects.length) return '<p class="muted">Aucun projet pour ces filtres.</p>'
+  return `
+    <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date limite</th>
+          <th>Matière</th>
+          <th>Intervenant</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${projects.map(project => `
+          <tr>
+            <td>${project.date}</td>
+            <td>${project.name}</td>
+            <td>${project.teacher}</td>
+            <td><span class="tag">${project.status}</span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    </div>
+  `
+}
+
+function documentRows() {
+  return [
+    { type: 'Annuel', title: 'Certificat de scolarité', desc: 'Année 2025-2026', status: 'Nouveau' },
+    { type: 'Annuel', title: 'Relevé de notes', desc: 'Semestre 1', status: 'Disponible' },
+    { type: 'Cours', title: 'Support Architecture cloud', desc: 'PDF cours', status: 'Cours' },
+    { type: 'Cours', title: 'TP scripting Python', desc: 'Archive sources', status: 'Cours' },
+    { type: 'Stage', title: 'Convention de stage', desc: 'Document à compléter', status: 'Action' }
+  ]
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
 }
 
 function portalTile(title, detail, meta) {
@@ -300,6 +430,7 @@ function gradesTable() {
     ['T3 - securite du code', 'M. MILANO', '2.00', '2.00', '-', '-']
   ]
   return `
+    <div class="table-scroll">
     <table class="data-table">
       <thead>
         <tr>
@@ -315,6 +446,7 @@ function gradesTable() {
         ${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
       </tbody>
     </table>
+    </div>
   `
 }
 
