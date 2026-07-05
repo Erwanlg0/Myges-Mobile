@@ -5,91 +5,118 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#217bb1">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Studly">
-  <title>Studly - MyGES moderne</title>
+  <meta name="apple-mobile-web-app-title" content="myGES">
+  <title>myGES moderne</title>
   <link rel="manifest" href="app.webmanifest">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23217bb1'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='26' font-family='Arial' font-weight='700' fill='white'%3EmG%3C/text%3E%3C/svg%3E">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            myges: {
+              50: '#eef7fc',
+              100: '#d9edf8',
+              500: '#217bb1',
+              700: '#15547b',
+              900: '#0e334c'
+            }
+          }
+        }
+      }
+    }
+  </script>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <section id="login-screen" class="login-shell">
-    <div class="login-brand">
-      <span class="myges-logo">my<span>GES</span></span>
-      <small>Extranet du Reseau GES</small>
-    </div>
-    <div class="login-grid">
-      <article class="login-hero">
-        <span class="login-badge">Espace etudiant</span>
-        <h1>Connecte-toi a ton portail MyGES</h1>
-        <p>Une entree plus claire pour retrouver ton planning, tes notes, tes absences, tes documents et tes projets depuis les donnees renvoyees par MyGES.</p>
-        <div class="login-preview" aria-hidden="true">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </article>
-      <form id="login-form" class="login-card" onsubmit="event.preventDefault(); window.mygesLogin && window.mygesLogin();">
-        <h2>Authentification</h2>
-        <p class="login-note">Colle ton bearer Kordis/MyGES. Seules les donnees renvoyees par l'API sont affichees.</p>
-        <label>
-          Bearer Kordis optionnel
-          <input id="token-input" type="password" autocomplete="off" placeholder="bearer ... ou token seul">
-        </label>
-        <p id="login-error" class="login-error" hidden></p>
-        <p id="login-status" class="login-note" hidden></p>
-        <button class="login-button" type="submit">Connexion avec mes donnees</button>
-        <div class="login-links">
-          <a href="#">Mot de passe oublie</a>
-          <a href="#">Changer mon mot de passe</a>
-        </div>
-      </form>
-    </div>
-  </section>
-
-  <div class="app-shell">
-    <aside class="sidebar" aria-label="Navigation principale">
-      <a class="brand" href="#dashboard" aria-label="Studly accueil">
-        <span class="brand-mark">mG</span>
-        <span>
-          <strong>myGES</strong>
-          <small>Espace etudiant</small>
-        </span>
-      </a>
-      <nav class="nav-list">
-        <a class="nav-item is-active" href="#dashboard" data-route="dashboard"><span>01</span>Accueil</a>
-        <a class="nav-item" href="#agenda" data-route="agenda"><span>02</span>Plannings</a>
-        <a class="nav-item" href="#grades" data-route="grades"><span>03</span>Notes</a>
-        <a class="nav-item" href="#absences" data-route="absences"><span>!</span>Absences</a>
-        <a class="nav-item" href="#projects" data-route="projects"><span>04</span>Projets</a>
-        <a class="nav-item" href="#documents" data-route="documents"><span>05</span>Docs</a>
-        <a class="nav-item" href="#events" data-route="events"><span>06</span>Events</a>
-      </nav>
-      <div class="sidebar-status">
-        <span class="status-dot"></span>
-        <span>Synchro locale</span>
-      </div>
-    </aside>
-
-    <main class="workspace">
-      <header class="topbar">
+<body class="bg-slate-100 text-slate-900 antialiased">
+  <div id="app" v-cloak>
+    <section v-if="!authenticated" class="min-h-screen px-4 py-6 sm:px-8 lg:px-10">
+      <div class="mx-auto flex w-full max-w-6xl items-end justify-between">
         <div>
-          <p class="eyebrow" id="breadcrumb">Root / Accueil</p>
-          <h1 id="page-title">Accueil</h1>
+          <div class="text-4xl font-black tracking-tight text-myges-500">my<span class="text-slate-600">GES</span></div>
+          <p class="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">Extranet du Reseau GES</p>
         </div>
-        <div class="top-actions">
-          <button class="icon-button" type="button" aria-label="Rechercher">?</button>
-          <button class="icon-button" type="button" aria-label="Notifications">i</button>
-          <button class="profile-button" type="button">
-            <span id="profile-initials">MG</span>
-            <strong id="profile-name">Profil MyGES</strong>
-          </button>
-        </div>
-      </header>
+        <span class="hidden rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 shadow-sm sm:inline-flex">GitHub Pages</span>
+      </div>
 
-      <section id="view" class="view" aria-live="polite"></section>
-    </main>
+      <div class="mx-auto mt-8 grid w-full max-w-6xl gap-4 lg:grid-cols-[1fr_390px]">
+        <article class="overflow-hidden rounded-lg bg-myges-700 p-7 text-white shadow-xl shadow-myges-900/10 sm:p-10">
+          <span class="inline-flex rounded-full bg-white/15 px-3 py-1 text-sm font-extrabold">Espace etudiant</span>
+          <h1 class="mt-5 max-w-3xl text-4xl font-black leading-tight sm:text-5xl">Connecte-toi a ton portail MyGES</h1>
+          <p class="mt-4 max-w-2xl text-lg leading-8 text-white/85">L'interface affiche uniquement les donnees renvoyees par l'API Kordis/MyGES: profil, planning, notes, absences, documents, projets et actualites.</p>
+          <div class="mt-10 grid min-h-44 grid-cols-[1.2fr_.8fr] gap-3 max-sm:hidden">
+            <div class="row-span-2 rounded-lg bg-white/15"></div>
+            <div class="rounded-lg bg-white/15"></div>
+            <div class="rounded-lg bg-white/15"></div>
+          </div>
+        </article>
+
+        <form class="rounded-lg border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5" @submit.prevent="login">
+          <h2 class="text-xl font-black">Authentification</h2>
+          <p class="mt-2 text-sm leading-6 text-slate-500">Colle ton bearer Kordis/MyGES. Aucune donnee locale inventee n'est affichee.</p>
+          <label class="mt-5 grid gap-2 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+            Bearer Kordis
+            <input v-model.trim="token" class="h-12 rounded-lg border border-slate-200 px-3 text-base font-medium text-slate-900 outline-none ring-myges-500 transition focus:ring-2" type="password" autocomplete="off" placeholder="bearer ... ou token seul">
+          </label>
+          <p v-if="error" class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{{ error }}</p>
+          <p v-if="loading" class="mt-4 rounded-lg bg-myges-50 px-3 py-2 text-sm font-bold text-myges-700">Connexion a Kordis...</p>
+          <button class="mt-5 h-12 w-full rounded-lg bg-myges-500 px-4 text-sm font-black text-white shadow-lg shadow-myges-500/20 transition hover:bg-myges-700" type="submit">Connexion avec mes donnees</button>
+          <div class="mt-4 flex justify-between gap-3 text-xs font-bold text-myges-500">
+            <a href="#">Mot de passe oublie</a>
+            <a href="#">Changer mon mot de passe</a>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section v-else class="min-h-screen lg:grid lg:grid-cols-[270px_1fr]">
+      <aside class="hidden border-r border-slate-200 bg-white/80 p-5 shadow-sm lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
+        <a class="flex items-center gap-3" href="#dashboard">
+          <span class="grid h-11 w-11 place-items-center rounded-lg bg-myges-500 text-sm font-black text-white">mG</span>
+          <span>
+            <strong class="block text-lg leading-none">myGES</strong>
+            <small class="text-xs font-bold text-slate-500">Espace etudiant</small>
+          </span>
+        </a>
+        <nav class="mt-8 grid gap-1">
+          <a v-for="item in nav" :key="item.route" :href="'#' + item.route" class="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-extrabold transition" :class="route === item.route ? 'bg-myges-500 text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'">
+            <span class="w-6 text-center text-xs">{{ item.code }}</span>
+            {{ item.label }}
+          </a>
+        </nav>
+        <div class="mt-auto flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-500">
+          <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+          Donnees API chargees
+        </div>
+      </aside>
+
+      <main class="min-w-0 px-4 pb-24 pt-4 sm:px-6 lg:px-8 lg:pb-8">
+        <header class="sticky top-0 z-20 -mx-4 flex items-center justify-between gap-4 bg-slate-100/90 px-4 pb-4 pt-2 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+          <div class="min-w-0">
+            <p class="text-xs font-black uppercase tracking-wide text-myges-500">Root / {{ title }}</p>
+            <h1 class="mt-1 truncate text-3xl font-black tracking-tight">{{ title }}</h1>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-sm font-black text-slate-500 shadow-sm" type="button">?</button>
+            <button class="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-sm font-black text-slate-500 shadow-sm" type="button">i</button>
+            <button class="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 pr-3 shadow-sm" type="button">
+              <span class="grid h-8 w-8 place-items-center rounded-lg bg-myges-700 text-xs font-black text-white">{{ initials }}</span>
+              <strong class="hidden max-w-40 truncate text-sm sm:block">{{ profile.name }}</strong>
+            </button>
+          </div>
+        </header>
+
+        <component :is="currentView"></component>
+      </main>
+
+      <nav class="fixed inset-x-3 bottom-3 z-30 flex gap-1 overflow-x-auto rounded-lg border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur lg:hidden">
+        <a v-for="item in nav" :key="item.route" :href="'#' + item.route" class="min-w-20 rounded-md px-3 py-2 text-center text-xs font-black" :class="route === item.route ? 'bg-myges-500 text-white' : 'text-slate-500'">{{ item.label }}</a>
+      </nav>
+    </section>
   </div>
 
-  <script src="app.js?v=real-data-2"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="app.js?v=tailwind-vue-1"></script>
 </body>
 </html>

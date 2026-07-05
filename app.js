@@ -1,511 +1,400 @@
 const API_BASE = 'https://api.kordis.fr/'
 const SNAPSHOT_KEY = 'myges.real.snapshot'
 
-const data = {
-  profile: null,
-  years: [],
-  agenda: [],
-  grades: [],
-  absences: [],
-  projects: [],
-  documents: [],
-  events: [],
-  news: [],
-  updatedAt: null
-}
+const { createApp, computed, reactive, ref } = Vue
 
-const state = {
-  year: '',
-  gradePeriod: 'all',
-  absenceStatus: 'all',
-  projectQuery: '',
-  documentType: 'all',
-  eventFilter: 'all'
-}
-
-const routes = {
-  dashboard: { title: 'Accueil', render: renderDashboard },
-  agenda: { title: 'Plannings', render: renderAgenda },
-  grades: { title: 'Notes', render: renderGrades },
-  absences: { title: 'Absences', render: renderAbsences },
-  projects: { title: 'Projets', render: renderProjects },
-  documents: { title: 'Documents', render: renderDocuments },
-  events: { title: 'Événements', render: renderEvents }
-}
-
-const loginForm = document.querySelector('#login-form')
-const loginButton = document.querySelector('.login-button')
-const tokenInput = document.querySelector('#token-input')
-const loginError = document.querySelector('#login-error')
-const loginStatus = document.querySelector('#login-status')
-const view = document.querySelector('#view')
-const pageTitle = document.querySelector('#page-title')
-const breadcrumb = document.querySelector('#breadcrumb')
-const profileInitials = document.querySelector('#profile-initials')
-const profileName = document.querySelector('#profile-name')
-const navItems = [...document.querySelectorAll('[data-route]')]
-
-loginForm.addEventListener('submit', async event => {
-  event.preventDefault()
-  await login()
-})
-loginButton.addEventListener('click', async event => {
-  event.preventDefault()
-  await login()
-})
-view.addEventListener('change', updateFilter)
-view.addEventListener('input', updateFilter)
-window.addEventListener('hashchange', render)
-window.mygesLogin = login
-restoreSnapshot()
-render()
-
-async function login() {
-  hideLoginError()
-  const token = tokenInput.value.trim().replace(/^bearer\s+/i, '')
-  if (!token) {
-    showLoginError('Colle ton bearer Kordis/MyGES pour charger de vraies donnees.')
-    return
-  }
-
-  loginForm.classList.add('is-loading')
-  showLoginStatus('Connexion a Kordis...')
-  try {
-    await loadRealData(token)
-    sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(data))
-    if (!location.hash || location.hash === '#login') location.hash = '#dashboard'
-    document.body.classList.add('is-authenticated')
-    render()
-  } catch (error) {
-    showLoginError("Connexion impossible avec ce bearer. Verifie le token ou l'acces CORS de l'API Kordis.")
-  } finally {
-    hideLoginStatus()
-    loginForm.classList.remove('is-loading')
-  }
-}
-
-function showLoginError(message) {
-  loginError.textContent = message
-  loginError.hidden = false
-}
-
-function hideLoginError() {
-  loginError.hidden = true
-  loginError.textContent = ''
-}
-
-function showLoginStatus(message) {
-  loginStatus.textContent = message
-  loginStatus.hidden = false
-}
-
-function hideLoginStatus() {
-  loginStatus.hidden = true
-  loginStatus.textContent = ''
-}
-
-async function loadRealData(token) {
-  const headers = {
-    Accept: 'application/json',
-    Authorization: `Bearer ${token}`
-  }
-  const get = path => fetch(`${API_BASE}${path}`, { headers })
-    .then(response => {
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      return response.json()
+createApp({
+  setup() {
+    const token = ref('')
+    const error = ref('')
+    const loading = ref(false)
+    const route = ref(routeFromHash())
+    const state = reactive({
+      gradePeriod: 'all',
+      absenceStatus: 'all',
+      projectQuery: '',
+      documentType: 'all',
+      eventFilter: 'all'
     })
-    .then(unwrap)
+    const data = reactive({
+      profile: null,
+      years: [],
+      agenda: [],
+      grades: [],
+      absences: [],
+      projects: [],
+      documents: [],
+      events: [],
+      news: [],
+      updatedAt: null
+    })
 
-  data.profile = profileFromApi(await get('me/profile'))
-  data.years = toArray(await get('me/years')).map(yearValue).filter(Boolean)
-  state.year = state.year || data.years[0] || String(new Date().getFullYear())
+    const nav = [
+      { route: 'dashboard', label: 'Accueil', code: '01' },
+      { route: 'agenda', label: 'Plannings', code: '02' },
+      { route: 'grades', label: 'Notes', code: '03' },
+      { route: 'absences', label: 'Absences', code: '!' },
+      { route: 'projects', label: 'Projets', code: '04' },
+      { route: 'documents', label: 'Docs', code: '05' },
+      { route: 'events', label: 'Events', code: '06' }
+    ]
 
-  const start = Math.floor((Date.now() - 7 * 86400000) / 1000)
-  const end = Math.floor((Date.now() + 28 * 86400000) / 1000)
-  const [
-    agenda,
-    grades,
-    absences,
-    projects,
-    documents,
-    news,
-    events
-  ] = await Promise.all([
-    get(`me/agenda?start=${start}&end=${end}`).catch(() => []),
-    get(`me/${state.year}/grades`).catch(() => []),
-    get(`me/${state.year}/absences`).catch(() => []),
-    get(`me/${state.year}/projects`).catch(() => []),
-    get('me/annualDocuments').catch(() => []),
-    get('me/news').catch(() => []),
-    get('me/events').catch(() => [])
-  ])
+    const authenticated = computed(() => Boolean(data.profile))
+    const profile = computed(() => data.profile || { name: 'Profil MyGES', school: 'MyGES', program: 'Espace etudiant' })
+    const title = computed(() => nav.find(item => item.route === route.value)?.label || 'Accueil')
+    const initials = computed(() => initialsFrom(profile.value.name))
+    const sortedAgenda = computed(() => data.agenda.slice().sort((a, b) => Number(eventStart(a) || 0) - Number(eventStart(b) || 0)))
+    const gradePeriods = computed(() => ['all', ...unique(data.grades.map(gradePeriod))])
+    const filteredGrades = computed(() => data.grades.filter(grade => state.gradePeriod === 'all' || gradePeriod(grade) === state.gradePeriod))
+    const filteredAbsences = computed(() => data.absences.filter(absence => state.absenceStatus === 'all' || absenceStatus(absence) === state.absenceStatus))
+    const filteredProjects = computed(() => data.projects.filter(project => projectTitle(project).toLowerCase().includes(state.projectQuery.toLowerCase())))
+    const documentTypes = computed(() => ['all', ...unique(data.documents.map(documentType))])
+    const filteredDocuments = computed(() => data.documents.filter(document => state.documentType === 'all' || documentType(document) === state.documentType))
+    const eventTypes = computed(() => ['all', ...unique(data.events.map(eventType))])
+    const filteredEvents = computed(() => data.events.filter(event => state.eventFilter === 'all' || eventType(event) === state.eventFilter))
+    const currentView = computed(() => ({
+      dashboard: 'dashboard-view',
+      agenda: 'agenda-view',
+      grades: 'grades-view',
+      absences: 'absences-view',
+      projects: 'projects-view',
+      documents: 'documents-view',
+      events: 'events-view'
+    })[route.value] || 'dashboard-view')
 
-  data.agenda = toArray(agenda)
-  data.grades = toArray(grades)
-  data.absences = toArray(absences)
-  data.projects = toArray(projects)
-  data.documents = toArray(documents)
-  data.news = toArray(news)
-  data.events = toArray(events)
-  data.updatedAt = Date.now()
-  updateProfileHeader()
-}
+    window.addEventListener('hashchange', () => {
+      route.value = routeFromHash()
+    })
+    restoreSnapshot()
 
-function restoreSnapshot() {
-  const saved = sessionStorage.getItem(SNAPSHOT_KEY)
-  if (!saved) return
-  try {
-    Object.assign(data, JSON.parse(saved))
-    state.year = state.year || data.years?.[0] || ''
-    updateProfileHeader()
-  } catch {
-    sessionStorage.removeItem(SNAPSHOT_KEY)
+    async function login() {
+      error.value = ''
+      const cleanToken = token.value.trim().replace(/^bearer\s+/i, '')
+      if (!cleanToken) {
+        error.value = 'Colle ton bearer Kordis/MyGES pour charger de vraies donnees.'
+        return
+      }
+
+      loading.value = true
+      try {
+        await loadRealData(cleanToken)
+        sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot()))
+        if (!location.hash || route.value === 'login') location.hash = '#dashboard'
+        route.value = routeFromHash()
+      } catch {
+        error.value = "Connexion impossible avec ce bearer. Verifie le token ou l'acces CORS de l'API Kordis."
+      } finally {
+        loading.value = false
+      }
+    }
+
+    async function loadRealData(cleanToken) {
+      const headers = { Accept: 'application/json', Authorization: `Bearer ${cleanToken}` }
+      const get = path => fetch(`${API_BASE}${path}`, { headers })
+        .then(response => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          return response.json()
+        })
+        .then(unwrap)
+
+      data.profile = profileFromApi(await get('me/profile'))
+      data.years = toArray(await get('me/years')).map(yearValue).filter(Boolean)
+      const year = data.years[0] || String(new Date().getFullYear())
+      const start = Math.floor((Date.now() - 7 * 86400000) / 1000)
+      const end = Math.floor((Date.now() + 28 * 86400000) / 1000)
+      const [agenda, grades, absences, projects, documents, news, events] = await Promise.all([
+        get(`me/agenda?start=${start}&end=${end}`).catch(() => []),
+        get(`me/${year}/grades`).catch(() => []),
+        get(`me/${year}/absences`).catch(() => []),
+        get(`me/${year}/projects`).catch(() => []),
+        get('me/annualDocuments').catch(() => []),
+        get('me/news').catch(() => []),
+        get('me/events').catch(() => [])
+      ])
+
+      data.agenda = toArray(agenda)
+      data.grades = toArray(grades)
+      data.absences = toArray(absences)
+      data.projects = toArray(projects)
+      data.documents = toArray(documents)
+      data.news = toArray(news)
+      data.events = toArray(events)
+      data.updatedAt = Date.now()
+    }
+
+    function snapshot() {
+      return {
+        profile: data.profile,
+        years: data.years,
+        agenda: data.agenda,
+        grades: data.grades,
+        absences: data.absences,
+        projects: data.projects,
+        documents: data.documents,
+        events: data.events,
+        news: data.news,
+        updatedAt: data.updatedAt
+      }
+    }
+
+    function restoreSnapshot() {
+      const saved = sessionStorage.getItem(SNAPSHOT_KEY)
+      if (!saved) return
+      try {
+        Object.assign(data, JSON.parse(saved))
+      } catch {
+        sessionStorage.removeItem(SNAPSHOT_KEY)
+      }
+    }
+
+    return {
+      token,
+      error,
+      loading,
+      route,
+      state,
+      data,
+      nav,
+      authenticated,
+      profile,
+      title,
+      initials,
+      sortedAgenda,
+      gradePeriods,
+      filteredGrades,
+      filteredAbsences,
+      filteredProjects,
+      documentTypes,
+      filteredDocuments,
+      eventTypes,
+      filteredEvents,
+      currentView,
+      login,
+      firstName,
+      formatDateTime,
+      formatTime,
+      eventStart,
+      eventEnd,
+      eventTitle,
+      eventRoom,
+      eventType,
+      gradeTitle,
+      gradePeriod,
+      gradeEcts,
+      teacherName,
+      absenceStatus,
+      projectTitle,
+      documentType,
+      valueOf,
+      sum
+    }
   }
-}
-
-function updateFilter(event) {
-  const key = event.target.dataset.filter
-  if (!key) return
-  state[key] = event.target.value
-  render()
-}
-
-function render() {
-  const route = location.hash.replace('#', '') || 'login'
-  if (!data.profile || route === 'login') {
-    document.body.classList.remove('is-authenticated')
-    return
-  }
-
-  document.body.classList.add('is-authenticated')
-  const screen = routes[route] || routes.dashboard
-  pageTitle.textContent = screen.title
-  breadcrumb.textContent = `Root / ${screen.title}`
-  navItems.forEach(item => item.classList.toggle('is-active', item.dataset.route === route))
-  view.innerHTML = screen.render()
-}
-
-function renderDashboard() {
-  const nextCourse = sortedAgenda()[0]
-  return `
-    <section class="grid dashboard-grid">
-      <div class="stack">
-        <article class="panel welcome">
-          <div>
-            <p class="eyebrow">Bonjour ${escapeHtml(firstName(data.profile.name))}</p>
-            <h2>${escapeHtml(data.profile.program || 'Espace etudiant')}</h2>
-            <p>${escapeHtml(data.profile.school || 'MyGES')} · donnees chargees depuis ton compte Kordis.</p>
-            <div class="pill-row">
-              <span class="pill">${nextCourse ? `Prochain cours ${formatDateTime(eventStart(nextCourse))}` : 'Aucun cours renvoye'}</span>
-              <span class="pill">${data.grades.length} matieres</span>
-              <span class="pill">${data.absences.length} absences</span>
+})
+  .component('metric-card', {
+    props: ['label', 'value', 'detail'],
+    template: `
+      <article class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <small class="text-xs font-black uppercase tracking-wide text-slate-500">{{ label }}</small>
+        <strong class="mt-3 block text-3xl font-black text-slate-900">{{ value }}</strong>
+        <em class="mt-2 block text-sm font-extrabold not-italic text-myges-500">{{ detail }}</em>
+      </article>
+    `
+  })
+  .component('empty-state', {
+    template: `<p class="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-slate-500">Aucune donnee renvoyee par MyGES pour cette rubrique.</p>`
+  })
+  .component('dashboard-view', {
+    template: `
+      <section class="grid gap-4 xl:grid-cols-[1.25fr_.75fr]">
+        <div class="grid gap-4">
+          <article class="rounded-lg bg-myges-700 p-6 text-white shadow-lg shadow-myges-900/10">
+            <p class="text-xs font-black uppercase tracking-wide text-white/70">Bonjour {{ firstName(profile.name) }}</p>
+            <h2 class="mt-2 text-2xl font-black">{{ profile.program || 'Espace etudiant' }}</h2>
+            <p class="mt-2 text-sm font-medium leading-6 text-white/80">{{ profile.school || 'MyGES' }} · donnees chargees depuis ton compte Kordis.</p>
+            <div class="mt-5 flex flex-wrap gap-2">
+              <span class="rounded-full bg-white/15 px-3 py-2 text-xs font-black">{{ sortedAgenda[0] ? 'Prochain cours ' + formatDateTime(eventStart(sortedAgenda[0])) : 'Aucun cours renvoye' }}</span>
+              <span class="rounded-full bg-white/15 px-3 py-2 text-xs font-black">{{ data.grades.length }} matieres</span>
+              <span class="rounded-full bg-white/15 px-3 py-2 text-xs font-black">{{ data.absences.length }} absences</span>
             </div>
-          </div>
-          <div class="campus-card" aria-hidden="true"></div>
-        </article>
-        <section class="grid cols-3">
-          ${metric('Planning', String(data.agenda.length), 'elements renvoyes')}
-          ${metric('Notes', String(data.grades.length), 'matieres renvoyees')}
-          ${metric('Projets', String(data.projects.length), 'projets renvoyes')}
-        </section>
-        <section class="grid portal-grid">
-          ${portalTile('Plannings', 'Semaine courante', `${data.agenda.length} elements`)}
-          ${portalTile('Notes et absences', state.year || 'Annee', `${data.grades.length} notes, ${data.absences.length} absences`)}
-          ${portalTile('Documents', 'Scolarite', `${data.documents.length} documents`)}
-          ${portalTile('Projets pédagogiques', 'Travaux', `${data.projects.length} projets`)}
-        </section>
-        <section class="panel">
-          <h2>Aujourd'hui</h2>
-          <div class="list">${renderList(sortedAgenda().slice(0, 5), agendaItem)}</div>
-        </section>
-      </div>
-      <aside class="stack">
-        <section class="panel">
-          <h2>Dernieres notes</h2>
-          <div class="list">${renderList(data.grades.slice(0, 4), gradeCard)}</div>
-        </section>
-        <section class="panel">
-          <h2>Actualites</h2>
-          <div class="list">${renderList(data.news.slice(0, 4), newsCard)}</div>
-        </section>
-      </aside>
-    </section>
-  `
-}
-
-function renderAgenda() {
-  return `
-    <section class="stack">
-      <div class="filter-bar">
-        <strong>${data.agenda.length} elements de planning</strong>
-        <span class="muted">Mise a jour ${formatDateTime(data.updatedAt)}</span>
-      </div>
-      <section class="panel">
-        <h2>Planning</h2>
-        <div class="list">${renderList(sortedAgenda(), agendaItem)}</div>
+          </article>
+          <section class="grid gap-3 sm:grid-cols-3">
+            <metric-card label="Planning" :value="String(data.agenda.length)" detail="elements renvoyes"></metric-card>
+            <metric-card label="Notes" :value="String(data.grades.length)" detail="matieres renvoyees"></metric-card>
+            <metric-card label="Projets" :value="String(data.projects.length)" detail="projets renvoyes"></metric-card>
+          </section>
+          <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <a class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-myges-500" href="#agenda"><span class="text-sm font-black text-myges-500">Plannings</span><strong class="mt-2 block">Semaine courante</strong><small class="text-slate-500">{{ data.agenda.length }} elements</small></a>
+            <a class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-myges-500" href="#grades"><span class="text-sm font-black text-myges-500">Notes et absences</span><strong class="mt-2 block">{{ data.years[0] || 'Annee' }}</strong><small class="text-slate-500">{{ data.grades.length }} notes, {{ data.absences.length }} absences</small></a>
+            <a class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-myges-500" href="#documents"><span class="text-sm font-black text-myges-500">Documents</span><strong class="mt-2 block">Scolarite</strong><small class="text-slate-500">{{ data.documents.length }} documents</small></a>
+            <a class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-myges-500" href="#projects"><span class="text-sm font-black text-myges-500">Projets pedagogiques</span><strong class="mt-2 block">Travaux</strong><small class="text-slate-500">{{ data.projects.length }} projets</small></a>
+          </section>
+          <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 class="mb-3 text-lg font-black">Aujourd'hui</h2>
+            <div v-if="sortedAgenda.length" class="grid gap-2">
+              <article v-for="event in sortedAgenda.slice(0, 5)" class="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[92px_1fr_auto] sm:items-center">
+                <span class="rounded-lg bg-myges-50 px-3 py-2 text-center text-sm font-black text-myges-700">{{ formatTime(eventStart(event)) }}<br>{{ formatTime(eventEnd(event)) }}</span>
+                <div><h3 class="font-black">{{ eventTitle(event) }}</h3><p class="text-sm font-bold text-slate-500">{{ eventRoom(event) || '-' }}</p></div>
+                <span class="justify-self-start rounded-full bg-myges-50 px-3 py-1 text-xs font-black text-myges-700">{{ eventType(event) }}</span>
+              </article>
+            </div>
+            <empty-state v-else></empty-state>
+          </section>
+        </div>
+        <aside class="grid content-start gap-4">
+          <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 class="mb-3 text-lg font-black">Dernieres notes</h2>
+            <div v-if="data.grades.length" class="grid gap-2">
+              <article v-for="grade in data.grades.slice(0, 4)" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3">
+                <div><h3 class="font-black">{{ gradeTitle(grade) }}</h3><p class="text-sm font-bold text-slate-500">{{ teacherName(grade) }}</p></div>
+                <strong class="text-myges-500">{{ valueOf(grade, ['average', 'ccaverage']) || '-' }}</strong>
+              </article>
+            </div>
+            <empty-state v-else></empty-state>
+          </section>
+          <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 class="mb-3 text-lg font-black">Actualites</h2>
+            <div v-if="data.news.length" class="grid gap-2">
+              <article v-for="item in data.news.slice(0, 5)" class="rounded-lg border border-slate-200 p-3">
+                <h3 class="font-black">{{ valueOf(item, ['title', 'name', 'label']) || 'Actualite' }}</h3>
+                <p class="text-sm font-bold text-slate-500">{{ valueOf(item, ['summary', 'description']) }}</p>
+              </article>
+            </div>
+            <empty-state v-else></empty-state>
+          </section>
+        </aside>
       </section>
-    </section>
-  `
-}
+    `
+  })
+  .component('agenda-view', {
+    template: `
+      <section class="grid gap-4">
+        <div class="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <strong>{{ data.agenda.length }} elements de planning</strong>
+          <span class="text-sm font-bold text-slate-500">Mise a jour {{ formatDateTime(data.updatedAt) }}</span>
+        </div>
+        <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 class="mb-3 text-lg font-black">Planning</h2>
+          <div v-if="sortedAgenda.length" class="grid gap-2">
+            <article v-for="event in sortedAgenda" class="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[92px_1fr_auto] sm:items-center">
+              <span class="rounded-lg bg-myges-50 px-3 py-2 text-center text-sm font-black text-myges-700">{{ formatTime(eventStart(event)) }}<br>{{ formatTime(eventEnd(event)) }}</span>
+              <div><h3 class="font-black">{{ eventTitle(event) }}</h3><p class="text-sm font-bold text-slate-500">{{ eventRoom(event) || '-' }}</p></div>
+              <span class="justify-self-start rounded-full bg-myges-50 px-3 py-1 text-xs font-black text-myges-700">{{ eventType(event) }}</span>
+            </article>
+          </div>
+          <empty-state v-else></empty-state>
+        </section>
+      </section>
+    `
+  })
+  .component('grades-view', {
+    template: `
+      <section class="grid gap-4">
+        <div class="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <label class="grid min-w-72 gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Periode
+            <select v-model="state.gradePeriod" class="h-11 rounded-lg border border-slate-200 px-3 text-sm text-slate-900"><option v-for="period in gradePeriods" :value="period">{{ period === 'all' ? 'Tous' : period }}</option></select>
+          </label>
+          <span class="text-sm font-bold text-slate-500">{{ filteredGrades.length }} matieres</span>
+        </div>
+        <section class="grid gap-3 sm:grid-cols-2">
+          <metric-card label="Matieres" :value="String(filteredGrades.length)" detail="renvoyees par MyGES"></metric-card>
+          <metric-card label="ECTS" :value="String(sum(filteredGrades.map(gradeEcts)))" detail="total affiche"></metric-card>
+        </section>
+        <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 class="mb-3 text-lg font-black">Notes</h2>
+          <div v-if="filteredGrades.length" class="overflow-x-auto">
+            <table class="w-full min-w-[680px] border-collapse text-sm">
+              <thead><tr class="bg-myges-500 text-left text-white"><th class="p-3">Matiere</th><th class="p-3">Intervenant</th><th class="p-3">Coef.</th><th class="p-3">ECTS</th><th class="p-3">Exam</th><th class="p-3">Moyenne</th></tr></thead>
+              <tbody><tr v-for="grade in filteredGrades" class="border-b border-slate-200 even:bg-slate-50"><td class="p-3 font-bold">{{ gradeTitle(grade) }}</td><td class="p-3">{{ teacherName(grade) }}</td><td class="p-3">{{ valueOf(grade, ['coef']) || '-' }}</td><td class="p-3">{{ valueOf(grade, ['ects']) || '-' }}</td><td class="p-3">{{ valueOf(grade, ['exam', 'letter_mark']) || '-' }}</td><td class="p-3 font-black text-myges-500">{{ valueOf(grade, ['average', 'ccaverage']) || '-' }}</td></tr></tbody>
+            </table>
+          </div>
+          <empty-state v-else></empty-state>
+        </section>
+      </section>
+    `
+  })
+  .component('absences-view', {
+    template: `
+      <section class="grid gap-4">
+        <div class="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <label class="grid min-w-52 gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Justifie
+            <select v-model="state.absenceStatus" class="h-11 rounded-lg border border-slate-200 px-3 text-sm text-slate-900"><option value="all">Tous</option><option>Oui</option><option>Non</option></select>
+          </label>
+          <span class="text-sm font-bold text-slate-500">{{ filteredAbsences.length }} absences</span>
+        </div>
+        <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 class="mb-3 text-lg font-black">Historique</h2>
+          <div v-if="filteredAbsences.length" class="grid gap-2">
+            <article v-for="absence in filteredAbsences" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"><div><h3 class="font-black">{{ valueOf(absence, ['course', 'course_name', 'matter']) || 'Absence' }}</h3><p class="text-sm font-bold text-slate-500">{{ formatDateTime(valueOf(absence, ['date', 'start_date', 'starts_at'])) || '-' }}</p></div><span class="rounded-full bg-myges-50 px-3 py-1 text-xs font-black text-myges-700">{{ absenceStatus(absence) }}</span></article>
+          </div>
+          <empty-state v-else></empty-state>
+        </section>
+      </section>
+    `
+  })
+  .component('projects-view', {
+    template: `
+      <section class="grid gap-4">
+        <div class="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <label class="grid min-w-72 gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Recherche
+            <input v-model="state.projectQuery" class="h-11 rounded-lg border border-slate-200 px-3 text-sm text-slate-900" placeholder="matiere, projet...">
+          </label>
+          <span class="text-sm font-bold text-slate-500">{{ filteredProjects.length }} projets</span>
+        </div>
+        <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 class="mb-3 text-lg font-black">Projets pedagogiques</h2>
+          <div v-if="filteredProjects.length" class="overflow-x-auto">
+            <table class="w-full min-w-[680px] border-collapse text-sm">
+              <thead><tr class="bg-myges-500 text-left text-white"><th class="p-3">Date</th><th class="p-3">Matiere</th><th class="p-3">Projet</th><th class="p-3">Actions</th></tr></thead>
+              <tbody><tr v-for="project in filteredProjects" class="border-b border-slate-200 even:bg-slate-50"><td class="p-3">{{ formatDateTime(valueOf(project, ['update_date', 'project_create_date'])) }}</td><td class="p-3">{{ valueOf(project, ['course_name']) || '-' }}</td><td class="p-3 font-bold">{{ projectTitle(project) }}</td><td class="p-3"><span class="rounded-full bg-myges-50 px-3 py-1 text-xs font-black text-myges-700">{{ project.groups?.length ? 'Groupe' : 'Voir' }}</span></td></tr></tbody>
+            </table>
+          </div>
+          <empty-state v-else></empty-state>
+        </section>
+      </section>
+    `
+  })
+  .component('documents-view', {
+    template: `
+      <section class="grid gap-4">
+        <div class="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <label class="grid min-w-52 gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Type
+            <select v-model="state.documentType" class="h-11 rounded-lg border border-slate-200 px-3 text-sm text-slate-900"><option v-for="type in documentTypes" :value="type">{{ type === 'all' ? 'Tous' : type }}</option></select>
+          </label>
+          <span class="text-sm font-bold text-slate-500">{{ filteredDocuments.length }} documents</span>
+        </div>
+        <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 class="mb-3 text-lg font-black">Documents</h2>
+          <div v-if="filteredDocuments.length" class="grid gap-2">
+            <article v-for="document in filteredDocuments" class="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[52px_1fr_auto] sm:items-center"><span class="grid h-11 w-11 place-items-center rounded-lg bg-myges-50 text-xs font-black text-myges-700">DOC</span><div><h3 class="font-black">{{ valueOf(document, ['name', 'title', 'label']) || 'Document' }}</h3><p class="text-sm font-bold text-slate-500">{{ documentType(document) }}</p></div><span class="justify-self-start rounded-full bg-myges-50 px-3 py-1 text-xs font-black text-myges-700">{{ valueOf(document, ['status', 'year']) || 'MyGES' }}</span></article>
+          </div>
+          <empty-state v-else></empty-state>
+        </section>
+      </section>
+    `
+  })
+  .component('events-view', {
+    template: `
+      <section class="grid gap-4">
+        <div class="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <label class="grid min-w-52 gap-1 text-xs font-black uppercase tracking-wide text-slate-500">Categorie
+            <select v-model="state.eventFilter" class="h-11 rounded-lg border border-slate-200 px-3 text-sm text-slate-900"><option v-for="type in eventTypes" :value="type">{{ type === 'all' ? 'Tous' : type }}</option></select>
+          </label>
+          <span class="text-sm font-bold text-slate-500">{{ filteredEvents.length }} evenements</span>
+        </div>
+        <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 class="mb-3 text-lg font-black">Vie etudiante</h2>
+          <div v-if="filteredEvents.length" class="grid gap-2">
+            <article v-for="event in filteredEvents" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3"><div><h3 class="font-black">{{ valueOf(event, ['name', 'title', 'label']) || 'Evenement' }}</h3><p class="text-sm font-bold text-slate-500">{{ valueOf(event, ['place', 'location', 'campus']) || '-' }}</p></div><span class="rounded-full bg-myges-50 px-3 py-1 text-xs font-black text-myges-700">{{ formatDateTime(valueOf(event, ['date', 'start_date', 'starts_at'])) || eventType(event) }}</span></article>
+          </div>
+          <empty-state v-else></empty-state>
+        </section>
+      </section>
+    `
+  })
+  .mount('#app')
 
-function renderGrades() {
-  const periods = ['all', ...unique(data.grades.map(gradePeriod))]
-  const grades = data.grades.filter(grade => state.gradePeriod === 'all' || gradePeriod(grade) === state.gradePeriod)
-  return `
-    <section class="filter-bar">
-      ${selectField('Période', 'gradePeriod', periods)}
-      <span class="muted">${grades.length} matieres</span>
-    </section>
-    <section class="grid cols-2">
-      ${metric('Matieres', String(grades.length), 'renvoyees par MyGES')}
-      ${metric('ECTS', String(sum(grades.map(gradeEcts))), 'total affiche')}
-    </section>
-    <section class="panel">
-      <h2>Notes</h2>
-      ${gradesTable(grades)}
-    </section>
-  `
-}
-
-function renderAbsences() {
-  const absences = data.absences.filter(absence =>
-    state.absenceStatus === 'all' || absenceStatus(absence) === state.absenceStatus
-  )
-  return `
-    <section class="filter-bar">
-      ${selectField('Justifie', 'absenceStatus', ['all', 'Oui', 'Non'])}
-      <span class="muted">${absences.length} absences</span>
-    </section>
-    <section class="panel">
-      <h2>Historique</h2>
-      <div class="list">${renderList(absences, absenceItem)}</div>
-    </section>
-  `
-}
-
-function renderProjects() {
-  const query = state.projectQuery.toLowerCase()
-  const projects = data.projects.filter(project => projectTitle(project).toLowerCase().includes(query))
-  return `
-    <section class="filter-bar">
-      <label class="filter-field">
-        Recherche
-        <input data-filter="projectQuery" value="${escapeHtml(state.projectQuery)}" placeholder="matiere, projet...">
-      </label>
-      <span class="muted">${projects.length} projets</span>
-    </section>
-    <section class="panel">
-      <h2>Projets pédagogiques</h2>
-      ${projectsTable(projects)}
-    </section>
-  `
-}
-
-function renderDocuments() {
-  const documents = data.documents.filter(document =>
-    state.documentType === 'all' || documentType(document) === state.documentType
-  )
-  const types = ['all', ...unique(data.documents.map(documentType))]
-  return `
-    <section class="filter-bar">
-      ${selectField('Type', 'documentType', types)}
-      <span class="muted">${documents.length} documents</span>
-    </section>
-    <section class="panel">
-      <h2>Documents</h2>
-      <div class="list">${renderList(documents, documentItem)}</div>
-    </section>
-  `
-}
-
-function renderEvents() {
-  const events = data.events.filter(event =>
-    state.eventFilter === 'all' || eventType(event) === state.eventFilter
-  )
-  const types = ['all', ...unique(data.events.map(eventType))]
-  return `
-    <section class="filter-bar">
-      ${selectField('Catégorie', 'eventFilter', types)}
-      <span class="muted">${events.length} evenements</span>
-    </section>
-    <section class="panel">
-      <h2>Vie étudiante</h2>
-      <div class="list">${renderList(events, eventItem)}</div>
-    </section>
-  `
-}
-
-function gradesTable(grades) {
-  if (!grades.length) return emptyState()
-  return `
-    <div class="table-scroll">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Matiere</th>
-            <th>Intervenant</th>
-            <th>Coef.</th>
-            <th>ECTS</th>
-            <th>Exam</th>
-            <th>Moyenne</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${grades.map(grade => `
-            <tr>
-              <td>${escapeHtml(gradeTitle(grade))}</td>
-              <td>${escapeHtml(teacherName(grade))}</td>
-              <td>${escapeHtml(valueOf(grade, ['coef']) || '-')}</td>
-              <td>${escapeHtml(valueOf(grade, ['ects']) || '-')}</td>
-              <td>${escapeHtml(valueOf(grade, ['exam', 'letter_mark']) || '-')}</td>
-              <td>${escapeHtml(valueOf(grade, ['average', 'ccaverage']) || '-')}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `
-}
-
-function projectsTable(projects) {
-  if (!projects.length) return emptyState()
-  return `
-    <div class="table-scroll">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Matiere</th>
-            <th>Projet</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${projects.map(project => `
-            <tr>
-              <td>${escapeHtml(formatDateTime(valueOf(project, ['update_date', 'project_create_date'])))}</td>
-              <td>${escapeHtml(valueOf(project, ['course_name']) || '-')}</td>
-              <td>${escapeHtml(projectTitle(project))}</td>
-              <td><span class="tag">${escapeHtml(project.groups?.length ? 'Groupe' : 'Voir')}</span></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `
-}
-
-function agendaItem(event) {
-  return `
-    <article class="event-card">
-      <span class="time-chip">${escapeHtml(formatTime(eventStart(event)))}<br>${escapeHtml(formatTime(eventEnd(event)))}</span>
-      <div>
-        <h3>${escapeHtml(eventTitle(event))}</h3>
-        <span class="muted">${escapeHtml(eventRoom(event) || '-')}</span>
-      </div>
-      <span class="tag">${escapeHtml(eventType(event) || 'Cours')}</span>
-    </article>
-  `
-}
-
-function gradeCard(grade) {
-  return `
-    <article class="table-row">
-      <div>
-        <h3>${escapeHtml(gradeTitle(grade))}</h3>
-        <span class="muted">${escapeHtml(teacherName(grade))}</span>
-      </div>
-      <strong class="score">${escapeHtml(valueOf(grade, ['average', 'ccaverage']) || '-')}</strong>
-    </article>
-  `
-}
-
-function absenceItem(absence) {
-  return `
-    <article class="table-row">
-      <div>
-        <h3>${escapeHtml(valueOf(absence, ['course', 'course_name', 'matter']) || 'Absence')}</h3>
-        <span class="muted">${escapeHtml(formatDateTime(valueOf(absence, ['date', 'start_date', 'starts_at'])) || '-')}</span>
-      </div>
-      <span class="tag">${escapeHtml(absenceStatus(absence))}</span>
-    </article>
-  `
-}
-
-function documentItem(document) {
-  return `
-    <article class="table-row doc-row">
-      <span class="doc-icon">DOC</span>
-      <div>
-        <h3>${escapeHtml(valueOf(document, ['name', 'title', 'label']) || 'Document')}</h3>
-        <span class="muted">${escapeHtml(documentType(document))}</span>
-      </div>
-      <span class="tag">${escapeHtml(valueOf(document, ['status', 'year']) || 'MyGES')}</span>
-    </article>
-  `
-}
-
-function eventItem(event) {
-  return `
-    <article class="table-row">
-      <div>
-        <h3>${escapeHtml(valueOf(event, ['name', 'title', 'label']) || 'Evenement')}</h3>
-        <span class="muted">${escapeHtml(valueOf(event, ['place', 'location', 'campus']) || '-')}</span>
-      </div>
-      <span class="tag">${escapeHtml(formatDateTime(valueOf(event, ['date', 'start_date', 'starts_at'])) || eventType(event))}</span>
-    </article>
-  `
-}
-
-function newsCard(news) {
-  return `
-    <article class="table-row">
-      <div>
-        <h3>${escapeHtml(valueOf(news, ['title', 'name', 'label']) || 'Actualite')}</h3>
-        <span class="muted">${escapeHtml(valueOf(news, ['summary', 'content', 'description']) || '')}</span>
-      </div>
-    </article>
-  `
-}
-
-function metric(label, value, detail) {
-  return `
-    <article class="metric">
-      <small>${escapeHtml(label)}</small>
-      <strong>${escapeHtml(value)}</strong>
-      <em>${escapeHtml(detail)}</em>
-    </article>
-  `
-}
-
-function selectField(label, key, options) {
-  return `
-    <label class="filter-field">
-      ${escapeHtml(label)}
-      <select data-filter="${key}">
-        ${options.filter(Boolean).map(option => `<option value="${escapeHtml(option)}"${state[key] === option ? ' selected' : ''}>${escapeHtml(option === 'all' ? 'Tous' : option)}</option>`).join('')}
-      </select>
-    </label>
-  `
-}
-
-function portalTile(title, detail, meta) {
-  const route = title.startsWith('Planning') ? 'agenda' : title.startsWith('Notes') ? 'grades' : title.startsWith('Documents') ? 'documents' : 'projects'
-  return `
-    <a class="portal-tile" href="#${route}">
-      <span>${escapeHtml(title)}</span>
-      <strong>${escapeHtml(detail)}</strong>
-      <small class="muted">${escapeHtml(meta)}</small>
-    </a>
-  `
-}
-
-function renderList(items, renderer) {
-  return items.length ? items.map(renderer).join('') : emptyState()
-}
-
-function emptyState() {
-  return '<p class="muted">Aucune donnee renvoyee par MyGES pour cette rubrique.</p>'
+function routeFromHash() {
+  return location.hash.replace('#', '') || 'login'
 }
 
 function unwrap(payload) {
@@ -530,22 +419,13 @@ function profileFromApi(payload) {
   }
 }
 
-function updateProfileHeader() {
-  profileName.textContent = data.profile?.name || 'Profil MyGES'
-  profileInitials.textContent = initials(profileName.textContent)
-}
-
-function initials(name) {
+function initialsFrom(name) {
   const parts = name.split(/\s+/).filter(Boolean)
   return ((parts[0]?.[0] || 'M') + (parts[1]?.[0] || 'G')).toUpperCase()
 }
 
 function firstName(name) {
   return name.split(/\s+/).filter(Boolean)[0] || 'toi'
-}
-
-function sortedAgenda() {
-  return data.agenda.slice().sort((a, b) => Number(eventStart(a) || 0) - Number(eventStart(b) || 0))
 }
 
 function eventStart(event) {
@@ -646,13 +526,4 @@ function toDate(value) {
   if (typeof value === 'number') return new Date(value < 10000000000 ? value * 1000 : value)
   const parsed = Date.parse(value)
   return Number.isNaN(parsed) ? null : new Date(parsed)
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;')
 }
