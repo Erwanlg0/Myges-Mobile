@@ -44,7 +44,7 @@ const data = {
 
 const routes = {
   dashboard: { title: 'Accueil', render: renderDashboard },
-  agenda: { title: 'Agenda', render: renderAgenda },
+  agenda: { title: 'Plannings', render: renderAgenda },
   grades: { title: 'Notes', render: renderGrades },
   absences: { title: 'Absences', render: renderAbsences },
   projects: { title: 'Projets', render: renderProjects },
@@ -52,17 +52,37 @@ const routes = {
   events: { title: 'Événements', render: renderEvents }
 }
 
+const loginForm = document.querySelector('#login-form')
+const demoButton = document.querySelector('#demo-button')
 const view = document.querySelector('#view')
 const pageTitle = document.querySelector('#page-title')
+const breadcrumb = document.querySelector('#breadcrumb')
 const navItems = [...document.querySelectorAll('[data-route]')]
 
+loginForm.addEventListener('submit', event => {
+  event.preventDefault()
+  openPortal()
+})
+demoButton.addEventListener('click', openPortal)
 window.addEventListener('hashchange', render)
 render()
 
+function openPortal() {
+  if (!location.hash || location.hash === '#login') location.hash = '#dashboard'
+  document.body.classList.add('is-authenticated')
+  render()
+}
+
 function render() {
   const route = location.hash.replace('#', '') || 'dashboard'
+  if (!location.hash || route === 'login') {
+    document.body.classList.remove('is-authenticated')
+    return
+  }
+  document.body.classList.add('is-authenticated')
   const screen = routes[route] || routes.dashboard
   pageTitle.textContent = screen.title
+  breadcrumb.textContent = `Root / ${screen.title}`
   navItems.forEach(item => item.classList.toggle('is-active', item.dataset.route === route))
   view.innerHTML = screen.render()
 }
@@ -89,6 +109,12 @@ function renderDashboard() {
           ${metric('Assiduité', '98%', '5 absences au total')}
           ${metric('Événements', '26', 'Vie étudiante')}
         </section>
+        <section class="grid portal-grid">
+          ${portalTile('Plannings', 'Semaine courante', '6 juillet - 12 juillet')}
+          ${portalTile('Notes et absences', 'Semestre 3', '29 notes, 5 absences')}
+          ${portalTile('Documents', 'Scolarite', 'Certificats et supports')}
+          ${portalTile('Relations entreprises', 'Stages', 'Conventions et suivi')}
+        </section>
         <section class="panel">
           <h2>Aujourd’hui</h2>
           <div class="list">${data.agenda.map(eventCard).join('')}</div>
@@ -112,13 +138,14 @@ function renderAgenda() {
   return `
     <section class="stack">
       <div class="pill-row">
-        <button class="pill-button is-active" type="button">Jour</button>
-        <button class="pill-button" type="button">Semaine</button>
+        <button class="pill-button" type="button">Aujourd'hui</button>
+        <button class="pill-button is-active" type="button">Semaine</button>
         <button class="pill-button" type="button">Mois</button>
+        <button class="pill-button" type="button">Actualiser</button>
       </div>
       <section class="panel">
-        <h2>Mercredi 8 juillet</h2>
-        <div class="list">${data.agenda.map(eventCard).join('')}</div>
+        <h2>6 juillet - 12 juillet 2026</h2>
+        ${weekPlanner()}
       </section>
     </section>
   `
@@ -131,8 +158,8 @@ function renderGrades() {
       ${metric('Meilleure matière', 'Projet annuel', '18,0 / 20')}
     </section>
     <section class="panel">
-      <h2>Notes récentes</h2>
-      <div class="list">${data.grades.map(gradeRow).join('')}</div>
+      <h2>Notes</h2>
+      ${gradesTable()}
     </section>
   `
 }
@@ -226,6 +253,68 @@ function metric(label, value, detail) {
       <strong>${value}</strong>
       <em>${detail}</em>
     </article>
+  `
+}
+
+function portalTile(title, detail, meta) {
+  const route = title.startsWith('Planning') ? 'agenda' : title.startsWith('Notes') ? 'grades' : title.startsWith('Documents') ? 'documents' : 'projects'
+  return `
+    <a class="portal-tile" href="#${route}">
+      <span>${title}</span>
+      <strong>${detail}</strong>
+      <small class="muted">${meta}</small>
+    </a>
+  `
+}
+
+function weekPlanner() {
+  const days = ['Lun. 6/07', 'Mar. 7/07', 'Mer. 8/07', 'Jeu. 9/07', 'Ven. 10/07']
+  const slots = ['09:00', '11:00', '14:00', '16:00']
+  const events = {
+    '0-0': ['Architecture cloud', 'B302'],
+    '1-1': ['Design thinking', 'A118'],
+    '2-0': ['Securite applicative', 'Amphi 4'],
+    '2-2': ['Projet annuel', 'Lab 2'],
+    '4-1': ['Scripting Python', 'C204']
+  }
+  return `
+    <div class="week-board">
+      <div class="week-head week-cell"></div>
+      ${days.map(day => `<div class="week-head week-cell">${day}</div>`).join('')}
+      ${slots.map((slot, row) => `
+        <div class="week-time">${slot}</div>
+        ${days.map((day, col) => {
+          const event = events[`${col}-${row}`]
+          return `<div class="week-cell">${event ? `<div class="week-event"><strong>${event[0]}</strong><span>${event[1]}</span></div>` : ''}</div>`
+        }).join('')}
+      `).join('')}
+    </div>
+  `
+}
+
+function gradesTable() {
+  const rows = [
+    ['T3 - open', 'Mme FILIOL', '1.00', '1.00', '20', '20.00'],
+    ['T3 - Scripting python', 'M. RAYNAL', '2.00', '2.00', '20,0', '20.00'],
+    ['T3 - projet annuel', 'M. SANANES', '3.00', '3.00', '-', '-'],
+    ['T3 - securite du code', 'M. MILANO', '2.00', '2.00', '-', '-']
+  ]
+  return `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Matiere</th>
+          <th>Intervenant</th>
+          <th>Coef.</th>
+          <th>ECTS</th>
+          <th>Exam</th>
+          <th>Moyenne</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+      </tbody>
+    </table>
   `
 }
 

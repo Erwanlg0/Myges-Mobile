@@ -1,17 +1,17 @@
 :root {
   color-scheme: light;
-  --bg: #f4f7f6;
+  --bg: #f5f7fa;
   --panel: #ffffff;
-  --panel-soft: #eef5f3;
-  --text: #17211f;
-  --muted: #63716d;
-  --brand: #0c6b63;
-  --brand-2: #1f6fb2;
-  --accent: #e6b84d;
-  --coral: #d95f59;
+  --panel-soft: #eef4f8;
+  --text: #24313a;
+  --muted: #6b7882;
+  --brand: #217bb1;
+  --brand-2: #15547b;
+  --accent: #68a9d0;
+  --coral: #d45b4f;
   --ok: #247a52;
   --border: rgba(23, 33, 31, .12);
-  --shadow: 0 18px 42px rgba(16, 46, 44, .10);
+  --shadow: 0 18px 42px rgba(31, 74, 105, .12);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -23,10 +23,172 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    linear-gradient(135deg, rgba(12, 107, 99, .10), transparent 34%),
-    linear-gradient(315deg, rgba(217, 95, 89, .10), transparent 30%),
+    linear-gradient(135deg, rgba(33, 123, 177, .12), transparent 34%),
+    linear-gradient(315deg, rgba(104, 169, 208, .14), transparent 30%),
     var(--bg);
   color: var(--text);
+}
+
+body:not(.is-authenticated) .app-shell {
+  display: none;
+}
+
+body.is-authenticated .login-shell {
+  display: none;
+}
+
+.login-shell {
+  display: grid;
+  align-content: center;
+  gap: 28px;
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.login-brand {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  width: min(1040px, 100%);
+  margin: 0 auto;
+}
+
+.myges-logo {
+  color: var(--brand);
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.myges-logo span {
+  color: #585f65;
+}
+
+.login-brand small {
+  color: var(--muted);
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.login-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 18px;
+  width: min(1040px, 100%);
+  margin: 0 auto;
+}
+
+.login-hero,
+.login-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: var(--shadow);
+}
+
+.login-hero {
+  display: grid;
+  align-content: space-between;
+  min-height: 520px;
+  padding: 34px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(33, 123, 177, .93), rgba(21, 84, 123, .94)),
+    #217bb1;
+  color: #ffffff;
+}
+
+.login-hero h1 {
+  max-width: 620px;
+  margin: 14px 0;
+  font-size: 48px;
+}
+
+.login-hero p {
+  max-width: 58ch;
+  color: rgba(255, 255, 255, .86);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.login-badge {
+  justify-self: start;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .15);
+  font-weight: 800;
+}
+
+.login-preview {
+  display: grid;
+  grid-template-columns: 1.2fr .8fr;
+  gap: 12px;
+  min-height: 170px;
+}
+
+.login-preview span {
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .16);
+}
+
+.login-preview span:first-child {
+  grid-row: span 2;
+}
+
+.login-card {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  padding: 28px;
+}
+
+.login-card label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.login-card input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  font: inherit;
+}
+
+.login-button,
+.demo-button {
+  min-height: 48px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+}
+
+.login-button {
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: #ffffff;
+}
+
+.demo-button {
+  border: 1px solid var(--border);
+  background: var(--panel-soft);
+  color: var(--brand-2);
+}
+
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 750;
 }
 
 button,
@@ -52,9 +214,9 @@ a {
   grid-template-rows: auto 1fr auto;
   gap: 28px;
   height: 100vh;
-  padding: 24px;
+  padding: 18px;
   border-right: 1px solid var(--border);
-  background: rgba(255, 255, 255, .72);
+  background: #eef1f4;
   backdrop-filter: blur(18px);
 }
 
@@ -100,7 +262,7 @@ a {
   gap: 12px;
   min-height: 44px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--muted);
   font-weight: 750;
 }
@@ -137,7 +299,7 @@ a {
 .workspace {
   width: min(1180px, 100%);
   margin: 0 auto;
-  padding: 24px;
+  padding: 20px 24px 28px;
 }
 
 .topbar {
@@ -149,7 +311,7 @@ a {
   justify-content: space-between;
   gap: 16px;
   padding: 0 0 22px;
-  background: linear-gradient(to bottom, var(--bg) 76%, rgba(244, 247, 246, 0));
+  background: linear-gradient(to bottom, var(--bg) 76%, rgba(245, 247, 250, 0));
 }
 
 .eyebrow {
@@ -240,11 +402,12 @@ h3 {
 .table-row {
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, .88);
+  background: rgba(255, 255, 255, .92);
   box-shadow: var(--shadow);
 }
 
 .panel {
+  min-width: 0;
   padding: 18px;
 }
 
@@ -255,7 +418,7 @@ h3 {
   overflow: hidden;
   min-height: 180px;
   padding: 22px;
-  background: linear-gradient(135deg, #0c6b63, #1f6fb2 58%, #d95f59);
+  background: linear-gradient(135deg, #217bb1, #15547b 72%);
   color: #ffffff;
 }
 
@@ -360,6 +523,91 @@ h3 {
   font-weight: 800;
 }
 
+.portal-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.portal-tile {
+  display: grid;
+  gap: 8px;
+  min-height: 126px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.portal-tile span {
+  color: var(--brand);
+  font-weight: 900;
+}
+
+.week-board {
+  display: grid;
+  grid-template-columns: 58px repeat(5, minmax(120px, 1fr));
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.week-cell,
+.week-time {
+  min-height: 64px;
+  padding: 8px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.week-time,
+.week-head {
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.week-event {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border-left: 4px solid var(--brand);
+  border-radius: 6px;
+  background: #edf6fb;
+  font-size: 12px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.data-table th {
+  padding: 11px 10px;
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 12px;
+  text-align: left;
+}
+
+.data-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.data-table tr:nth-child(even) td {
+  background: #f7fafc;
+}
+
 .score {
   color: var(--ok);
   font-weight: 900;
@@ -405,6 +653,33 @@ h3 {
 }
 
 @media (max-width: 900px) {
+  .login-shell {
+    padding: 16px;
+  }
+
+  .login-brand {
+    align-items: start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .login-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .login-hero {
+    min-height: auto;
+    padding: 24px;
+  }
+
+  .login-hero h1 {
+    font-size: 32px;
+  }
+
+  .login-preview {
+    display: none;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
   }
@@ -455,6 +730,7 @@ h3 {
   .dashboard-grid,
   .cols-2,
   .cols-3,
+  .portal-grid,
   .welcome {
     grid-template-columns: 1fr;
   }
@@ -472,5 +748,9 @@ h3 {
   .table-row,
   .doc-row {
     grid-template-columns: 1fr;
+  }
+
+  .week-board {
+    grid-template-columns: 58px repeat(5, 120px);
   }
 }
