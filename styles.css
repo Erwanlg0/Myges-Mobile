@@ -148,6 +148,13 @@ body.is-authenticated .login-shell {
   font-size: 13px;
 }
 
+.login-error {
+  margin-bottom: 0;
+  color: var(--coral);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .login-card label {
   display: grid;
   gap: 7px;
@@ -167,8 +174,7 @@ body.is-authenticated .login-shell {
   font: inherit;
 }
 
-.login-button,
-.demo-button {
+.login-button {
   min-height: 48px;
   border-radius: 8px;
   cursor: pointer;
@@ -180,12 +186,6 @@ body.is-authenticated .login-shell {
   border: 1px solid var(--brand);
   background: var(--brand);
   color: #ffffff;
-}
-
-.demo-button {
-  border: 1px solid var(--border);
-  background: var(--panel-soft);
-  color: var(--brand-2);
 }
 
 .login-links {
