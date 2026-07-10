@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.annotation.StringRes
@@ -104,7 +105,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -395,6 +398,9 @@ fun AgendaScreen(
     val selectedCalendarId by settingsViewModel.selectedCalendarId.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val syncDoneMessage = stringResource(R.string.agenda_sync_done)
+    val exportTitle = stringResource(R.string.agenda_export_title)
     var selectedMode by remember { mutableStateOf(AgendaMode.Grid) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
@@ -404,7 +410,6 @@ fun AgendaScreen(
     val calendarConnected = settingsState.settings?.calendarSyncEnabled == true && selectedCalendarId != null
 
     val connectCalendar = {
-        settingsViewModel.setCalendarSync(true)
         pendingCalendarPick = true
         settingsViewModel.loadCalendars()
     }
@@ -428,9 +433,8 @@ fun AgendaScreen(
             calendars = calendars,
             selectedCalendarId = selectedCalendarId,
             onSelect = { id ->
-                settingsViewModel.selectCalendar(id)
+                settingsViewModel.connectCalendar(id, state.data)
                 showCalendarPicker = false
-                viewModel.syncAgendaToCalendar(state.data)
             },
             onDismiss = { showCalendarPicker = false }
         )
@@ -456,7 +460,7 @@ fun AgendaScreen(
 
     LaunchedEffect(viewModel) {
         viewModel.calendarSyncCompleted.collect {
-            android.widget.Toast.makeText(context, context.getString(R.string.agenda_sync_done), android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, syncDoneMessage, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     val daysWithEvents = remember(state.data) {
@@ -530,17 +534,24 @@ fun AgendaScreen(
                 OutlinedButton(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        runCatching {
-                            val icsString = events.toIcsString()
-                            val file = File(context.cacheDir, "agenda.ics")
-                            file.writeText(icsString)
-                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/calendar"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        scope.launch {
+                            val uri = runCatching {
+                                withContext(Dispatchers.IO) {
+                                    val icsString = events.toIcsString()
+                                    val directory = File(context.cacheDir, "calendar").apply { mkdirs() }
+                                    val file = File(directory, "agenda.ics")
+                                    file.writeText(icsString)
+                                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                                }
+                            }.getOrNull() ?: return@launch
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/calendar"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, exportTitle))
                             }
-                            context.startActivity(Intent.createChooser(intent, context.getString(R.string.agenda_export_title)))
                         }
                     },
                     modifier = Modifier.weight(1f)
@@ -2023,21 +2034,23 @@ fun SettingsScreen(
     val settings = state.settings
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val biometricAvailable = remember(context) {
+        BiometricManager.from(context).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) ==
+            BiometricManager.BIOMETRIC_SUCCESS
+    }
     var showCalendarPicker by remember { mutableStateOf(false) }
     var pendingFirstPick by remember { mutableStateOf(false) }
     val enableCalendarSync = {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        settingsViewModel.setCalendarSync(true)
         pendingFirstPick = true
         settingsViewModel.loadCalendars()
-        if (agendaState.data.isNotEmpty()) studentViewModel.syncAgendaToCalendar(agendaState.data)
     }
     val calendarLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
         if (grants.values.all { it }) enableCalendarSync()
     }
     LaunchedEffect(calendars, pendingFirstPick) {
         if (pendingFirstPick && calendars.isNotEmpty()) {
-            if (selectedCalendarId == null) showCalendarPicker = true
+            showCalendarPicker = true
             pendingFirstPick = false
         }
     }
@@ -2055,11 +2068,8 @@ fun SettingsScreen(
             calendars = calendars,
             selectedCalendarId = selectedCalendarId,
             onSelect = { id ->
-                settingsViewModel.selectCalendar(id)
+                settingsViewModel.connectCalendar(id, agendaState.data)
                 showCalendarPicker = false
-                if (agendaState.data.isNotEmpty()) {
-                    studentViewModel.syncAgendaToCalendar(agendaState.data)
-                }
             },
             onDismiss = { showCalendarPicker = false }
         )
@@ -2176,6 +2186,13 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+                if (biometricAvailable) {
+                    SwitchRow(
+                        title = R.string.auth_enable_biometric,
+                        checked = settings.biometricEnabled,
+                        onCheckedChange = settingsViewModel::setBiometricEnabled
+                    )
+                }
                 SwitchRow(
                     title = R.string.settings_calendar_sync,
                     checked = settings.calendarSyncEnabled,
@@ -3192,6 +3209,7 @@ internal fun CourseCard(
 ) {
     var showFilesDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val documentsState by viewModel.documents.collectAsStateWithLifecycle()
     val courseFiles = remember(documentsState.data, course.id) {
         documentsState.data.orEmpty().filter {
@@ -3258,21 +3276,25 @@ internal fun CourseCard(
                     val savedMsg = stringResource(R.string.courses_syllabus_saved)
                     val failedMsg = stringResource(R.string.courses_syllabus_save_failed)
                     val saveSyllabus: () -> Unit = {
-                        val uri = PdfGenerator.savePdfToDownloads(
-                            context = context,
-                            text = course.syllabus,
-                            title = "${course.name} - Syllabus",
-                            fileName = "${course.name}_syllabus"
-                        )
-                        if (uri != null) {
-                            Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
-                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(uri, "application/pdf")
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        scope.launch {
+                            val uri = withContext(Dispatchers.IO) {
+                                PdfGenerator.savePdfToDownloads(
+                                    context = context,
+                                    text = course.syllabus,
+                                    title = "${course.name} - Syllabus",
+                                    fileName = "${course.name}_syllabus"
+                                )
                             }
-                            runCatching { context.startActivity(viewIntent) }
-                        } else {
-                            Toast.makeText(context, failedMsg, Toast.LENGTH_SHORT).show()
+                            if (uri != null) {
+                                Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
+                                val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, "application/pdf")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                runCatching { context.startActivity(viewIntent) }
+                            } else {
+                                Toast.makeText(context, failedMsg, Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                     val storagePermissionLauncher = rememberLauncherForActivityResult(
@@ -3282,10 +3304,13 @@ internal fun CourseCard(
                     }
                     TextButton(
                         onClick = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                saveSyllabus()
-                            } else {
+                            if (Build.VERSION.SDK_INT in Build.VERSION_CODES.O..Build.VERSION_CODES.P &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                                PackageManager.PERMISSION_GRANTED
+                            ) {
                                 storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            } else {
+                                saveSyllabus()
                             }
                         },
                         modifier = Modifier.weight(1f)

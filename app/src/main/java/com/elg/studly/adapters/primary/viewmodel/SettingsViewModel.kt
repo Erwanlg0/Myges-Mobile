@@ -3,6 +3,7 @@ package com.elg.studly.adapters.primary.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elg.studly.application.ports.CalendarSyncPort
+import com.elg.studly.application.ports.SessionRepository
 import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.application.usecase.ClearCacheUseCase
 import com.elg.studly.application.usecase.LogoutUseCase
@@ -10,6 +11,7 @@ import com.elg.studly.application.usecase.RescheduleSyncUseCase
 import com.elg.studly.application.usecase.UpdateReminderLeadUseCase
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.AgendaColorMode
+import com.elg.studly.domain.model.AgendaEvent
 import com.elg.studly.domain.model.AppError
 import com.elg.studly.domain.model.CalendarAccount
 import com.elg.studly.domain.model.ThemeMode
@@ -33,6 +35,7 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
+    private val sessionRepository: SessionRepository,
     private val updateReminderLeadUseCase: UpdateReminderLeadUseCase,
     private val clearCacheUseCase: ClearCacheUseCase,
     private val logoutUseCase: LogoutUseCase,
@@ -41,6 +44,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     private val loading = MutableStateFlow(false)
     private val error = MutableStateFlow<AppError?>(null)
+    private var connectingCalendar = false
 
     private val _calendars = MutableStateFlow<List<CalendarAccount>>(emptyList())
     val calendars: StateFlow<List<CalendarAccount>> = _calendars
@@ -63,6 +67,23 @@ class SettingsViewModel @Inject constructor(
                 calendarSyncPort.selectCalendar(id)
                 _selectedCalendarId.value = id
             }.onFailure { error.value = it.toAppError() }
+        }
+    }
+
+    fun connectCalendar(id: Long, events: List<AgendaEvent>) {
+        if (connectingCalendar) return
+        connectingCalendar = true
+        viewModelScope.launch {
+            loading.value = true
+            error.value = null
+            runCatching {
+                calendarSyncPort.selectCalendar(id)
+                _selectedCalendarId.value = id
+                calendarSyncPort.sync(events)
+                settingsRepository.setCalendarSyncEnabled(true)
+            }.onFailure { error.value = it.toAppError() }
+            loading.value = false
+            connectingCalendar = false
         }
     }
 
@@ -95,6 +116,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setBiometricEnabled(enabled: Boolean) = launchSettingChange {
+        sessionRepository.setBiometricEnabled(enabled)
         settingsRepository.setBiometricEnabled(enabled)
     }
 

@@ -4,6 +4,9 @@
         name="documents"
         path="documents/" />
     <cache-path
-        name="cache_root"
-        path="." />
+        name="calendar_exports"
+        path="calendar/" />
+    <external-path
+        name="downloads"
+        path="Download/" />
 </paths>

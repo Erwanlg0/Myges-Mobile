@@ -139,6 +139,29 @@ class MygesSessionRepositoryTest {
     }
 
     @Test
+    fun biometricPreferenceUpdatesAndPersistsCurrentSession() = runTest {
+        val session = Session(
+            username = "user",
+            accessToken = "token",
+            refreshToken = null,
+            expiresAt = Instant.now().plusSeconds(3600),
+            biometricEnabled = false,
+            issuedAt = Instant.now(),
+            refreshAfter = Instant.now().plusSeconds(1800)
+        )
+        val secureStore = mockk<SecureSessionStore>(relaxed = true) {
+            every { read() } returns session
+        }
+        val repository = MygesSessionRepository(secureStore)
+
+        repository.setBiometricEnabled(true)
+
+        assertTrue(repository.currentSession()?.biometricEnabled == true)
+        assertTrue(repository.session.first()?.biometricEnabled == true)
+        verify { secureStore.save(match { it.biometricEnabled }) }
+    }
+
+    @Test
     fun authenticateStoreFailureBecomesUnexpectedError() = runTest {
         val secureStore = mockk<SecureSessionStore> {
             every { read() } returns null

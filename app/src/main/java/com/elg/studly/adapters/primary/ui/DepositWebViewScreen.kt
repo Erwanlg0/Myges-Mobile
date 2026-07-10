@@ -25,6 +25,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +68,21 @@ fun DepositWebViewScreen(
         if (webView != null && webView.canGoBack()) webView.goBack() else onBack()
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            fileChooserCallback?.onReceiveValue(null)
+            fileChooserCallback = null
+            webViewRef?.apply {
+                stopLoading()
+                webChromeClient = null
+                webViewClient = WebViewClient()
+                removeAllViews()
+                destroy()
+            }
+            webViewRef = null
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text(stringResource(R.string.deposit_document)) },
@@ -97,12 +113,13 @@ fun DepositWebViewScreen(
                                 view: WebView,
                                 request: WebResourceRequest
                             ): Boolean {
-                                val host = request.url.host ?: return false
-                                if (host == "myges.fr" || host.endsWith(".myges.fr")) return false
-                                return runCatching {
-                                    view.context.startActivity(Intent(Intent.ACTION_VIEW, request.url))
-                                    true
-                                }.getOrDefault(false)
+                                val scheme = request.url.scheme
+                                val host = request.url.host
+                                if ((scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)) &&
+                                    (host.equals("myges.fr", ignoreCase = true) || host?.endsWith(".myges.fr", ignoreCase = true) == true)
+                                ) return false
+                                runCatching { view.context.startActivity(Intent(Intent.ACTION_VIEW, request.url)) }
+                                return true
                             }
                         }
                         webChromeClient = object : WebChromeClient() {
@@ -121,6 +138,7 @@ fun DepositWebViewScreen(
                                     fileChooserLauncher.launch(fileChooserParams.createIntent())
                                     true
                                 } catch (e: Exception) {
+                                    filePathCallback.onReceiveValue(null)
                                     fileChooserCallback = null
                                     false
                                 }

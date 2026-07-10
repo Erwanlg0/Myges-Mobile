@@ -19,6 +19,8 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,8 +32,13 @@ class AndroidCalendarSyncAdapter @Inject constructor(
     private companion object {
         const val BATCH_SIZE = 100
     }
+    private val syncMutex = Mutex()
 
     override suspend fun sync(events: List<AgendaEvent>) {
+        syncMutex.withLock { syncLocked(events) }
+    }
+
+    private suspend fun syncLocked(events: List<AgendaEvent>) {
         withContext(Dispatchers.IO) {
             try {
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) != PackageManager.PERMISSION_GRANTED) {
@@ -51,7 +58,7 @@ class AndroidCalendarSyncAdapter @Inject constructor(
                 val desiredEvents = events
                     .filter { it.startsAt >= weekStart }
                     .map { event -> event.toCalendarEvent(calendarId, timeZone, eventColorKeys, markerPrefix) }
-                val plan = calendarSyncPlan(currentEvents(calendarId, desiredEvents), desiredEvents)
+                val plan = calendarSyncPlan(currentEvents(calendarId), desiredEvents)
                 val operations = ArrayList<ContentProviderOperation>(plan.deletes.size + plan.updates.size + plan.inserts.size)
                 plan.deletes.forEach { event ->
                     operations += ContentProviderOperation
@@ -119,40 +126,23 @@ class AndroidCalendarSyncAdapter @Inject constructor(
     private fun writableCalendarId(): Long? {
         val prefs = context.getSharedPreferences("calendar_settings", Context.MODE_PRIVATE)
         val savedId = prefs.getLong("selected_calendar_id", -1L)
+        if (savedId == -1L) return null
         val projection = arrayOf(
-            CalendarContract.Calendars._ID,
-            CalendarContract.Calendars.ACCOUNT_TYPE
+            CalendarContract.Calendars._ID
         )
         val selection = "${CalendarContract.Calendars.VISIBLE} = 1 AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ?"
         val args = arrayOf(CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString())
 
-        if (savedId != -1L) {
-            context.contentResolver.query(
-                CalendarContract.Calendars.CONTENT_URI,
-                projection,
-                "${CalendarContract.Calendars._ID} = ? AND $selection",
-                arrayOf(savedId.toString()) + args,
-                null
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    return savedId
-                }
+        context.contentResolver.query(
+            CalendarContract.Calendars.CONTENT_URI,
+            projection,
+            "${CalendarContract.Calendars._ID} = ? AND $selection",
+            arrayOf(savedId.toString()) + args,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                return savedId
             }
-        }
-
-        context.contentResolver.query(CalendarContract.Calendars.CONTENT_URI, projection, selection, args, null)?.use { cursor ->
-            var fallbackId: Long? = null
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(0)
-                val accountType = cursor.getString(1)
-                if (accountType == "com.google") {
-                    return id
-                }
-                if (fallbackId == null) {
-                    fallbackId = id
-                }
-            }
-            return fallbackId
         }
         return null
     }
@@ -196,7 +186,7 @@ class AndroidCalendarSyncAdapter @Inject constructor(
         }
     }
 
-    private fun currentEvents(calendarId: Long, desired: List<DesiredCalendarEvent>): List<CalendarEventRow> {
+    private fun currentEvents(calendarId: Long): List<CalendarEventRow> {
         val markerPrefix = context.getString(R.string.calendar_event_marker_prefix)
         val projection = arrayOf(
             CalendarContract.Events._ID,
@@ -210,23 +200,16 @@ class AndroidCalendarSyncAdapter @Inject constructor(
             CalendarContract.Events.CUSTOM_APP_URI,
             CalendarContract.Events.EVENT_COLOR_KEY
         )
-        val selectionParts = mutableListOf<String>()
-        val args = mutableListOf<String>()
-        if (desired.isNotEmpty()) {
-            selectionParts += "(${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events.DTSTART} >= ? AND ${CalendarContract.Events.DTSTART} <= ?)"
-            args += calendarId.toString()
-            args += desired.minOf { it.startsAtEpochMillis }.toString()
-            args += desired.maxOf { it.startsAtEpochMillis }.toString()
-        }
-        selectionParts += "${CalendarContract.Events.CUSTOM_APP_PACKAGE} = ?"
-        args += context.packageName
-        selectionParts += "${CalendarContract.Events.DESCRIPTION} LIKE ?"
-        args += "%$markerPrefix%"
+        val selection = "${CalendarContract.Events.CALENDAR_ID} = ? AND (" +
+            "${CalendarContract.Events.CUSTOM_APP_PACKAGE} = ? OR " +
+            "${CalendarContract.Events.CUSTOM_APP_URI} LIKE ? OR " +
+            "${CalendarContract.Events.DESCRIPTION} LIKE ?)"
+        val args = arrayOf(calendarId.toString(), context.packageName, "Studly://agenda/%", "%$markerPrefix%")
         return context.contentResolver.query(
             CalendarContract.Events.CONTENT_URI,
             projection,
-            selectionParts.joinToString(" OR "),
-            args.toTypedArray(),
+            selection,
+            args,
             null
         )?.use { cursor ->
             buildList {

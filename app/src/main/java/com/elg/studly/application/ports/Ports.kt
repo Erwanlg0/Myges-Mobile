@@ -28,7 +28,11 @@ interface SessionRepository {
     val hasLockedBiometricSession: Flow<Boolean>
     fun currentSession(): Session?
     fun invalidateSession()
+    fun invalidateSessionIfCurrent(session: Session) {
+        if (currentSession() == session) invalidateSession()
+    }
     suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean)
+    suspend fun setBiometricEnabled(enabled: Boolean) = Unit
     suspend fun unlockWithBiometrics()
     suspend fun logout()
 }

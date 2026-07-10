@@ -36,7 +36,6 @@ import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import java.util.concurrent.ConcurrentHashMap
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -144,21 +143,24 @@ object DependencyModule {
 
 
 internal class InMemoryCookieJar : CookieJar {
-    private val store = ConcurrentHashMap<String, MutableList<Cookie>>()
+    private val lock = Any()
+    private val store = mutableMapOf<CookieKey, Cookie>()
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        val host = url.host
-        val existing = store.getOrPut(host) { mutableListOf() }
-        cookies.forEach { cookie ->
-            existing.removeAll { it.name == cookie.name }
-            existing.add(cookie)
+        synchronized(lock) {
+            cookies.forEach { cookie ->
+                store[CookieKey(cookie.name, cookie.domain, cookie.path)] = cookie
+            }
         }
     }
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> {
-        val now = System.currentTimeMillis()
-        val cookies = store[url.host] ?: return emptyList()
-        cookies.removeAll { it.expiresAt < now }
-        return cookies.filter { it.matches(url) }
+        return synchronized(lock) {
+            val now = System.currentTimeMillis()
+            store.entries.removeAll { it.value.expiresAt < now }
+            store.values.filter { it.matches(url) }
+        }
     }
+
+    private data class CookieKey(val name: String, val domain: String, val path: String)
 }

@@ -37,14 +37,20 @@ import androidx.core.content.FileProvider
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.spyk
 import io.mockk.unmockkStatic
+import io.mockk.verify
 import okhttp3.Protocol
 import okhttp3.Request
 import retrofit2.HttpException
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import okhttp3.ResponseBody
@@ -53,6 +59,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import retrofit2.Response
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -88,9 +95,10 @@ class OfflineFirstStudentDataRepositoryTest {
         assertEquals(listOf("project-1"), dao.projectState.value.map { it.id })
         assertEquals(setOf("step-1", "upcoming-step-1"), dao.projectStepState.value.map { it.id }.toSet())
         assertEquals(listOf("practical-1"), dao.practicalState.value.map { it.id })
-        assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1", "syllabus-course-1"), dao.documentState.value.map { it.id }.toSet())
-        assertEquals("me/course-1/files/course-doc-1", dao.documentState.value.first { it.id == "course-doc-1" }.downloadUrl)
-        assertEquals(setOf("skolae_app_version", "news-1", "banner-1", "partner-1", "speed-1"), dao.newsState.value.map { it.id }.toSet())
+        assertEquals(setOf("annual:2026:annual-doc-1", "course:course-1:course-doc-1", "project:project-1:file:project-doc-1", "syllabus-course-1"), dao.documentState.value.map { it.id }.toSet())
+        assertEquals("me/course-1/files/course-doc-1", dao.documentState.value.first { it.id == "course:course-1:course-doc-1" }.downloadUrl)
+        assertEquals(5, dao.newsState.value.size)
+        assertTrue(dao.newsState.value.map { it.id }.containsAll(listOf("news-1", "banner-1", "partner-1", "speed-1")))
         assertEquals(listOf("course-1"), api.courseFileRequests)
         assertFalse(expired.exists())
         assertTrue(current.exists())
@@ -114,7 +122,7 @@ class OfflineFirstStudentDataRepositoryTest {
         assertEquals(listOf("grade-1"), notifications.grades)
         assertEquals(listOf("absence-1"), notifications.absences)
         assertEquals(listOf("project-1"), notifications.projects)
-        assertEquals(setOf("annual-doc-1", "course-doc-1", "project-doc-1", "syllabus-course-1"), notifications.documents.toSet())
+        assertEquals(setOf("annual:2026:annual-doc-1", "course:course-1:course-doc-1", "project:project-1:file:project-doc-1", "syllabus-course-1"), notifications.documents.toSet())
     }
 
     @Test
@@ -162,7 +170,7 @@ class OfflineFirstStudentDataRepositoryTest {
 
         repository.syncAll(force = true, features = setOf(SyncFeature.Agenda))
 
-        assertEquals(listOf("agenda-1"), dao.agendaState.value.map { it.id })
+        assertEquals(setOf("agenda", "agenda-1"), dao.agendaState.value.map { it.id }.toSet())
         assertEquals(listOf("grade"), dao.gradeState.value.map { it.id })
     }
 
@@ -232,7 +240,8 @@ class OfflineFirstStudentDataRepositoryTest {
             assertEquals("unsafe_name_.pdf", "unsafe name?.pdf".sanitizedFileName())
             assertEquals("document", "".sanitizedFileName())
             assertEquals("document.pdf", "document".withExtension("application/pdf".toMediaType()))
-            assertEquals("document.pdf", "document.pdf".withExtension("text/plain".toMediaType()))
+            assertEquals("reportpdf.pdf", "reportpdf".withExtension("application/pdf".toMediaType()))
+            assertEquals("document.pdf.txt", "document.pdf".withExtension("text/plain".toMediaType()))
             assertEquals("zip", "application/zip".toMediaType().toFileExtension())
             assertEquals(null, "application/octet-stream".toMediaType().toFileExtension())
             assertEquals("report name.pdf", "attachment; filename*=UTF-8''report%20name.pdf".contentDispositionFileName())
@@ -240,6 +249,8 @@ class OfflineFirstStudentDataRepositoryTest {
             assertEquals(null, "attachment".contentDispositionFileName())
             assertEquals(AppError.Network, IOException().toRepositoryException().error)
             assertEquals(AppError.Unexpected("broken"), IllegalStateException("broken").toRepositoryException().error)
+            val cancellation = CancellationException("cancelled")
+            assertSame(cancellation, runCatching { cancellation.toRepositoryException() }.exceptionOrNull())
         }
     }
 
@@ -272,6 +283,110 @@ class OfflineFirstStudentDataRepositoryTest {
 
         repository.syncAll(force = true)
         assertEquals("student-1", dao.profileState.value?.id)
+    }
+
+    @Test
+    fun futureLastFetchedTimestampMakesFeaturesDue() = runTest {
+        val dao = RepositoryDao()
+        val settings = RepositorySettingsRepository().apply {
+            lastFetched = Instant.now().plus(Duration.ofDays(1))
+        }
+        val repository = repository(createTempDir(), RepositoryApi(), dao, RepositoryNotificationScheduler(), settings)
+
+        repository.syncAll()
+
+        assertEquals("student-1", dao.profileState.value?.id)
+    }
+
+    @Test
+    fun authoritativeEndpointFailuresKeepCachedFeatureSnapshots() = runTest {
+        suspend fun verifyFailure(
+            feature: SyncFeature,
+            seed: RepositoryDao.() -> Unit,
+            fail: RepositoryApi.() -> Unit,
+            cachedIds: (RepositoryDao) -> List<String>
+        ) {
+            val dao = RepositoryDao().apply(seed)
+            val api = RepositoryApi().apply(fail)
+            val repository = repository(createTempDir(), api, dao, RepositoryNotificationScheduler())
+
+            val failure = runCatching {
+                repository.syncAll(force = true, features = setOf(feature))
+            }.exceptionOrNull() as AppException
+
+            assertEquals(AppError.Network, failure.error)
+            assertEquals(listOf("cached"), cachedIds(dao))
+        }
+
+        verifyFailure(
+            SyncFeature.Grades,
+            { gradeState.value = listOf(gradeEntity("cached")) },
+            { gradesFailure = IOException("offline") },
+            { it.gradeState.value.map(GradeEntity::id) }
+        )
+        verifyFailure(
+            SyncFeature.Absences,
+            { absenceState.value = listOf(absenceEntity("cached")) },
+            { absencesFailure = IOException("offline") },
+            { it.absenceState.value.map(AbsenceEntity::id) }
+        )
+        verifyFailure(
+            SyncFeature.Events,
+            { eventState.value = listOf(eventEntity("cached")) },
+            { eventsFailure = IOException("offline") },
+            { it.eventState.value.map(StudentEventEntity::id) }
+        )
+        verifyFailure(
+            SyncFeature.Directory,
+            { directoryState.value = listOf(directoryEntity("cached")) },
+            { teachersFailure = IOException("offline") },
+            { it.directoryState.value.map(DirectoryPersonEntity::id) }
+        )
+        verifyFailure(
+            SyncFeature.Documents,
+            { documentState.value = listOf(documentEntity("cached")) },
+            { coursesFailure = IOException("offline") },
+            { it.documentState.value.map(AcademicDocumentEntity::id) }
+        )
+    }
+
+    @Test
+    fun concurrentSyncsAreSerialized() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val api = RepositoryApi().apply {
+            agendaStarted = started
+            agendaRelease = release
+        }
+        val repository = repository(createTempDir(), api, RepositoryDao(), RepositoryNotificationScheduler())
+
+        val first = async { repository.syncAll(force = true, features = setOf(SyncFeature.Agenda)) }
+        started.await()
+        val second = async { repository.syncAll(force = true, features = setOf(SyncFeature.Agenda)) }
+        yield()
+
+        assertEquals(1, api.agendaCalls)
+        release.complete(Unit)
+        first.await()
+        second.await()
+        assertEquals(2, api.agendaCalls)
+    }
+
+    @Test
+    fun documentIdsAreNamespacedByRemoteSource() = runTest {
+        val api = RepositoryApi().apply {
+            annualDocumentRemoteId = "7"
+            courseDocumentRemoteId = "7"
+        }
+        val dao = RepositoryDao()
+        val repository = repository(createTempDir(), api, dao, RepositoryNotificationScheduler())
+
+        repository.syncAll(force = true, features = setOf(SyncFeature.Documents))
+
+        val annual = dao.documentState.value.first { it.id == "annual:2026:7" }
+        val course = dao.documentState.value.first { it.id == "course:course-1:7" }
+        assertEquals("me/annualDocuments/7", annual.downloadUrl)
+        assertEquals("me/course-1/files/7", course.downloadUrl)
     }
 
     @Test
@@ -345,20 +460,24 @@ class OfflineFirstStudentDataRepositoryTest {
             assertEquals(listOf(0f, 1f), progress)
 
             val remoteDoc = AcademicDocument("remote", "Doc", null, null, null, "doc", "remote", null)
+            val remoteBody = spyk("data".toResponseBody("application/pdf".toMediaType()))
             api.downloadResponse = Response.success(
-                "data".toResponseBody("application/pdf".toMediaType()),
+                remoteBody,
                 rawResponse("https://example.com/file.pdf")
             )
             repository.downloadDocument(remoteDoc) {}
+            verify { remoteBody.close() }
 
+            val redirectBody = spyk("x".toResponseBody("application/pdf".toMediaType()))
             api.downloadResponse = Response.success(
-                "x".toResponseBody("application/pdf".toMediaType()),
+                redirectBody,
                 rawResponse("https://cas.example.com/login")
             )
             assertEquals(
                 AppError.DocumentUnavailable,
                 (runCatching { repository.downloadDocument(remoteDoc) {} }.exceptionOrNull() as AppException).error
             )
+            verify { redirectBody.close() }
 
             api.downloadResponse = Response.success(
                 "<html></html>".toResponseBody("text/html".toMediaType()),
@@ -380,6 +499,39 @@ class OfflineFirstStudentDataRepositoryTest {
                 AppError.Remote(404, "missing"),
                 (runCatching { repository.downloadDocument(remoteDoc) {} }.exceptionOrNull() as AppException).error
             )
+        } finally {
+            unmockkStatic(FileProvider::class)
+        }
+    }
+
+    @Test
+    fun downloadDocumentIsolatesHomonymousFilesByDocumentId() = runTest {
+        mockkStatic(FileProvider::class)
+        every { FileProvider.getUriForFile(any(), any(), any()) } returns mockk<Uri>()
+        val cacheDir = createTempDir()
+        try {
+            val api = RepositoryApi()
+            val repository = repository(cacheDir, api, RepositoryDao(), RepositoryNotificationScheduler())
+            val first = AcademicDocument("first", "First", null, null, "application/pdf", "shared.pdf", "first", null)
+            val second = AcademicDocument("second", "Second", null, null, "application/pdf", "shared.pdf", "second", null)
+
+            api.downloadResponse = Response.success(
+                "first".toResponseBody("application/pdf".toMediaType()),
+                rawResponse("https://example.com/first")
+            )
+            repository.downloadDocument(first) {}
+            api.downloadResponse = Response.success(
+                "second".toResponseBody("application/pdf".toMediaType()),
+                rawResponse("https://example.com/second")
+            )
+            repository.downloadDocument(second) {}
+
+            val cachedFiles = File(cacheDir, "documents").walkTopDown()
+                .filter { it.isFile && it.name == "shared.pdf" }
+                .toList()
+            assertEquals(2, cachedFiles.size)
+            assertEquals(setOf("first", "second"), cachedFiles.map { it.readText() }.toSet())
+            assertTrue(File(cacheDir, "documents").walkTopDown().none { it.name.endsWith(".tmp") })
         } finally {
             unmockkStatic(FileProvider::class)
         }
@@ -418,6 +570,16 @@ class OfflineFirstStudentDataRepositoryTest {
 private class RepositoryApi : MyGesApiService {
     val courseFileRequests = mutableListOf<String>()
     var profileFailure: Throwable? = null
+    var coursesFailure: Throwable? = null
+    var gradesFailure: Throwable? = null
+    var absencesFailure: Throwable? = null
+    var teachersFailure: Throwable? = null
+    var eventsFailure: Throwable? = null
+    var annualDocumentRemoteId = "annual-doc-1"
+    var courseDocumentRemoteId = "course-doc-1"
+    var agendaStarted: CompletableDeferred<Unit>? = null
+    var agendaRelease: CompletableDeferred<Unit>? = null
+    var agendaCalls = 0
     var groupResponse: Response<ResponseBody> = Response.success(null)
     var projectMessagesResponse: JsonElement = jsonElement("""{"result":[]}""")
     val sentMessages = mutableListOf<String>()
@@ -453,19 +615,30 @@ private class RepositoryApi : MyGesApiService {
 
     override suspend fun submitSuggestion(suggestion: JsonElement): JsonElement = jsonElement("""{"result":{}}""")
 
-    override suspend fun agenda(start: Long?, end: Long?): JsonElement = jsonElement(
-        """{"result":[{"id":"agenda-1","title":"Math","start_date":"2026-06-12T08:00:00Z","end_date":"2026-06-12T10:00:00Z","room":"A101","teacher":"Teacher","type":"Course","rc_id":"course-1"}]}"""
-    )
+    override suspend fun agenda(start: Long?, end: Long?): JsonElement {
+        agendaCalls += 1
+        agendaStarted?.complete(Unit)
+        agendaRelease?.await()
+        return jsonElement(
+            """{"result":[{"id":"agenda-1","title":"Math","start_date":"2026-06-12T08:00:00Z","end_date":"2026-06-12T10:00:00Z","room":"A101","teacher":"Teacher","type":"Course","rc_id":"course-1"}]}"""
+        )
+    }
 
-    override suspend fun courses(year: String): JsonElement = jsonElement(
-        """{"result":[{"id":"course-1","name":"Algorithms","teacher":"Teacher","year":"2026","has_documents":true}]}"""
-    )
+    override suspend fun courses(year: String): JsonElement {
+        coursesFailure?.let { throw it }
+        return jsonElement(
+            """{"result":[{"id":"course-1","name":"Algorithms","teacher":"Teacher","year":"2026","has_documents":true}]}"""
+        )
+    }
 
     override suspend fun classes(year: String): JsonElement = jsonElement(classesJson)
 
     override suspend fun students(year: String): JsonElement = jsonElement(studentsJson)
 
-    override suspend fun teachers(year: String): JsonElement = jsonElement(teachersJson)
+    override suspend fun teachers(year: String): JsonElement {
+        teachersFailure?.let { throw it }
+        return jsonElement(teachersJson)
+    }
 
     override suspend fun classStudents(puid: String, year: String): JsonElement = jsonElement(classStudentsJson)
 
@@ -477,7 +650,7 @@ private class RepositoryApi : MyGesApiService {
     override suspend fun courseFiles(rcId: String): JsonElement {
         courseFileRequests += rcId
         return jsonElement(
-            """{"result":[{"oc_id":"course-doc-1","title":"Course file","fileName":"course.pdf","extension":"pdf","links":[{"rel":"url","href":"https://example.com/doc.pdf"}]}]}"""
+            """{"result":[{"oc_id":"$courseDocumentRemoteId","title":"Course file","fileName":"course.pdf","extension":"pdf","links":[{"rel":"url","href":"https://example.com/doc.pdf"}]}]}"""
         )
     }
 
@@ -487,16 +660,22 @@ private class RepositoryApi : MyGesApiService {
         """{"result":{"syllabus_name":"Algorithms","detail_plan":"Detailed syllabus"}}"""
     )
 
-    override suspend fun grades(year: String): JsonElement = jsonElement(
-        """{"result":[{"id":"grade-1","courseName":"Algorithms","subject":"Exam","value":15.5,"scale":20,"date":"2026-06-10"}]}"""
-    )
+    override suspend fun grades(year: String): JsonElement {
+        gradesFailure?.let { throw it }
+        return jsonElement(
+            """{"result":[{"id":"grade-1","courseName":"Algorithms","subject":"Exam","value":15.5,"scale":20,"date":"2026-06-10"}]}"""
+        )
+    }
 
-    override suspend fun absences(year: String): JsonElement = jsonElement(
-        """{"result":[{"id":"absence-1","courseName":"Algorithms","start":"2026-06-11T08:00:00Z","end":"2026-06-11T10:00:00Z","justified":false,"status":"pending"}]}"""
-    )
+    override suspend fun absences(year: String): JsonElement {
+        absencesFailure?.let { throw it }
+        return jsonElement(
+            """{"result":[{"id":"absence-1","courseName":"Algorithms","start":"2026-06-11T08:00:00Z","end":"2026-06-11T10:00:00Z","justified":false,"status":"pending"}]}"""
+        )
+    }
 
     override suspend fun annualDocuments(year: String): JsonElement = jsonElement(
-        """{"result":[{"id":"annual-doc-1","title":"Certificate","fileName":"certificate.pdf","extension":"pdf","year":"2026","updatedAt":"2026-06-01T12:00:00Z"}]}"""
+        """{"result":[{"id":"$annualDocumentRemoteId","title":"Certificate","fileName":"certificate.pdf","extension":"pdf","year":"2026","updatedAt":"2026-06-01T12:00:00Z"}]}"""
     )
 
     override suspend fun annualDocument(id: String): JsonElement = jsonElement("""{"result":{}}""")
@@ -549,7 +728,10 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"ss_id":"speed-1","title":"Speed meeting","corporate_name":"Company","location":"ONLINE","appointment_start":"2026-06-03T08:00:00Z"}]}"""
     )
 
-    override suspend fun events(): JsonElement = jsonElement("""{"result":[]}""")
+    override suspend fun events(): JsonElement {
+        eventsFailure?.let { throw it }
+        return jsonElement("""{"result":[]}""")
+    }
 
     override suspend fun download(url: String): Response<ResponseBody> {
         return downloadResponse ?: error("unused")
@@ -635,7 +817,8 @@ private class RepositoryDao : StudentDao() {
         profileState.value = profile
     }
     override suspend fun upsertAgenda(events: List<AgendaEventEntity>) {
-        agendaState.value = events
+        val incomingIds = events.map { it.id }.toSet()
+        agendaState.value = agendaState.value.filter { it.id !in incomingIds } + events
     }
     override suspend fun upsertGrades(grades: List<GradeEntity>) {
         gradeState.value = grades
@@ -796,3 +979,5 @@ private fun gradeEntity(id: String) = GradeEntity(id, "Old", "Old", 10.0, 20.0, 
 private fun absenceEntity(id: String) = AbsenceEntity(id, "Old", 1L, 2L, false, null, null)
 private fun projectEntity(id: String) = ProjectEntity(id, "Old", null, null, null, null, 0, null, null)
 private fun documentEntity(id: String) = AcademicDocumentEntity(id, "Old", null, null, null, "old.pdf", null, null, null, null, null)
+private fun directoryEntity(id: String) = DirectoryPersonEntity(id, "Old", null, "student", null, null, null)
+private fun eventEntity(id: String) = StudentEventEntity(id, "Old", null, null, null, null, null, null, null, false)

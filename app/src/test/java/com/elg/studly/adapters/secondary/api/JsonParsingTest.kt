@@ -478,7 +478,7 @@ class JsonParsingTest {
         ).toProjectDocuments()
 
         assertEquals(1, documents.size)
-        assertEquals("20788", documents.first().id)
+        assertEquals("project:22843:file:20788", documents.first().id)
         assertEquals("Consignes du projet", documents.first().title)
         assertEquals("2025", documents.first().year)
         assertEquals("consignes.md", documents.first().fileName)
@@ -626,11 +626,12 @@ class JsonParsingTest {
         ).toProjectDocuments()
 
         assertEquals(1, documents.size)
-        assertEquals("991", documents.first().id)
+        assertTrue(documents.first().id.startsWith("project:22843:step:"))
+        assertTrue(documents.first().id.endsWith(":991"))
         assertEquals("rendu.zip", documents.first().title)
         assertEquals("rendu.zip", documents.first().fileName)
         assertEquals("application/zip", documents.first().mimeType)
-        assertEquals("https://api.kordis.fr/bar.zip", documents.first().downloadUrl)
+        assertEquals("me/projectStepFiles/991", documents.first().downloadUrl)
         assertEquals(Instant.ofEpochMilli(1774653214127), documents.first().updatedAt)
     }
 
@@ -660,6 +661,35 @@ class JsonParsingTest {
         ).toProjectDocuments()
 
         assertEquals("me/projectStepFiles/991", documents.first().downloadUrl)
+    }
+
+    @Test
+    fun projectDocumentIdsDistinguishFileAndStepSourcesWithSameRemoteId() {
+        val documents = json.parseToJsonElement(
+            """
+            {
+              "result": [
+                {
+                  "project_id": 42,
+                  "project_files": [
+                    { "pf_id": 7, "pf_title": "Brief" }
+                  ],
+                  "steps": [
+                    {
+                      "psp_id": 9,
+                      "files": [
+                        { "psf_id": 7, "psf_name": "Submission" }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toProjectDocuments()
+
+        assertEquals(setOf("project:42:file:7", "project:42:step:9:7"), documents.map { it.id }.toSet())
+        assertEquals(setOf("me/projectFiles/7", "me/projectStepFiles/7"), documents.map { it.downloadUrl }.toSet())
     }
 
     @Test
@@ -728,7 +758,7 @@ class JsonParsingTest {
         ).toNews()
 
         assertEquals(1, news.size)
-        assertEquals("skolae_app_version", news.first().id)
+        assertTrue(news.first().id != "skolae_app_version")
         assertEquals("Version minimum requise", news.first().title)
         assertEquals("3.5.0", news.first().body)
     }
@@ -1027,6 +1057,7 @@ class JsonParsingTest {
     @Test
     fun htmlTextKeepsInvalidEntitiesAndNormalizesWhitespace() {
         assertEquals("A\nB & &#xZZ; &#999999999999; &unknown;", "<p>A</p><div>B&nbsp;&amp; &#xZZ; &#999999999999; &unknown;</div>".htmlToPlainText())
+        assertEquals("&#x110000; &#1114112;", "&#x110000; &#1114112;".htmlToPlainText())
     }
 
     @Test
@@ -1090,9 +1121,130 @@ class JsonParsingTest {
             """{"result":[{"project_id":42,"deliverables":[{"pf_id":7,"pf_title":"rendu.zip","psf_file_type":"application/zip"}]}]}"""
         ).toProjectDocuments()
         assertEquals(1, documents.size)
-        assertEquals("7", documents.first().id)
+        assertEquals("project:42:file:7", documents.first().id)
         assertEquals("me/projectFiles/7", documents.first().downloadUrl)
         assertEquals(null, documents.first().groupId)
+    }
+
+    @Test
+    fun profilePreservesExplicitAcademicYearAndSkipsBlankAliases() {
+        val profile = json.parseToJsonElement(
+            """{"id":"","uid":"p","displayName":"","fullName":"Ada Lovelace","academicYear":"2025-2026","student_id":"2023-ESGI-123"}"""
+        ).toProfile()
+
+        assertEquals("p", profile.id)
+        assertEquals("Ada Lovelace", profile.displayName)
+        assertEquals("2025-2026", profile.academicYear)
+    }
+
+    @Test
+    fun flatCourseGradeDoesNotBecomeStructuredAverage() {
+        val grades = json.parseToJsonElement(
+            """{"items":[
+              {"id":"flat","course":"Algorithmique","subject":"Quiz","grade":"17,5"},
+              {"id":"structured","course":{"name":"Maths"},"average":13.5}
+            ]}"""
+        ).toGrades()
+
+        assertEquals(2, grades.size)
+        assertEquals("Quiz", grades.first().subject)
+        assertEquals(17.5, grades.first().value ?: 0.0, 0.0)
+        assertEquals(13.5, grades.last().value ?: 0.0, 0.0)
+    }
+
+    @Test
+    fun gradeLocalDateParsesFrenchFormatWithoutTimezoneShift() {
+        val defaultTimeZone = java.util.TimeZone.getDefault()
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Europe/Paris"))
+            val grade = json.parseToJsonElement(
+                """[{"id":"g","courseName":"Algo","grade":12,"date":"12/06/2026"}]"""
+            ).toGrades().single()
+
+            assertEquals(java.time.LocalDate.of(2026, 6, 12), grade.date)
+        } finally {
+            java.util.TimeZone.setDefault(defaultTimeZone)
+        }
+    }
+
+    @Test
+    fun absencesResolveAcademicPeriodInParisTimezone() {
+        val absence = json.parseToJsonElement(
+            """{"items":[{"id":"a","date":"2025-08-31T22:30:00Z"}]}"""
+        ).toAbsences().single()
+
+        assertEquals("2025-2026 - Semestre 1", absence.period)
+    }
+
+    @Test
+    fun coursesParseLocationAliases() {
+        val courses = json.parseToJsonElement(
+            """{"courses":[
+              {"id":"location","location":"Paris"},
+              {"id":"campus","campus":"Lyon"},
+              {"id":"room","room":"A101"},
+              {"id":"site","site":"Bordeaux"},
+              {"id":"address","address":"10 rue Exemple"}
+            ]}"""
+        ).toCourses()
+
+        assertEquals(listOf("Paris", "Lyon", "A101", "Bordeaux", "10 rue Exemple"), courses.map { it.location })
+    }
+
+    @Test
+    fun syllabusResultObjectKeepsPrimitiveArrays() {
+        val syllabus = json.parseToJsonElement(
+            """{"result":{
+              "syllabus_name":"Kotlin",
+              "skills":["Coroutines", "Flow"],
+              "control_types":[{"evaluation_label":"Exam"}, "Project"],
+              "seance_details":[1, "Workshop"]
+            }}"""
+        ).toCourseSyllabus()
+
+        checkNotNull(syllabus)
+        assertTrue(syllabus.contains("Kotlin"))
+        assertTrue(syllabus.contains("Coroutines, Flow"))
+        assertTrue(syllabus.contains("Exam, Project"))
+        assertTrue(syllabus.contains("1, Workshop"))
+    }
+
+    @Test
+    fun arrayWrappersIgnoreUnrelatedArraysAndPreserveEmptyPayloads() {
+        val news = json.parseToJsonElement(
+            """{"title":"Actual","metadata":[{"title":"Wrong"}]}"""
+        ).toNews().single()
+
+        assertEquals("Actual", news.title)
+        assertTrue(json.parseToJsonElement("""{"metadata":[{"id":"wrong"}]}""").toCourses().isEmpty())
+        assertTrue(json.parseToJsonElement("""{"result":{"projects":[]}}""").toProjects().isEmpty())
+        assertEquals(
+            "project",
+            json.parseToJsonElement("""{"id":"project","groups":[{"id":"group"}]}""").toProjects().single().id
+        )
+    }
+
+    @Test
+    fun requestedLinkRelationDoesNotFallbackToFirstLink() {
+        val profile = json.parseToJsonElement(
+            """{"id":"p","links":[{"rel":"self","href":"wrong"}]}"""
+        ).toProfile()
+
+        assertEquals(null, profile.avatarUrl)
+        assertTrue(
+            json.parseToJsonElement("""{"classes":[{"links":[{"rel":"photo","href":"wrong"}]}]}""")
+                .toClassIds().isEmpty()
+        )
+    }
+
+    @Test
+    fun newsWithoutRemoteIdsKeepDistinctStableIds() {
+        val news = json.parseToJsonElement(
+            """{"items":[{"type":"alert","title":"First"},{"type":"alert","title":"Second"}]}"""
+        ).toNews()
+
+        assertEquals(2, news.size)
+        assertEquals(2, news.map { it.id }.distinct().size)
     }
 
     private fun parseStart(raw: String): Instant? =
@@ -1119,6 +1271,10 @@ class JsonParsingTest {
         assertEquals(
             java.time.LocalDate.parse("12/06/2026", java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")).atStartOfDay(zone).toInstant(),
             parseStart("\"12/06/2026\"")
+        )
+        assertEquals(
+            java.time.LocalDateTime.parse("2026-06-12T08:30:00").atZone(zone).toInstant(),
+            parseStart("\"2026-06-12T08:30:00\"")
         )
 
         assertEquals(Instant.parse("2026-06-12T08:00:00Z"), parseStart("\"2026-06-12T08:00:00Z\""))

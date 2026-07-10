@@ -101,6 +101,21 @@ class StudentDaoTest {
     }
 
     @Test
+    fun syncAgendaWindowPreservesRowsOutsideFetchedWindow() = runTest {
+        val beforeWindow = agenda("before").copy(startsAtEpochMillis = 1L, endsAtEpochMillis = 2L)
+        val staleInWindow = agenda("stale").copy(startsAtEpochMillis = 120L, endsAtEpochMillis = 140L)
+        val afterWindow = agenda("after").copy(startsAtEpochMillis = 300L, endsAtEpochMillis = 320L)
+        val incoming = agenda("incoming").copy(startsAtEpochMillis = 150L, endsAtEpochMillis = 170L)
+        val dao = TestStudentDao().apply {
+            agendaRows = listOf(beforeWindow, staleInWindow, afterWindow)
+        }
+
+        dao.syncAgendaWindow(listOf(incoming), 100L, 200L)
+
+        assertEquals(setOf("before", "after", "incoming"), dao.agendaRows.map { it.id }.toSet())
+    }
+
+    @Test
     fun replaceGroupsForProjectOnlyDeletesTargetProjectGroups() = runTest {
         val dao = TestStudentDao().apply {
             projectGroupRows = listOf(

@@ -26,7 +26,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.jsonArray
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -46,7 +45,8 @@ fun JsonElement.toProfile(): StudentProfile {
         email = root.text("email", "mail"),
         school = root.text("school", "campus", "institution"),
         program = root.text("program", "programme", "formation", "className"),
-        academicYear = root.text("academicYear", "year", "annee", "student_id")?.let(::academicYearFromProfile),
+        academicYear = root.text("academicYear", "year", "annee")
+            ?: root.text("student_id")?.let(::academicYearFromProfile),
         avatarUrl = root.text("avatarUrl", "avatar", "picture") ?: root.namedLinkHref("photo")
     )
 }
@@ -184,7 +184,8 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
         val root = element.objectOrData()
         val baseId = root.text("id", "gradeId", "uid", "rc_id") ?: stableId(root)
 
-        if (!root.containsKey("grades") && !root.containsKey("exam") && !root.containsKey("course")) {
+        if (!root.containsKey("grades") && !root.containsKey("exam") &&
+            (!root.containsKey("course") || listOf("grade", "value", "note").any { root.containsKey(it) })) {
             return@flatMap listOf(
                 root.toGrade(
                     value = root.number("grade", "value", "note"),
@@ -272,7 +273,7 @@ fun JsonElement.toAbsences(year: String? = null, availablePeriods: List<String> 
         val endsAt = root.instant("endsAt", "end", "endDate", "dateEnd")
             ?: startsAt.plusSeconds(3600)
 
-        val startsAtLdt = java.time.LocalDateTime.ofInstant(startsAt, java.time.ZoneOffset.UTC)
+        val startsAtLdt = java.time.LocalDateTime.ofInstant(startsAt, java.time.ZoneId.of("Europe/Paris"))
         val month = startsAtLdt.monthValue
 
         val startYearNum = root.number("year", "academicYear")?.toInt()
@@ -314,7 +315,8 @@ fun JsonElement.toCourses(): List<Course> {
             syllabus = root.text("syllabus", "description", "summary"),
             fileCount = files.size.takeIf { it > 0 }
                 ?: root.number("fileCount", "file_count", "files_count", "document_count", "documents_count", "nb_documents")?.toInt()
-                ?: if (root.bool("has_documents") == true) 1 else 0
+                ?: if (root.bool("has_documents") == true) 1 else 0,
+            location = root.text("location", "campus", "room", "site", "address")
         )
     }
 }
@@ -349,7 +351,7 @@ fun JsonElement.toProjects(currentUserId: String? = null, fallbackYear: String? 
         "update_date", "date_limite", "dateLimite"
     )
     val arrayResult = arrayOrNested("projects", "items", "data")
-    if (arrayResult.isEmpty() && hasArrayPayload()) return emptyList()
+    if (arrayResult.isEmpty() && hasArrayPayload("projects", "items", "data")) return emptyList()
     return (arrayResult.ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }).map { element ->
         val root = element.objectOrData()
         val projectId = root.text("id", "projectId", "project_id", "uid") ?: stableId(root)
@@ -485,7 +487,7 @@ fun JsonElement.toPracticals(currentUserId: String? = null, fallbackYear: String
 
 fun JsonElement.toPracticalDocuments(fallbackYear: String? = null): List<AcademicDocument> {
     val arrayResult = arrayOrNested("practicals", "items", "data")
-    if (arrayResult.isEmpty() && hasArrayPayload()) return emptyList()
+    if (arrayResult.isEmpty() && hasArrayPayload("practicals", "items", "data")) return emptyList()
     return (arrayResult.ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }).flatMap { element ->
         val root = element.objectOrData()
         val practicalId = root.text("id", "practicalId", "project_id", "uid") ?: stableId(root)
@@ -497,10 +499,15 @@ fun JsonElement.toPracticalDocuments(fallbackYear: String? = null): List<Academi
                 parentYear = practicalYear,
                 ownerId = practicalId
             )
-            document.copy(downloadUrl = document.downloadUrl ?: "me/projectFiles/${document.id}")
+            val remoteId = document.id
+            document.copy(
+                id = "practical:$practicalId:file:$remoteId",
+                downloadUrl = "me/projectFiles/$remoteId"
+            )
         }
         val stepFiles = root.array("steps", "projectSteps").flatMap { step ->
             val stepRoot = step.objectOrData()
+            val stepId = stepRoot.text("id", "stepId", "psp_id", "uid") ?: stableId(stepRoot)
             stepRoot.array("files").map { file ->
                 val fileRoot = file.objectOrData()
                 val document = fileRoot.toDocument(
@@ -509,7 +516,11 @@ fun JsonElement.toPracticalDocuments(fallbackYear: String? = null): List<Academi
                     ownerId = practicalId,
                     groupId = fileRoot.text("project_group_id", "pgr_id", "group_id")
                 )
-                document.copy(downloadUrl = document.downloadUrl ?: "me/projectStepFiles/${document.id}")
+                val remoteId = document.id
+                document.copy(
+                    id = "practical:$practicalId:step:$stepId:$remoteId",
+                    downloadUrl = "me/projectStepFiles/$remoteId"
+                )
             }
         }
         files + stepFiles
@@ -532,7 +543,7 @@ fun JsonElement.toDocuments(fallbackYear: String? = null): List<AcademicDocument
 
 fun JsonElement.toProjectDocuments(fallbackYear: String? = null): List<AcademicDocument> {
     val arrayResult = arrayOrNested("projects", "items", "data")
-    if (arrayResult.isEmpty() && hasArrayPayload()) return emptyList()
+    if (arrayResult.isEmpty() && hasArrayPayload("projects", "items", "data")) return emptyList()
     return (arrayResult.ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }).flatMap { element ->
         val projectRoot = element.objectOrData()
         val projectId = projectRoot.text("id", "projectId", "project_id", "uid") ?: stableId(projectRoot)
@@ -544,10 +555,15 @@ fun JsonElement.toProjectDocuments(fallbackYear: String? = null): List<AcademicD
                 parentYear = projectYear,
                 ownerId = projectId
             )
-            document.copy(downloadUrl = document.downloadUrl ?: "me/projectFiles/${document.id}")
+            val remoteId = document.id
+            document.copy(
+                id = "project:$projectId:file:$remoteId",
+                downloadUrl = "me/projectFiles/$remoteId"
+            )
         }
         val stepFiles = projectRoot.array("steps", "projectSteps").flatMap { step ->
             val stepRoot = step.objectOrData()
+            val stepId = stepRoot.text("id", "stepId", "psp_id", "uid") ?: stableId(stepRoot)
             stepRoot.array("files").map { file ->
                 val root = file.objectOrData()
                 val document = root.toDocument(
@@ -556,7 +572,11 @@ fun JsonElement.toProjectDocuments(fallbackYear: String? = null): List<AcademicD
                     ownerId = projectId,
                     groupId = root.text("project_group_id", "pgr_id", "group_id")
                 )
-                document.copy(downloadUrl = document.downloadUrl ?: "me/projectStepFiles/${document.id}")
+                val remoteId = document.id
+                document.copy(
+                    id = "project:$projectId:step:$stepId:$remoteId",
+                    downloadUrl = "me/projectStepFiles/$remoteId"
+                )
             }
         }
         projectFiles + stepFiles
@@ -588,7 +608,7 @@ fun JsonElement.toClassIds(): List<String> {
 
 fun JsonElement.toNews(): List<NewsItem> {
     val arrayResult = arrayOrNested("news", "banners", "content", "items", "data")
-    if (arrayResult.isEmpty() && hasArrayPayload()) return emptyList()
+    if (arrayResult.isEmpty() && hasArrayPayload("news", "banners", "content", "items", "data")) return emptyList()
     val items = arrayResult.ifEmpty { listOf(objectOrData()).filter { it.isNotEmpty() } }
     return items.map { element ->
         val root = element.objectOrData()
@@ -598,7 +618,7 @@ fun JsonElement.toNews(): List<NewsItem> {
             ?.takeIf { it.isNotBlank() }
             ?: root.newsFallbackBody()
         NewsItem(
-            id = root.text("id", "newsId", "ne_id", "partner_id", "ss_id", "type", "uid") ?: stableId(root),
+            id = root.text("id", "newsId", "ne_id", "partner_id", "ss_id", "uid") ?: stableId(root),
             title = root.text("title", "name", "label") ?: "",
             body = preview,
             publishedAt = root.instant(
@@ -657,11 +677,16 @@ private fun JsonElement.objectOrData(): JsonObject {
     return (root["result"] as? JsonObject) ?: (root["data"] as? JsonObject) ?: root
 }
 
-private fun JsonElement.hasArrayPayload(): Boolean {
+private fun JsonElement.hasArrayPayload(vararg keys: String): Boolean {
     if (this is JsonArray) return true
     val root = this as? JsonObject ?: return false
-    val keys = listOf("result", "data", "items", "results")
-    return keys.any { root[it] is JsonArray } || root.values.any { it is JsonArray }
+    return (keys.toList() + listOf("result", "data", "items", "results")).distinct().any { key ->
+        when (val value = root[key]) {
+            is JsonArray -> true
+            is JsonObject -> value.hasArrayPayload(*keys)
+            else -> false
+        }
+    }
 }
 
 private fun JsonElement.arrayOrNested(vararg keys: String): List<JsonElement> {
@@ -671,11 +696,11 @@ private fun JsonElement.arrayOrNested(vararg keys: String): List<JsonElement> {
         val value = root[key]
         if (value is JsonArray) return value.toList()
         if (value is JsonObject) {
-            val nested = value.arrayOrNested("content", "items", "data", "results")
+            val nested = value.arrayOrNested(*keys)
             if (nested.isNotEmpty()) return nested
         }
     }
-    return root.values.firstOrNull { it is JsonArray }?.jsonArray?.toList().orEmpty()
+    return emptyList()
 }
 
 private fun academicYearFromProfile(value: String): String {
@@ -708,7 +733,7 @@ private fun JsonObject.text(vararg keys: String): String? {
     keys.forEach { key ->
         val value = this[key]
         if (value is JsonPrimitive) {
-            return value.contentOrNull?.takeIf { it.isNotBlank() }
+            value.contentOrNull?.takeIf { it.isNotBlank() }?.let { return it }
         }
         if (value is JsonObject) {
             value.text("name", "title", "label", "value")?.let { return it }
@@ -756,7 +781,13 @@ private fun JsonObject.array(vararg keys: String): List<JsonElement> {
 
 private fun JsonObject.arrayText(key: String, vararg textKeys: String): String? {
     return array(key)
-        .mapNotNull { (it as? JsonObject)?.text(*textKeys) }
+        .mapNotNull { element ->
+            when (element) {
+                is JsonPrimitive -> element.contentOrNull?.takeIf { it.isNotBlank() }
+                is JsonObject -> element.text(*textKeys)
+                else -> null
+            }
+        }
         .takeIf { it.isNotEmpty() }
         ?.joinToString(", ")
 }
@@ -838,9 +869,8 @@ private fun String.toDocumentFileName(extension: String?): String {
 private fun JsonObject.linkHref(vararg rels: String): String? {
     val links = array("links").mapNotNull { it as? JsonObject }
     if (rels.isNotEmpty()) {
-        links.firstOrNull { link -> link.text("rel") in rels }
+        return links.firstOrNull { link -> link.text("rel") in rels }
             ?.text("href", "url")
-            ?.let { return it }
     }
     return links.mapNotNull { it.text("href", "url") }.firstOrNull()
 }
@@ -872,9 +902,13 @@ internal fun String.htmlToPlainText(): String {
         val entity = match.groupValues[1]
         when {
             entity.startsWith("#x") || entity.startsWith("#X") ->
-                entity.drop(2).toIntOrNull(16)?.let { String(Character.toChars(it)) } ?: match.value
+                entity.drop(2).toIntOrNull(16)
+                    ?.takeIf { Character.isValidCodePoint(it) }
+                    ?.let { String(Character.toChars(it)) } ?: match.value
             entity.startsWith("#") ->
-                entity.drop(1).toIntOrNull()?.let { String(Character.toChars(it)) } ?: match.value
+                entity.drop(1).toIntOrNull()
+                    ?.takeIf { Character.isValidCodePoint(it) }
+                    ?.let { String(Character.toChars(it)) } ?: match.value
             else -> NAMED_ENTITIES[entity] ?: match.value
         }
     }
@@ -917,6 +951,7 @@ private fun JsonObject.localDate(vararg keys: String): LocalDate? {
         val value = this[key]
         val text = (value as? JsonPrimitive)?.contentOrNull
         text?.let { candidate ->
+            runCatching { LocalDate.parse(candidate.take(10), DateTimeFormatter.ofPattern("dd/MM/yyyy")) }.getOrNull()?.let { return it }
             runCatching { LocalDate.parse(candidate.take(10)) }.getOrNull()?.let { return it }
             parseInstant(value)?.atZone(ZoneOffset.UTC)?.toLocalDate()?.let { return it }
         }
@@ -993,6 +1028,10 @@ private fun parseInstant(value: JsonElement?): Instant? {
             }.getOrNull()?.let { return it }
         }
         runCatching { Instant.parse(cleanText) }.getOrNull()?.let { return it }
+        runCatching {
+            java.time.LocalDateTime.parse(cleanText, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                .atZone(java.time.ZoneId.systemDefault()).toInstant()
+        }.getOrNull()?.let { return it }
         runCatching { LocalDate.parse(cleanText.take(10)).atStartOfDay().toInstant(ZoneOffset.UTC) }.getOrNull()?.let { return it }
         runCatching { DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(cleanText, Instant::from) }.getOrNull()?.let { return it }
     }

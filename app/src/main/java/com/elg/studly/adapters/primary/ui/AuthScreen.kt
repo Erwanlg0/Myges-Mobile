@@ -83,10 +83,11 @@ fun AuthRoute(
         hasBiometricSession = state.hasBiometricSession,
         authorizationUrl = state.authorizationUrl,
         onLogin = {
+            val authorizationUrl = viewModel.beginOAuthLogin()
             CustomTabsIntent.Builder()
                 .setShowTitle(true)
                 .build()
-                .launchUrl(context, Uri.parse(state.authorizationUrl))
+                .launchUrl(context, Uri.parse(authorizationUrl))
         },
         onBiometricUnlock = { biometricPrompt?.authenticate(promptInfo) }
     )

@@ -25,3 +25,11 @@ internal fun String.withRedirectUri(redirectUri: String): String {
         .build()
         .toString()
 }
+
+internal fun String.withOAuthState(state: String): String {
+    return toHttpUrl().newBuilder()
+        .removeAllQueryParameters("state")
+        .addQueryParameter("state", state)
+        .build()
+        .toString()
+}

@@ -1,6 +1,7 @@
 package com.elg.studly.adapters.primary.viewmodel
 
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import com.elg.studly.application.ports.NotificationScheduler
 import com.elg.studly.application.ports.SessionRepository
 import com.elg.studly.application.ports.SettingsRepository
@@ -131,6 +132,75 @@ class AuthViewModelTest {
     }
 
     @Test
+    fun completeOAuthCallbackWithNegativeExpiresInStoresNoExpiry() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository()
+        val viewModel = authViewModel(sessionRepository)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token=token-1&expires_in=-1"))
+        advanceUntilIdle()
+
+        assertEquals("token-1", sessionRepository.accessToken)
+        assertEquals(null, sessionRepository.expiresAt)
+    }
+
+    @Test
+    fun completeOAuthCallbackWithOverflowingExpiresInStoresNoExpiry() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository()
+        val viewModel = authViewModel(sessionRepository)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token=token-1&expires_in=${Long.MAX_VALUE}"))
+        advanceUntilIdle()
+
+        assertEquals("token-1", sessionRepository.accessToken)
+        assertEquals(null, sessionRepository.expiresAt)
+    }
+
+    @Test
+    fun oauthStateSurvivesViewModelRecreation() = runTest(dispatcher) {
+        val savedStateHandle = SavedStateHandle()
+        val firstViewModel = authViewModel(savedStateHandle = savedStateHandle)
+        val authorizationUrl = firstViewModel.beginOAuthLogin()
+        val oauthState = authorizationUrl.substringAfter("state=").substringBefore('&')
+        val sessionRepository = AuthRecordingSessionRepository()
+        val recreatedViewModel = authViewModel(sessionRepository, savedStateHandle = savedStateHandle)
+
+        recreatedViewModel.completeOAuthCallback(oauthUri("access_token=token-1", oauthState))
+        advanceUntilIdle()
+
+        assertEquals("token-1", sessionRepository.accessToken)
+    }
+
+    @Test
+    fun oauthStateCanOnlyBeUsedOnce() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository()
+        val viewModel = authViewModel(sessionRepository)
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token=token-1"))
+        advanceUntilIdle()
+        viewModel.completeOAuthCallback(oauthUri("access_token=token-1"))
+        advanceUntilIdle()
+
+        assertEquals(1, sessionRepository.authenticateCount)
+        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        stateCollection.cancel()
+    }
+
+    @Test
+    fun mismatchedOAuthStateIsRejected() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository()
+        val viewModel = authViewModel(sessionRepository)
+        val stateCollection = collectState(viewModel)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token=token-1", "other-state"))
+        advanceUntilIdle()
+
+        assertEquals(0, sessionRepository.authenticateCount)
+        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        stateCollection.cancel()
+    }
+
+    @Test
     fun completeOAuthCallbackFailureIsExposedAsUiError() = runTest(dispatcher) {
         val sessionRepository = AuthRecordingSessionRepository().apply {
             authenticateFailure = AppException(AppError.Unauthorized)
@@ -242,30 +312,36 @@ class AuthViewModelTest {
 
     private fun authViewModel(
         sessionRepository: AuthRecordingSessionRepository = AuthRecordingSessionRepository(),
-        notificationScheduler: AuthRecordingNotificationScheduler = AuthRecordingNotificationScheduler()
+        notificationScheduler: AuthRecordingNotificationScheduler = AuthRecordingNotificationScheduler(),
+        savedStateHandle: SavedStateHandle = SavedStateHandle(mapOf("oauth_state" to TEST_OAUTH_STATE))
     ): AuthViewModel {
         return AuthViewModel(
             sessionRepository,
             CompleteOAuthLoginUseCase(sessionRepository, AuthStubSettingsRepository(), notificationScheduler),
             mockk<AppConfig> {
                 every { oauthAuthorizeUrl } returns "https://authentication.example/oauth"
-            }
+            },
+            savedStateHandle
         )
     }
 
-    private fun oauthUri(fragment: String?): Uri {
+    private fun oauthUri(fragment: String?, state: String? = TEST_OAUTH_STATE): Uri {
         return mockk {
             every { getQueryParameter(any()) } returns null
-            every { encodedFragment } returns fragment
+            every { encodedFragment } returns if (fragment != null && state != null) "$fragment&state=$state" else fragment
         }
     }
 
     private fun queryOauthUri(vararg parameters: Pair<String, String>): Uri {
-        val values = parameters.toMap()
+        val values = parameters.toMap() + ("state" to TEST_OAUTH_STATE)
         return mockk {
             every { getQueryParameter(any()) } answers { values[firstArg()] }
             every { encodedFragment } returns null
         }
+    }
+
+    private companion object {
+        const val TEST_OAUTH_STATE = "oauth-state"
     }
 }
 
@@ -274,6 +350,7 @@ private class AuthRecordingSessionRepository : SessionRepository {
     var expiresAt: Instant? = null
     var enableBiometric = false
     var unlockCount = 0
+    var authenticateCount = 0
     var authenticateFailure: Throwable? = null
     var unlockFailure: Throwable? = null
     override val session: Flow<Session?> = MutableStateFlow(null)
@@ -285,6 +362,7 @@ private class AuthRecordingSessionRepository : SessionRepository {
 
     override suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) {
         authenticateFailure?.let { throw it }
+        authenticateCount += 1
         this.accessToken = accessToken
         this.expiresAt = expiresAt
         this.enableBiometric = enableBiometric

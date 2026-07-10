@@ -63,18 +63,20 @@ class MainActivity : AppCompatActivity() {
             ) {
                 MygesApp(
                     oauthCallbackUri = oauthCallbackUri,
-                    onOAuthCallbackConsumed = { oauthCallbackUri = null },
+                    onOAuthCallbackConsumed = {
+                        oauthCallbackUri = null
+                        intent.data = null
+                    },
                     notificationRoute = notificationRoute,
-                    onNotificationRouteConsumed = { notificationRoute = null },
+                    onNotificationRouteConsumed = {
+                        notificationRoute = null
+                        intent.removeExtra(EXTRA_NOTIFICATION_ROUTE)
+                        if (intent.data?.scheme == SHORTCUT_SCHEME) intent.data = null
+                    },
                     onSuccessfulRefresh = playQualityManager::requestReview
                 )
             }
         }
-        playQualityManager.checkForFlexibleUpdate(this)
-    }
-
-    override fun onResume() {
-        super.onResume()
         playQualityManager.checkForFlexibleUpdate(this)
     }
 
@@ -95,13 +97,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        val incomingIntent = intent ?: return
+        val data = incomingIntent.data
         when {
-            intent?.action == Intent.ACTION_VIEW && intent.data.isOAuthCallback() ->
-                oauthCallbackUri = intent.data
-            intent?.action == Intent.ACTION_VIEW && intent.data?.scheme == SHORTCUT_SCHEME ->
-                notificationRoute = intent.data?.host
-            else ->
-                notificationRoute = intent?.getStringExtra(EXTRA_NOTIFICATION_ROUTE)
+            incomingIntent.action == Intent.ACTION_VIEW && data.isOAuthCallback() -> {
+                oauthCallbackUri = data
+            }
+            incomingIntent.action == Intent.ACTION_VIEW && data?.scheme == SHORTCUT_SCHEME -> {
+                notificationRoute = data.host
+            }
+            incomingIntent.hasExtra(EXTRA_NOTIFICATION_ROUTE) -> {
+                notificationRoute = incomingIntent.getStringExtra(EXTRA_NOTIFICATION_ROUTE)
+            }
         }
     }
 
@@ -109,6 +116,7 @@ class MainActivity : AppCompatActivity() {
         if (this == null) return false
         val redirect = Uri.parse(BuildConfig.KORDIS_OAUTH_REDIRECT_URI)
         return scheme.equals(redirect.scheme, ignoreCase = true) &&
+            authority.equals(redirect.authority, ignoreCase = true) &&
             (redirect.path.isNullOrEmpty() || path == redirect.path)
     }
 

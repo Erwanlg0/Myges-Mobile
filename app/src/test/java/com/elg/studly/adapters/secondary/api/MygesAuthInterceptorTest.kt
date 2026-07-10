@@ -102,6 +102,19 @@ class MygesAuthInterceptorTest {
     }
 
     @Test
+    fun delayedUnauthorizedResponseDoesNotInvalidateNewSession() {
+        val sessionRepository = RecordingSessionRepository(sampleSession("old-token"))
+        val newSession = sampleSession("new-token")
+        val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)
+        val chain = mockChain(401) { sessionRepository.replaceSession(newSession) }
+
+        interceptor.intercept(chain)
+
+        assertEquals(0, sessionRepository.invalidations)
+        assertEquals(newSession, sessionRepository.currentSession())
+    }
+
+    @Test
     fun interceptorKeepsExistingAcceptHeader() {
         val sessionRepository = RecordingSessionRepository(sampleSession("token"))
         val interceptor = MygesAuthInterceptor("agent", "https://api.kordis.fr/", sessionRepository)
@@ -177,12 +190,14 @@ class MygesAuthInterceptorTest {
 private fun mockChain(
     statusCode: Int,
     url: String = "https://api.kordis.fr/me/profile",
-    request: Request = Request.Builder().url(url).build()
+    request: Request = Request.Builder().url(url).build(),
+    beforeResponse: () -> Unit = {}
 ): Interceptor.Chain {
     val chain = mockk<Interceptor.Chain>()
     val requestSlot = slot<Request>()
     every { chain.request() } returns request
     every { chain.proceed(capture(requestSlot)) } answers {
+        beforeResponse()
         Response.Builder()
             .request(requestSlot.captured)
             .protocol(Protocol.HTTP_1_1)
@@ -206,6 +221,10 @@ private class RecordingSessionRepository(
     override fun invalidateSession() {
         invalidations++
         current = null
+    }
+
+    fun replaceSession(session: Session) {
+        current = session
     }
 
     override suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) = Unit

@@ -1,11 +1,13 @@
 package com.elg.studly.adapters.primary.viewmodel
 
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elg.studly.application.ports.SessionRepository
 import com.elg.studly.application.usecase.CompleteOAuthLoginUseCase
 import com.elg.studly.config.AppConfig
+import com.elg.studly.config.withOAuthState
 import com.elg.studly.domain.model.AppError
 import com.elg.studly.domain.model.toAppError
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +20,7 @@ import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.util.UUID
 import javax.inject.Inject
 
 data class AuthUiState(
@@ -31,7 +34,8 @@ data class AuthUiState(
 class AuthViewModel @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val completeOAuthLoginUseCase: CompleteOAuthLoginUseCase,
-    appConfig: AppConfig
+    private val appConfig: AppConfig,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val loading = MutableStateFlow(false)
     private val error = MutableStateFlow<AppError?>(null)
@@ -50,7 +54,20 @@ class AuthViewModel @Inject constructor(
         AuthUiState(false, null, false, appConfig.oauthAuthorizeUrl)
     )
 
+    fun beginOAuthLogin(): String {
+        val oauthState = UUID.randomUUID().toString()
+        savedStateHandle[OAUTH_STATE_KEY] = oauthState
+        return appConfig.oauthAuthorizeUrl.withOAuthState(oauthState).also { authorizationUrl.value = it }
+    }
+
     fun completeOAuthCallback(uri: Uri) {
+        val expectedState = savedStateHandle.get<String>(OAUTH_STATE_KEY)
+        val callbackState = uri.oauthParameter("state")
+        if (expectedState.isNullOrBlank() || callbackState != expectedState) {
+            error.value = AppError.Unauthorized
+            return
+        }
+        savedStateHandle.remove<String>(OAUTH_STATE_KEY)
         val accessToken = uri.oauthParameter("access_token")
         if (accessToken.isNullOrBlank()) {
             error.value = AppError.Unauthorized
@@ -59,7 +76,8 @@ class AuthViewModel @Inject constructor(
         val authorizationToken = accessToken.withAuthorizationScheme(uri.oauthParameter("token_type"))
         val expiresAt = uri.oauthParameter("expires_in")
             ?.toLongOrNull()
-            ?.let { Instant.now().plusSeconds(it) }
+            ?.takeIf { it >= 0L }
+            ?.let { runCatching { Instant.now().plusSeconds(it) }.getOrNull() }
         viewModelScope.launch {
             loading.value = true
             error.value = null
@@ -94,5 +112,9 @@ class AuthViewModel @Inject constructor(
     private fun String.withAuthorizationScheme(tokenType: String?): String {
         if (any(Char::isWhitespace) || tokenType.isNullOrBlank()) return this
         return "${tokenType.lowercase()} $this"
+    }
+
+    private companion object {
+        const val OAUTH_STATE_KEY = "oauth_state"
     }
 }

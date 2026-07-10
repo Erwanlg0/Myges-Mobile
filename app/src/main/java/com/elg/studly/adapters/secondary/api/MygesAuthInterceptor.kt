@@ -26,7 +26,7 @@ class MygesAuthInterceptor(
         }
         val session = sessionRepository.currentSession()
         if (session?.isExpired == true || session?.requiresRefresh == true) {
-            sessionRepository.invalidateSession()
+            sessionRepository.invalidateSessionIfCurrent(session)
             return Response.Builder()
                 .request(chain.request())
                 .protocol(Protocol.HTTP_1_1)
@@ -39,7 +39,7 @@ class MygesAuthInterceptor(
             requestBuilder.header("Authorization", token.withBearerScheme())
         }
         return chain.proceed(requestBuilder.build()).also { response ->
-            if (response.code == 401) sessionRepository.invalidateSession()
+            if (response.code == 401 && session != null) sessionRepository.invalidateSessionIfCurrent(session)
         }
     }
 }

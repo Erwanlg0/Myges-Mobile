@@ -22,6 +22,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.await
 import androidx.work.workDataOf
 import com.elg.studly.MainActivity
 import com.elg.studly.R
@@ -104,7 +105,13 @@ class AndroidNotificationScheduler @Inject constructor(
     }
 
     override suspend fun cancelStudentSync() {
-        WorkManager.getInstance(context).cancelUniqueWork(WORK_STUDENT_SYNC)
+        with(WorkManager.getInstance(context)) {
+            listOf(
+                cancelUniqueWork(WORK_STUDENT_SYNC),
+                cancelUniqueWork(WORK_STUDENT_SYNC_NOW),
+                cancelAllWorkByTag(EventReminderWorker.TAG)
+            ).forEach { it.await() }
+        }
     }
 
     override suspend fun showSyncFailure() {

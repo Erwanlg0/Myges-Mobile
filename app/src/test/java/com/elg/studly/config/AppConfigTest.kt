@@ -43,4 +43,14 @@ class AppConfigTest {
             url.withRedirectUri("app:/callback")
         )
     }
+
+    @Test
+    fun withOAuthStateReplacesExistingState() {
+        val url = "https://authentication.kordis.fr/oauth/authorize?state=old"
+
+        assertEquals(
+            "https://authentication.kordis.fr/oauth/authorize?state=new",
+            url.withOAuthState("new")
+        )
+    }
 }

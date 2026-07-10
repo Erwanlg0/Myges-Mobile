@@ -15,7 +15,7 @@ import javax.inject.Singleton
 class MygesSessionRepository @Inject constructor(
     private val secureSessionStore: SecureSessionStore
 ) : SessionRepository {
-    private var storedSession: Session? = readUsableSession()
+    @Volatile private var storedSession: Session? = readUsableSession()
     private val unlockedSession = MutableStateFlow(storedSession?.takeUnless { it.biometricEnabled })
     private val lockedBiometricSession = MutableStateFlow(storedSession?.biometricEnabled == true)
 
@@ -24,11 +24,17 @@ class MygesSessionRepository @Inject constructor(
 
     override fun currentSession(): Session? = storedSession
 
+    @Synchronized
     override fun invalidateSession() {
         secureSessionStore.clear()
         storedSession = null
         lockedBiometricSession.value = false
         unlockedSession.value = null
+    }
+
+    @Synchronized
+    override fun invalidateSessionIfCurrent(session: Session) {
+        if (storedSession == session) invalidateSession()
     }
 
     override suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) {
@@ -51,6 +57,17 @@ class MygesSessionRepository @Inject constructor(
             unlockedSession.value = session
         } catch (throwable: Throwable) {
             throw throwable.toSessionAppException()
+        }
+    }
+
+    override suspend fun setBiometricEnabled(enabled: Boolean) {
+        synchronized(this) {
+            val session = storedSession ?: return
+            val updated = session.copy(biometricEnabled = enabled)
+            secureSessionStore.save(updated)
+            storedSession = updated
+            if (!enabled) lockedBiometricSession.value = false
+            if (unlockedSession.value != null || !enabled) unlockedSession.value = updated
         }
     }
 

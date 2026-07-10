@@ -1,10 +1,12 @@
 package com.elg.studly.adapters.primary.navigation
 
+import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -14,6 +16,8 @@ import android.widget.Toast
 import java.io.File
 import java.io.FileOutputStream
 import androidx.annotation.StringRes
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -51,12 +55,16 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.os.LocaleListCompat
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -82,9 +90,12 @@ import com.elg.studly.adapters.primary.ui.ProjectsScreen
 import com.elg.studly.adapters.primary.ui.SettingsScreen
 import com.elg.studly.adapters.primary.ui.StudentAvatar
 import com.elg.studly.adapters.primary.viewmodel.AppViewModel
+import com.elg.studly.adapters.primary.viewmodel.DocumentOpenRequest
 import com.elg.studly.adapters.primary.viewmodel.SettingsViewModel
 import com.elg.studly.adapters.primary.viewmodel.StudentViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class Destination(
     val route: String,
@@ -92,14 +103,14 @@ data class Destination(
     val icon: ImageVector
 )
 
-private fun saveToDownloads(context: Context, uri: Uri, mimeType: String?): Boolean {
+private suspend fun saveToDownloads(context: Context, uri: Uri, mimeType: String?): Boolean = withContext(Dispatchers.IO) {
     val resolver = context.contentResolver
     val displayName = runCatching {
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
     }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "document"
-    return runCatching {
+    runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, displayName)
@@ -108,10 +119,10 @@ private fun saveToDownloads(context: Context, uri: Uri, mimeType: String?): Bool
                 put(MediaStore.Downloads.IS_PENDING, 1)
             }
             val target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: return false
+                ?: return@withContext false
             resolver.openOutputStream(target)?.use { output ->
-                resolver.openInputStream(uri)?.use { input -> input.copyTo(output) } ?: return false
-            } ?: return false
+                resolver.openInputStream(uri)?.use { input -> input.copyTo(output) } ?: return@withContext false
+            } ?: return@withContext false
             values.clear()
             values.put(MediaStore.Downloads.IS_PENDING, 0)
             resolver.update(target, values, null, null)
@@ -120,7 +131,7 @@ private fun saveToDownloads(context: Context, uri: Uri, mimeType: String?): Bool
                 .apply { mkdirs() }
             val target = File(downloads, displayName)
             FileOutputStream(target).use { output ->
-                resolver.openInputStream(uri)?.use { input -> input.copyTo(output) } ?: return false
+                resolver.openInputStream(uri)?.use { input -> input.copyTo(output) } ?: return@withContext false
             }
         }
         true
@@ -153,11 +164,15 @@ fun MygesApp(
     val viewModel: AppViewModel = hiltViewModel()
     val session by viewModel.session.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    LaunchedEffect(settings?.languageTag) {
+    LaunchedEffect(settings?.languageTag, settings != null) {
+        val currentSettings = settings ?: return@LaunchedEffect
         AppCompatDelegate.setApplicationLocales(
-            settings?.languageTag?.let(LocaleListCompat::forLanguageTags)
+            currentSettings.languageTag?.let(LocaleListCompat::forLanguageTags)
                 ?: LocaleListCompat.getEmptyLocaleList()
         )
+    }
+    LaunchedEffect(session, oauthCallbackUri) {
+        if (session != null && oauthCallbackUri != null) onOAuthCallbackConsumed()
     }
     if (session == null) {
         AuthRoute(
@@ -179,10 +194,36 @@ private fun StudentRoute(
     val navController = rememberNavController()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
     val studentViewModel: StudentViewModel = hiltViewModel()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
+    var pendingDocumentSave by remember { mutableStateOf<DocumentOpenRequest?>(null) }
+    val saveDocument: (DocumentOpenRequest) -> Unit = { request ->
+        coroutineScope.launch {
+            if (saveToDownloads(context, request.uri, request.mimeType)) {
+                Toast.makeText(context, R.string.documents_saved_to_downloads, Toast.LENGTH_LONG).show()
+            } else {
+                studentViewModel.reportOpenDocumentFailure()
+            }
+        }
+    }
+    val storagePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val request = pendingDocumentSave
+        pendingDocumentSave = null
+        if (granted && request != null) saveDocument(request)
+        else if (request != null) studentViewModel.reportOpenDocumentFailure()
+    }
+    val requestDocumentSave: (DocumentOpenRequest) -> Unit = { request ->
+        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.O..Build.VERSION_CODES.P &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingDocumentSave = request
+            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            saveDocument(request)
+        }
+    }
     val dashboardState by studentViewModel.dashboard.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val selectedDestination = destinations.firstOrNull { destination ->
@@ -198,11 +239,7 @@ private fun StudentRoute(
     LaunchedEffect(studentViewModel) {
         studentViewModel.documentOpenRequests.collect { request ->
             if (request.downloadOnly) {
-                if (saveToDownloads(context, request.uri, request.mimeType)) {
-                    Toast.makeText(context, R.string.documents_saved_to_downloads, Toast.LENGTH_LONG).show()
-                } else {
-                    studentViewModel.reportOpenDocumentFailure()
-                }
+                requestDocumentSave(request)
                 return@collect
             }
             val openWithMime = { mime: String ->
@@ -229,11 +266,7 @@ private fun StudentRoute(
                         throw exception
                     }
                 } catch (e: ActivityNotFoundException) {
-                    if (saveToDownloads(context, request.uri, request.mimeType)) {
-                        Toast.makeText(context, R.string.documents_saved_to_downloads, Toast.LENGTH_LONG).show()
-                    } else {
-                        studentViewModel.reportOpenDocumentFailure()
-                    }
+                    requestDocumentSave(request)
                 }
             }
         }

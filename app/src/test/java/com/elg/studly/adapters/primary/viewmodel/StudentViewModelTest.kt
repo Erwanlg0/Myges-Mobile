@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -177,6 +178,7 @@ class StudentViewModelTest {
         viewModel.navigateToAgendaDate(date)
         
         assertEquals(date, viewModel.agendaDateToNavigate.first())
+        assertNull(withTimeoutOrNull(1) { viewModel.agendaDateToNavigate.first() })
     }
 
     @Test

@@ -27,6 +27,8 @@ import com.elg.studly.domain.model.ProjectMessage
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.toAppError
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +39,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -69,35 +72,33 @@ class StudentViewModel @Inject constructor(
     val calendarSyncCompleted: SharedFlow<Unit> = _calendarSyncCompleted
     private val _projectMessages = MutableStateFlow<Map<String, FeatureUiState<List<ProjectMessage>>>>(emptyMap())
     val projectMessages: StateFlow<Map<String, FeatureUiState<List<ProjectMessage>>>> = _projectMessages
+    private var calendarSyncJob: Job? = null
 
     private val _depositRequests = MutableSharedFlow<String>()
     val depositRequests: SharedFlow<String> = _depositRequests
 
-    val agendaDateToNavigate = MutableSharedFlow<LocalDate>()
+    private val agendaDateNavigation = Channel<LocalDate>(Channel.BUFFERED)
+    val agendaDateToNavigate = agendaDateNavigation.receiveAsFlow()
 
     fun requestDeposit(groupId: String) {
         viewModelScope.launch { _depositRequests.emit(groupId) }
     }
 
-    val gradesPeriodToNavigate = MutableSharedFlow<String>()
-    val absencesPeriodToNavigate = MutableSharedFlow<String>()
+    private val gradesPeriodNavigation = Channel<String>(Channel.BUFFERED)
+    val gradesPeriodToNavigate = gradesPeriodNavigation.receiveAsFlow()
+    private val absencesPeriodNavigation = Channel<String>(Channel.BUFFERED)
+    val absencesPeriodToNavigate = absencesPeriodNavigation.receiveAsFlow()
 
     fun navigateToAgendaDate(date: LocalDate) {
-        viewModelScope.launch {
-            agendaDateToNavigate.emit(date)
-        }
+        agendaDateNavigation.trySend(date)
     }
 
     fun navigateToGradesPeriod(period: String) {
-        viewModelScope.launch {
-            gradesPeriodToNavigate.emit(period)
-        }
+        gradesPeriodNavigation.trySend(period)
     }
 
     fun navigateToAbsencesPeriod(period: String) {
-        viewModelScope.launch {
-            absencesPeriodToNavigate.emit(period)
-        }
+        absencesPeriodNavigation.trySend(period)
     }
 
     val dashboard: StateFlow<FeatureUiState<DashboardSummary?>> = repository.observeDashboard()
@@ -159,7 +160,8 @@ class StudentViewModel @Inject constructor(
     }
 
     fun syncAgendaToCalendar(events: List<AgendaEvent>) {
-        viewModelScope.launch {
+        if (calendarSyncJob?.isActive == true) return
+        calendarSyncJob = viewModelScope.launch {
             refreshing.value = true
             error.value = null
             runCatching { calendarSyncPort.sync(events) }

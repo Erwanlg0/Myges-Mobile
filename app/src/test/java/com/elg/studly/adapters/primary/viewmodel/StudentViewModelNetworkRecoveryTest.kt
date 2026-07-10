@@ -198,7 +198,7 @@ class StudentViewModelNetworkRecoveryTest {
             repository,
             calendarSyncPort,
             RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, notificationScheduler),
-            LogoutUseCase(sessionRepository, notificationScheduler),
+            LogoutUseCase(sessionRepository, notificationScheduler, repository, settingsRepository),
             networkMonitor
         )
     }

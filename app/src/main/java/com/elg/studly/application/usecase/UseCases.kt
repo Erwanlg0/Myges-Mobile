@@ -21,9 +21,10 @@ class CompleteOAuthLoginUseCase @Inject constructor(
     private val notificationScheduler: NotificationScheduler
 ) {
     suspend operator fun invoke(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) {
-        sessionRepository.authenticateWithToken(accessToken, expiresAt, enableBiometric)
+        val settings = settingsRepository.settings.first()
+        sessionRepository.authenticateWithToken(accessToken, expiresAt, settings.biometricEnabled)
         notificationScheduler.ensureChannels()
-        val intervalMinutes = settingsRepository.settings.first().refreshIntervals.smallestIntervalMinutes().toLong()
+        val intervalMinutes = settings.refreshIntervals.smallestIntervalMinutes().toLong()
         notificationScheduler.scheduleStudentSync(intervalMinutes)
         notificationScheduler.runStudentSyncNow()
     }
@@ -31,10 +32,14 @@ class CompleteOAuthLoginUseCase @Inject constructor(
 
 class LogoutUseCase @Inject constructor(
     private val sessionRepository: SessionRepository,
-    private val notificationScheduler: NotificationScheduler
+    private val notificationScheduler: NotificationScheduler,
+    private val studentDataRepository: StudentDataRepository,
+    private val settingsRepository: SettingsRepository
 ) {
     suspend operator fun invoke() {
         notificationScheduler.cancelStudentSync()
+        studentDataRepository.clearCache()
+        settingsRepository.clearSyncMetadata()
         sessionRepository.logout()
     }
 }

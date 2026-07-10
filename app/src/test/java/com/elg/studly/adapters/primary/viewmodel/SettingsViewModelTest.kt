@@ -104,12 +104,14 @@ class SettingsViewModelTest {
     @Test
     fun setBiometricUpdatesSettingsRepository() = runTest(dispatcher) {
         val settingsRepository = RecordingSettingsRepository()
-        val viewModel = settingsViewModel(settingsRepository = settingsRepository)
+        val sessionRepository = RecordingSessionRepository(mutableListOf())
+        val viewModel = settingsViewModel(settingsRepository = settingsRepository, sessionRepository = sessionRepository)
 
         viewModel.setBiometricEnabled(true)
         advanceUntilIdle()
 
         assertEquals(true, settingsRepository.biometricEnabled)
+        assertEquals(true, sessionRepository.biometricEnabled)
     }
 
     @Test
@@ -184,6 +186,22 @@ class SettingsViewModelTest {
         assertEquals(2L, calendarSyncPort.selected)
     }
 
+    @Test
+    fun connectCalendarSelectsThenSyncsBeforeEnabling() = runTest(dispatcher) {
+        val events = mutableListOf<String>()
+        val settingsRepository = RecordingSettingsRepository(events)
+        val viewModel = settingsViewModel(
+            settingsRepository = settingsRepository,
+            calendarSyncPort = RecordingCalendarSyncPort(events)
+        )
+
+        viewModel.connectCalendar(2L, emptyList())
+        advanceUntilIdle()
+
+        assertEquals(listOf("selectCalendar", "syncCalendar", "enableCalendar"), events)
+        assertEquals(true, settingsRepository.calendarSyncEnabled)
+    }
+
 
     @Test
     fun clearCacheClearsRepositoryAndSyncMetadata() = runTest(dispatcher) {
@@ -244,22 +262,28 @@ class SettingsViewModelTest {
     ): SettingsViewModel {
         return SettingsViewModel(
             settingsRepository,
+            sessionRepository,
             UpdateReminderLeadUseCase(settingsRepository, studentDataRepository, notificationScheduler),
             ClearCacheUseCase(studentDataRepository, settingsRepository),
-            LogoutUseCase(sessionRepository, notificationScheduler),
+            LogoutUseCase(sessionRepository, notificationScheduler, studentDataRepository, settingsRepository),
             calendarSyncPort,
             RescheduleSyncUseCase(settingsRepository, notificationScheduler)
         )
     }
 }
 
-private class RecordingCalendarSyncPort : CalendarSyncPort {
+private class RecordingCalendarSyncPort(
+    private val events: MutableList<String> = mutableListOf()
+) : CalendarSyncPort {
     var selected: Long? = 1L
 
-    override suspend fun sync(events: List<AgendaEvent>) = Unit
+    override suspend fun sync(events: List<AgendaEvent>) {
+        this.events += "syncCalendar"
+    }
     override suspend fun availableCalendars(): List<CalendarAccount> = listOf(CalendarAccount(1L, "Primary", "account"))
     override suspend fun selectedCalendarId(): Long? = selected
     override suspend fun selectCalendar(id: Long) {
+        events += "selectCalendar"
         selected = id
     }
 }
@@ -291,6 +315,7 @@ private class RecordingSettingsRepository(
 
     override suspend fun setCalendarSyncEnabled(enabled: Boolean) {
         failure?.let { throw it }
+        if (enabled) events += "enableCalendar"
         this.calendarSyncEnabled = enabled
     }
 
@@ -392,12 +417,16 @@ private class RecordingStudentDataRepository(
 private class RecordingSessionRepository(
     private val events: MutableList<String>
 ) : SessionRepository {
+    var biometricEnabled: Boolean? = null
     override val session: Flow<Session?> = flowOf(null)
     override val hasLockedBiometricSession: Flow<Boolean> = flowOf(false)
     override fun currentSession(): Session? = null
     override fun invalidateSession() = Unit
     override suspend fun authenticateWithToken(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) = Unit
     override suspend fun unlockWithBiometrics() = Unit
+    override suspend fun setBiometricEnabled(enabled: Boolean) {
+        biometricEnabled = enabled
+    }
     override suspend fun logout() {
         events += "logout"
     }

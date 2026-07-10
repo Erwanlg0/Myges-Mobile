@@ -238,6 +238,18 @@ abstract class StudentDao {
     open suspend fun syncAgenda(agenda: List<AgendaEventEntity>) = replaceAgenda(agenda)
 
     @Transaction
+    open suspend fun syncAgendaWindow(
+        agenda: List<AgendaEventEntity>,
+        startEpochMillis: Long,
+        endEpochMillis: Long
+    ) = replaceAgenda(
+        agenda,
+        this.agenda().filter { event ->
+            event.endsAtEpochMillis >= startEpochMillis && event.startsAtEpochMillis <= endEpochMillis
+        }
+    )
+
+    @Transaction
     open suspend fun syncGrades(grades: List<GradeEntity>) = replaceGrades(grades)
 
     @Transaction
@@ -294,8 +306,11 @@ abstract class StudentDao {
         if (current != profile) upsertProfile(profile)
     }
 
-    private suspend fun replaceAgenda(incoming: List<AgendaEventEntity>) {
-        val plan = entitySyncPlan(agenda(), incoming, AgendaEventEntity::id)
+    private suspend fun replaceAgenda(incoming: List<AgendaEventEntity>) =
+        replaceAgenda(incoming, agenda())
+
+    private suspend fun replaceAgenda(incoming: List<AgendaEventEntity>, current: List<AgendaEventEntity>) {
+        val plan = entitySyncPlan(current, incoming, AgendaEventEntity::id)
         if (plan.deletes.isNotEmpty()) deleteAgenda(plan.deletes)
         if (plan.upserts.isNotEmpty()) upsertAgenda(plan.upserts)
     }
