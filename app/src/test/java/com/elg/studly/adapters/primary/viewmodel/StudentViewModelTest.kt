@@ -1,8 +1,11 @@
 package com.elg.studly.adapters.primary.viewmodel
 
 import android.net.Uri
+import com.elg.studly.application.ports.CalendarSyncPort
 import com.elg.studly.application.ports.NetworkMonitor
-import com.elg.studly.application.usecase.*
+import com.elg.studly.application.ports.StudentDataRepository
+import com.elg.studly.application.usecase.LogoutUseCase
+import com.elg.studly.application.usecase.RefreshStudentDataUseCase
 import com.elg.studly.domain.model.*
 import io.mockk.coEvery
 import io.mockk.every
@@ -25,30 +28,30 @@ class StudentViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
+    private lateinit var repository: StudentDataRepository
+    private lateinit var calendarSyncPort: CalendarSyncPort
     private lateinit var refreshStudentDataUseCase: RefreshStudentDataUseCase
-    private lateinit var syncAgendaToCalendarUseCase: SyncAgendaToCalendarUseCase
-    private lateinit var downloadDocumentUseCase: DownloadDocumentUseCase
-    private lateinit var joinGroupUseCase: JoinGroupUseCase
-    private lateinit var leaveGroupUseCase: LeaveGroupUseCase
-    private lateinit var subscribeEventUseCase: SubscribeEventUseCase
-    private lateinit var unsubscribeEventUseCase: UnsubscribeEventUseCase
-    private lateinit var projectMessagesUseCase: ProjectMessagesUseCase
-    private lateinit var sendProjectMessageUseCase: SendProjectMessageUseCase
     private lateinit var logoutUseCase: LogoutUseCase
     private lateinit var networkMonitor: NetworkMonitor
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        repository = mockk(relaxed = true) {
+            every { observeDashboard() } returns MutableStateFlow(mockk<DashboardSummary>(relaxed = true))
+            every { observeAgenda() } returns MutableStateFlow(emptyList())
+            every { observeGrades() } returns MutableStateFlow(emptyList())
+            every { observeAbsences() } returns MutableStateFlow(emptyList())
+            every { observeCourses() } returns MutableStateFlow(emptyList())
+            every { observeProjects() } returns MutableStateFlow(emptyList())
+            every { observePracticals() } returns MutableStateFlow(emptyList())
+            every { observeDocuments() } returns MutableStateFlow(emptyList())
+            every { observeDirectory() } returns MutableStateFlow(emptyList())
+            every { observeNews() } returns MutableStateFlow(emptyList())
+            every { observeEvents() } returns MutableStateFlow(emptyList())
+        }
+        calendarSyncPort = mockk(relaxed = true)
         refreshStudentDataUseCase = mockk(relaxed = true)
-        syncAgendaToCalendarUseCase = mockk(relaxed = true)
-        downloadDocumentUseCase = mockk(relaxed = true)
-        joinGroupUseCase = mockk(relaxed = true)
-        leaveGroupUseCase = mockk(relaxed = true)
-        subscribeEventUseCase = mockk(relaxed = true)
-        unsubscribeEventUseCase = mockk(relaxed = true)
-        projectMessagesUseCase = mockk(relaxed = true)
-        sendProjectMessageUseCase = mockk(relaxed = true)
         logoutUseCase = mockk(relaxed = true)
         networkMonitor = mockk {
             every { isOnline } returns MutableStateFlow(true)
@@ -62,26 +65,9 @@ class StudentViewModelTest {
 
     private fun createViewModel(): StudentViewModel {
         return StudentViewModel(
-            observeDashboard = mockk { every { this@mockk.invoke() } returns MutableStateFlow(mockk<DashboardSummary>(relaxed = true)) },
-            observeAgenda = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
-            observeGrades = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
-            observeAbsences = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
-            observeCourses = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
-            observeProjects = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
-            observePracticals = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
-            observeDocuments = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
-            observeDirectory = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
-            observeNews = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
-            observeEvents = mockk { every { this@mockk.invoke() } returns MutableStateFlow(emptyList()) },
+            repository = repository,
+            calendarSyncPort = calendarSyncPort,
             refreshStudentDataUseCase = refreshStudentDataUseCase,
-            syncAgendaToCalendarUseCase = syncAgendaToCalendarUseCase,
-            downloadDocumentUseCase = downloadDocumentUseCase,
-            joinGroupUseCase = joinGroupUseCase,
-            leaveGroupUseCase = leaveGroupUseCase,
-            subscribeEventUseCase = subscribeEventUseCase,
-            unsubscribeEventUseCase = unsubscribeEventUseCase,
-            projectMessagesUseCase = projectMessagesUseCase,
-            sendProjectMessageUseCase = sendProjectMessageUseCase,
             logoutUseCase = logoutUseCase,
             networkMonitor = networkMonitor
         )
@@ -105,7 +91,7 @@ class StudentViewModelTest {
         viewModel.syncAgendaToCalendar(events)
         advanceUntilIdle()
 
-        io.mockk.coVerify { syncAgendaToCalendarUseCase(events) }
+        io.mockk.coVerify { calendarSyncPort.sync(events) }
     }
 
     @Test
@@ -113,7 +99,7 @@ class StudentViewModelTest {
         val viewModel = createViewModel()
         val document = AcademicDocument("id", "Doc", null, null, "application/pdf", "doc.pdf", "url", Instant.now())
         val uri = mockk<Uri>()
-        coEvery { downloadDocumentUseCase(document, any()) } returns uri
+        coEvery { repository.downloadDocument(document, any()) } returns uri
 
         val requests = mutableListOf<DocumentOpenRequest>()
         val job = backgroundScope.launch {
@@ -133,12 +119,12 @@ class StudentViewModelTest {
     @Test
     fun joinGroupTriggersUseCaseWithoutFullRefresh() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        coEvery { joinGroupUseCase("courseId", "projectId", "groupId") } returns Unit
+        coEvery { repository.joinGroup("courseId", "projectId", "groupId") } returns Unit
 
         viewModel.joinGroup("courseId", "projectId", "groupId")
         advanceUntilIdle()
 
-        io.mockk.coVerify { joinGroupUseCase("courseId", "projectId", "groupId") }
+        io.mockk.coVerify { repository.joinGroup("courseId", "projectId", "groupId") }
     }
 
     @Test
@@ -155,12 +141,12 @@ class StudentViewModelTest {
     @Test
     fun leaveGroupTriggersUseCaseWithoutFullRefresh() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        coEvery { leaveGroupUseCase("courseId", "projectId", "groupId") } returns Unit
+        coEvery { repository.leaveGroup("courseId", "projectId", "groupId") } returns Unit
 
         viewModel.leaveGroup("courseId", "projectId", "groupId")
         advanceUntilIdle()
 
-        io.mockk.coVerify { leaveGroupUseCase("courseId", "projectId", "groupId") }
+        io.mockk.coVerify { repository.leaveGroup("courseId", "projectId", "groupId") }
     }
 
 
@@ -207,7 +193,7 @@ class StudentViewModelTest {
         val viewModel = createViewModel()
         val document = AcademicDocument("id", "Doc", null, null, "application/pdf", "doc.pdf", "url", Instant.now())
         val uri = mockk<Uri>()
-        coEvery { downloadDocumentUseCase(document, any()) } returns uri
+        coEvery { repository.downloadDocument(document, any()) } returns uri
         val requests = mutableListOf<DocumentOpenRequest>()
         val job = backgroundScope.launch { viewModel.documentOpenRequests.collect { requests += it } }
 
@@ -224,7 +210,7 @@ class StudentViewModelTest {
     fun downloadDocumentReportsNonAuthenticationFailure() = runTest(dispatcher) {
         val viewModel = createViewModel()
         val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", Instant.now())
-        coEvery { downloadDocumentUseCase(document, any()) } throws AppException(AppError.Network)
+        coEvery { repository.downloadDocument(document, any()) } throws AppException(AppError.Network)
 
         viewModel.openDocument(document)
         advanceUntilIdle()
@@ -236,7 +222,7 @@ class StudentViewModelTest {
     fun downloadDocumentLogsOutForUnauthorizedFailure() = runTest(dispatcher) {
         val viewModel = createViewModel()
         val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", Instant.now())
-        coEvery { downloadDocumentUseCase(document, any()) } throws AppException(AppError.Unauthorized)
+        coEvery { repository.downloadDocument(document, any()) } throws AppException(AppError.Unauthorized)
 
         viewModel.openDocument(document)
         advanceUntilIdle()
@@ -262,7 +248,7 @@ class StudentViewModelTest {
     fun projectMessagesLoadAndSendCoverSuccessAndFailure() = runTest(dispatcher) {
         val viewModel = createViewModel()
         val message = ProjectMessage("message", "Alice", "Hello", Instant.now(), false)
-        coEvery { projectMessagesUseCase("group") } returns listOf(message)
+        coEvery { repository.projectMessages("group") } returns listOf(message)
 
         viewModel.loadProjectMessages("group")
         advanceUntilIdle()
@@ -270,12 +256,12 @@ class StudentViewModelTest {
         assertEquals(listOf(message), viewModel.projectMessages.value.getValue("group").data)
         viewModel.sendProjectMessage("group", "  hello  ")
         advanceUntilIdle()
-        io.mockk.coVerify { sendProjectMessageUseCase("group", "hello") }
+        io.mockk.coVerify { repository.sendProjectMessage("group", "hello") }
         viewModel.sendProjectMessage("group", "   ")
         advanceUntilIdle()
-        io.mockk.coVerify(exactly = 1) { sendProjectMessageUseCase(any(), any()) }
+        io.mockk.coVerify(exactly = 1) { repository.sendProjectMessage(any(), any()) }
 
-        coEvery { projectMessagesUseCase("failure") } throws AppException(AppError.Network)
+        coEvery { repository.projectMessages("failure") } throws AppException(AppError.Network)
         viewModel.loadProjectMessages("failure")
         advanceUntilIdle()
         assertEquals(AppError.Network, viewModel.projectMessages.value.getValue("failure").error)
@@ -309,8 +295,8 @@ class StudentViewModelTest {
     fun failuresAndFeatureRefreshUpdateState() = runTest(dispatcher) {
         val viewModel = createViewModel()
         coEvery { refreshStudentDataUseCase(true, setOf(SyncFeature.Agenda)) } throws AppException(AppError.Unauthorized)
-        coEvery { syncAgendaToCalendarUseCase(any()) } throws AppException(AppError.Network)
-        coEvery { sendProjectMessageUseCase("failure", "message") } throws AppException(AppError.Unauthorized)
+        coEvery { calendarSyncPort.sync(any()) } throws AppException(AppError.Network)
+        coEvery { repository.sendProjectMessage("failure", "message") } throws AppException(AppError.Unauthorized)
         coEvery { logoutUseCase() } throws IllegalStateException()
 
         viewModel.refresh(SyncFeature.Agenda)
@@ -342,8 +328,8 @@ class StudentViewModelTest {
         val viewModel = createViewModel()
         val document = AcademicDocument("id", "Doc", null, null, null, "doc.pdf", "url", Instant.now())
         val extensionlessDocument = document.copy(id = "extensionless", fileName = "document")
-        coEvery { downloadDocumentUseCase(document, any()) } returns mockk<Uri>()
-        coEvery { downloadDocumentUseCase(extensionlessDocument, any()) } returns mockk<Uri>()
+        coEvery { repository.downloadDocument(document, any()) } returns mockk<Uri>()
+        coEvery { repository.downloadDocument(extensionlessDocument, any()) } returns mockk<Uri>()
         val requests = mutableListOf<DocumentOpenRequest>()
         val job = backgroundScope.launch { viewModel.documentOpenRequests.collect { requests += it } }
 

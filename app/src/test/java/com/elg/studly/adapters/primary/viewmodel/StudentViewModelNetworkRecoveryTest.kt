@@ -8,27 +8,8 @@ import com.elg.studly.application.ports.NotificationScheduler
 import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.application.ports.StudentDataRepository
 import com.elg.studly.application.ports.SessionRepository
-import com.elg.studly.application.usecase.DownloadDocumentUseCase
-import com.elg.studly.application.usecase.JoinGroupUseCase
-import com.elg.studly.application.usecase.LeaveGroupUseCase
 import com.elg.studly.application.usecase.LogoutUseCase
-import com.elg.studly.application.usecase.ObserveAbsencesUseCase
-import com.elg.studly.application.usecase.ObserveAgendaUseCase
-import com.elg.studly.application.usecase.ObserveCoursesUseCase
-import com.elg.studly.application.usecase.ObserveDashboardUseCase
-import com.elg.studly.application.usecase.ObserveDirectoryUseCase
-import com.elg.studly.application.usecase.ObserveDocumentsUseCase
-import com.elg.studly.application.usecase.ObserveEventsUseCase
-import com.elg.studly.application.usecase.ObserveGradesUseCase
-import com.elg.studly.application.usecase.ObserveNewsUseCase
-import com.elg.studly.application.usecase.ObservePracticalsUseCase
-import com.elg.studly.application.usecase.ObserveProjectsUseCase
-import com.elg.studly.application.usecase.ProjectMessagesUseCase
 import com.elg.studly.application.usecase.RefreshStudentDataUseCase
-import com.elg.studly.application.usecase.SendProjectMessageUseCase
-import com.elg.studly.application.usecase.SubscribeEventUseCase
-import com.elg.studly.application.usecase.SyncAgendaToCalendarUseCase
-import com.elg.studly.application.usecase.UnsubscribeEventUseCase
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
 import com.elg.studly.domain.model.AgendaEvent
@@ -214,26 +195,9 @@ class StudentViewModelNetworkRecoveryTest {
     ): StudentViewModel {
         val calendarSyncPort = FakeCalendarSyncPort()
         return StudentViewModel(
-            ObserveDashboardUseCase(repository),
-            ObserveAgendaUseCase(repository),
-            ObserveGradesUseCase(repository),
-            ObserveAbsencesUseCase(repository),
-            ObserveCoursesUseCase(repository),
-            ObserveProjectsUseCase(repository),
-            ObservePracticalsUseCase(repository),
-            ObserveDocumentsUseCase(repository),
-            ObserveDirectoryUseCase(repository),
-            ObserveNewsUseCase(repository),
-            ObserveEventsUseCase(repository),
+            repository,
+            calendarSyncPort,
             RefreshStudentDataUseCase(repository, settingsRepository, calendarSyncPort, notificationScheduler),
-            SyncAgendaToCalendarUseCase(calendarSyncPort),
-            DownloadDocumentUseCase(repository),
-            JoinGroupUseCase(repository),
-            LeaveGroupUseCase(repository),
-            SubscribeEventUseCase(repository),
-            UnsubscribeEventUseCase(repository),
-            ProjectMessagesUseCase(repository),
-            SendProjectMessageUseCase(repository),
             LogoutUseCase(sessionRepository, notificationScheduler),
             networkMonitor
         )
@@ -285,6 +249,8 @@ private class FakeStudentDataRepository : StudentDataRepository {
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
     override suspend fun subscribeEvent(eventId: String) {}
     override suspend fun unsubscribeEvent(eventId: String) {}
+    override suspend fun projectMessages(groupId: String) = emptyList<com.elg.studly.domain.model.ProjectMessage>()
+    override suspend fun sendProjectMessage(groupId: String, message: String) {}
 }
 
 private class FakeSettingsRepository : SettingsRepository {

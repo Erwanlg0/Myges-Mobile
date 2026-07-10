@@ -3,9 +3,8 @@ package com.elg.studly.adapters.primary.viewmodel
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elg.studly.application.ports.SessionRepository
 import com.elg.studly.application.usecase.CompleteOAuthLoginUseCase
-import com.elg.studly.application.usecase.ObserveLockedBiometricSessionUseCase
-import com.elg.studly.application.usecase.UnlockWithBiometricsUseCase
 import com.elg.studly.config.AppConfig
 import com.elg.studly.domain.model.AppError
 import com.elg.studly.domain.model.toAppError
@@ -30,9 +29,8 @@ data class AuthUiState(
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    observeLockedBiometricSession: ObserveLockedBiometricSessionUseCase,
+    private val sessionRepository: SessionRepository,
     private val completeOAuthLoginUseCase: CompleteOAuthLoginUseCase,
-    private val unlockWithBiometricsUseCase: UnlockWithBiometricsUseCase,
     appConfig: AppConfig
 ) : ViewModel() {
     private val loading = MutableStateFlow(false)
@@ -42,7 +40,7 @@ class AuthViewModel @Inject constructor(
     val state: StateFlow<AuthUiState> = combine(
         loading,
         error,
-        observeLockedBiometricSession(),
+        sessionRepository.hasLockedBiometricSession,
         authorizationUrl
     ) { isLoading, currentError, hasBiometricSession, oauthUrl ->
         AuthUiState(isLoading, currentError, hasBiometricSession, oauthUrl)
@@ -78,7 +76,7 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             loading.value = true
             error.value = null
-            runCatching { unlockWithBiometricsUseCase() }
+            runCatching { sessionRepository.unlockWithBiometrics() }
                 .onFailure { error.value = it.toAppError() }
             loading.value = false
         }

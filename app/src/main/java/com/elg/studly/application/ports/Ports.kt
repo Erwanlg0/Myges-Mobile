@@ -52,8 +52,8 @@ interface StudentDataRepository {
     suspend fun leaveGroup(courseId: String, projectId: String, groupId: String)
     suspend fun subscribeEvent(eventId: String)
     suspend fun unsubscribeEvent(eventId: String)
-    suspend fun projectMessages(groupId: String): List<ProjectMessage> = emptyList()
-    suspend fun sendProjectMessage(groupId: String, message: String) = Unit
+    suspend fun projectMessages(groupId: String): List<ProjectMessage>
+    suspend fun sendProjectMessage(groupId: String, message: String)
 }
 
 interface SettingsRepository {

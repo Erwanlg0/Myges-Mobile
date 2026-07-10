@@ -6,12 +6,10 @@ import com.elg.studly.application.ports.NotificationScheduler
 import com.elg.studly.application.ports.SessionRepository
 import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.application.ports.StudentDataRepository
-import com.elg.studly.application.usecase.CalendarAccountsUseCase
 import com.elg.studly.application.usecase.ClearCacheUseCase
 import com.elg.studly.application.usecase.LogoutUseCase
-import com.elg.studly.application.usecase.ObserveSettingsUseCase
 import com.elg.studly.application.usecase.RescheduleSyncUseCase
-import com.elg.studly.application.usecase.UpdateSettingsUseCase
+import com.elg.studly.application.usecase.UpdateReminderLeadUseCase
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
 import com.elg.studly.domain.model.AgendaEvent
@@ -245,11 +243,11 @@ class SettingsViewModelTest {
         calendarSyncPort: CalendarSyncPort = RecordingCalendarSyncPort()
     ): SettingsViewModel {
         return SettingsViewModel(
-            ObserveSettingsUseCase(settingsRepository),
-            UpdateSettingsUseCase(settingsRepository, studentDataRepository, notificationScheduler),
+            settingsRepository,
+            UpdateReminderLeadUseCase(settingsRepository, studentDataRepository, notificationScheduler),
             ClearCacheUseCase(studentDataRepository, settingsRepository),
             LogoutUseCase(sessionRepository, notificationScheduler),
-            CalendarAccountsUseCase(calendarSyncPort),
+            calendarSyncPort,
             RescheduleSyncUseCase(settingsRepository, notificationScheduler)
         )
     }
@@ -387,6 +385,8 @@ private class RecordingStudentDataRepository(
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
     override suspend fun subscribeEvent(eventId: String) {}
     override suspend fun unsubscribeEvent(eventId: String) {}
+    override suspend fun projectMessages(groupId: String) = emptyList<com.elg.studly.domain.model.ProjectMessage>()
+    override suspend fun sendProjectMessage(groupId: String, message: String) {}
 }
 
 private class RecordingSessionRepository(

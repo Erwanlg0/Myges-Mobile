@@ -6,28 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.elg.studly.adapters.primary.state.FeatureUiState
 import java.time.LocalDate
 import java.net.URLConnection
+import com.elg.studly.application.ports.CalendarSyncPort
 import com.elg.studly.application.ports.NetworkMonitor
-import com.elg.studly.application.usecase.DownloadDocumentUseCase
-import com.elg.studly.application.usecase.JoinGroupUseCase
-import com.elg.studly.application.usecase.LeaveGroupUseCase
+import com.elg.studly.application.ports.StudentDataRepository
 import com.elg.studly.application.usecase.LogoutUseCase
-import com.elg.studly.application.usecase.ObserveAbsencesUseCase
-import com.elg.studly.application.usecase.ObserveAgendaUseCase
-import com.elg.studly.application.usecase.ObserveCoursesUseCase
-import com.elg.studly.application.usecase.ObserveDirectoryUseCase
-import com.elg.studly.application.usecase.ObserveDashboardUseCase
-import com.elg.studly.application.usecase.ObserveDocumentsUseCase
-import com.elg.studly.application.usecase.ObserveGradesUseCase
-import com.elg.studly.application.usecase.ObserveEventsUseCase
-import com.elg.studly.application.usecase.ObserveNewsUseCase
-import com.elg.studly.application.usecase.ObservePracticalsUseCase
-import com.elg.studly.application.usecase.ObserveProjectsUseCase
-import com.elg.studly.application.usecase.ProjectMessagesUseCase
 import com.elg.studly.application.usecase.RefreshStudentDataUseCase
-import com.elg.studly.application.usecase.SendProjectMessageUseCase
-import com.elg.studly.application.usecase.SubscribeEventUseCase
-import com.elg.studly.application.usecase.UnsubscribeEventUseCase
-import com.elg.studly.application.usecase.SyncAgendaToCalendarUseCase
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
 import com.elg.studly.domain.model.AgendaEvent
@@ -65,26 +48,9 @@ data class DocumentOpenRequest(
 
 @HiltViewModel
 class StudentViewModel @Inject constructor(
-    observeDashboard: ObserveDashboardUseCase,
-    observeAgenda: ObserveAgendaUseCase,
-    observeGrades: ObserveGradesUseCase,
-    observeAbsences: ObserveAbsencesUseCase,
-    observeCourses: ObserveCoursesUseCase,
-    observeProjects: ObserveProjectsUseCase,
-    observePracticals: ObservePracticalsUseCase,
-    observeDocuments: ObserveDocumentsUseCase,
-    observeDirectory: ObserveDirectoryUseCase,
-    observeNews: ObserveNewsUseCase,
-    observeEvents: ObserveEventsUseCase,
+    private val repository: StudentDataRepository,
+    private val calendarSyncPort: CalendarSyncPort,
     private val refreshStudentDataUseCase: RefreshStudentDataUseCase,
-    private val syncAgendaToCalendarUseCase: SyncAgendaToCalendarUseCase,
-    private val downloadDocumentUseCase: DownloadDocumentUseCase,
-    private val joinGroupUseCase: JoinGroupUseCase,
-    private val leaveGroupUseCase: LeaveGroupUseCase,
-    private val subscribeEventUseCase: SubscribeEventUseCase,
-    private val unsubscribeEventUseCase: UnsubscribeEventUseCase,
-    private val projectMessagesUseCase: ProjectMessagesUseCase,
-    private val sendProjectMessageUseCase: SendProjectMessageUseCase,
     private val logoutUseCase: LogoutUseCase,
     networkMonitor: NetworkMonitor
 ) : ViewModel() {
@@ -134,37 +100,37 @@ class StudentViewModel @Inject constructor(
         }
     }
 
-    val dashboard: StateFlow<FeatureUiState<DashboardSummary?>> = observeDashboard()
+    val dashboard: StateFlow<FeatureUiState<DashboardSummary?>> = repository.observeDashboard()
         .asFeatureState(null, networkMonitor.isOnline)
 
-    val agenda: StateFlow<FeatureUiState<List<AgendaEvent>>> = observeAgenda()
+    val agenda: StateFlow<FeatureUiState<List<AgendaEvent>>> = repository.observeAgenda()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
-    val grades: StateFlow<FeatureUiState<List<Grade>>> = observeGrades()
+    val grades: StateFlow<FeatureUiState<List<Grade>>> = repository.observeGrades()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
-    val absences: StateFlow<FeatureUiState<List<Absence>>> = observeAbsences()
+    val absences: StateFlow<FeatureUiState<List<Absence>>> = repository.observeAbsences()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
-    val courses: StateFlow<FeatureUiState<List<Course>>> = observeCourses()
+    val courses: StateFlow<FeatureUiState<List<Course>>> = repository.observeCourses()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
-    val projects: StateFlow<FeatureUiState<List<Project>>> = observeProjects()
+    val projects: StateFlow<FeatureUiState<List<Project>>> = repository.observeProjects()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
-    val practicals: StateFlow<FeatureUiState<List<Practical>>> = observePracticals()
+    val practicals: StateFlow<FeatureUiState<List<Practical>>> = repository.observePracticals()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
-    val documents: StateFlow<FeatureUiState<List<AcademicDocument>>> = observeDocuments()
+    val documents: StateFlow<FeatureUiState<List<AcademicDocument>>> = repository.observeDocuments()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
-    val directory: StateFlow<FeatureUiState<List<DirectoryPerson>>> = observeDirectory()
+    val directory: StateFlow<FeatureUiState<List<DirectoryPerson>>> = repository.observeDirectory()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
-    val news: StateFlow<FeatureUiState<List<NewsItem>>> = observeNews()
+    val news: StateFlow<FeatureUiState<List<NewsItem>>> = repository.observeNews()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
-    val events: StateFlow<FeatureUiState<List<StudentEvent>>> = observeEvents()
+    val events: StateFlow<FeatureUiState<List<StudentEvent>>> = repository.observeEvents()
         .asFeatureState(emptyList(), networkMonitor.isOnline)
 
     init {
@@ -196,7 +162,7 @@ class StudentViewModel @Inject constructor(
         viewModelScope.launch {
             refreshing.value = true
             error.value = null
-            runCatching { syncAgendaToCalendarUseCase(events) }
+            runCatching { calendarSyncPort.sync(events) }
                 .onSuccess { _calendarSyncCompleted.emit(Unit) }
                 .onFailure { handleFailure(it) }
             refreshing.value = false
@@ -213,7 +179,7 @@ class StudentViewModel @Inject constructor(
             _documentDownloadProgress.update { it + (document.id to null) }
             _documentError.value = null
             runCatching {
-                downloadDocumentUseCase(document) { progress ->
+                repository.downloadDocument(document) { progress ->
                     _documentDownloadProgress.update { it + (document.id to progress) }
                 }
             }
@@ -231,19 +197,19 @@ class StudentViewModel @Inject constructor(
     }
 
     fun joinGroup(courseId: String, projectId: String, groupId: String) {
-        changeGroupMembership { joinGroupUseCase(courseId, projectId, groupId) }
+        changeGroupMembership { repository.joinGroup(courseId, projectId, groupId) }
     }
 
     fun leaveGroup(courseId: String, projectId: String, groupId: String) {
-        changeGroupMembership { leaveGroupUseCase(courseId, projectId, groupId) }
+        changeGroupMembership { repository.leaveGroup(courseId, projectId, groupId) }
     }
 
     fun subscribeEvent(eventId: String) {
-        changeGroupMembership { subscribeEventUseCase(eventId) }
+        changeGroupMembership { repository.subscribeEvent(eventId) }
     }
 
     fun unsubscribeEvent(eventId: String) {
-        changeGroupMembership { unsubscribeEventUseCase(eventId) }
+        changeGroupMembership { repository.unsubscribeEvent(eventId) }
     }
 
     fun loadProjectMessages(groupId: String) {
@@ -251,7 +217,7 @@ class StudentViewModel @Inject constructor(
             _projectMessages.update { states ->
                 states + (groupId to (states[groupId] ?: FeatureUiState(emptyList())).copy(refreshing = true, error = null))
             }
-            runCatching { projectMessagesUseCase(groupId) }
+            runCatching { repository.projectMessages(groupId) }
                 .onSuccess { messages ->
                     _projectMessages.update { states ->
                         states + (groupId to FeatureUiState(data = messages.sortedBy { it.sentAt }, online = true))
@@ -274,7 +240,7 @@ class StudentViewModel @Inject constructor(
             _projectMessages.update { states ->
                 states + (groupId to (states[groupId] ?: FeatureUiState(emptyList())).copy(refreshing = true, error = null))
             }
-            runCatching { sendProjectMessageUseCase(groupId, trimmed) }
+            runCatching { repository.sendProjectMessage(groupId, trimmed) }
                 .onSuccess { loadProjectMessages(groupId) }
                 .onFailure { throwable ->
                     val appError = throwable.toAppError()

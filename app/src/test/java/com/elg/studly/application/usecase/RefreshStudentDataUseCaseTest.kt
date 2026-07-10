@@ -180,6 +180,8 @@ private class RecordingStudentDataRepository(
     override suspend fun leaveGroup(courseId: String, projectId: String, groupId: String) {}
     override suspend fun subscribeEvent(eventId: String) {}
     override suspend fun unsubscribeEvent(eventId: String) {}
+    override suspend fun projectMessages(groupId: String) = emptyList<com.elg.studly.domain.model.ProjectMessage>()
+    override suspend fun sendProjectMessage(groupId: String, message: String) {}
 }
 
 private class RecordingSettingsRepository(

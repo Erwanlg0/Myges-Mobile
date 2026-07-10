@@ -5,8 +5,6 @@ import com.elg.studly.application.ports.NotificationScheduler
 import com.elg.studly.application.ports.SessionRepository
 import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.application.usecase.CompleteOAuthLoginUseCase
-import com.elg.studly.application.usecase.ObserveLockedBiometricSessionUseCase
-import com.elg.studly.application.usecase.UnlockWithBiometricsUseCase
 import com.elg.studly.config.AppConfig
 import com.elg.studly.domain.model.Absence
 import com.elg.studly.domain.model.AcademicDocument
@@ -247,9 +245,8 @@ class AuthViewModelTest {
         notificationScheduler: AuthRecordingNotificationScheduler = AuthRecordingNotificationScheduler()
     ): AuthViewModel {
         return AuthViewModel(
-            ObserveLockedBiometricSessionUseCase(sessionRepository),
+            sessionRepository,
             CompleteOAuthLoginUseCase(sessionRepository, AuthStubSettingsRepository(), notificationScheduler),
-            UnlockWithBiometricsUseCase(sessionRepository),
             mockk<AppConfig> {
                 every { oauthAuthorizeUrl } returns "https://authentication.example/oauth"
             }

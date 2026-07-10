@@ -1,7 +1,7 @@
 package com.elg.studly.adapters.primary.viewmodel
 
-import com.elg.studly.application.usecase.ObserveSessionUseCase
-import com.elg.studly.application.usecase.ObserveSettingsUseCase
+import com.elg.studly.application.ports.SessionRepository
+import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.domain.model.Session
 import com.elg.studly.domain.model.UserSettings
 import io.mockk.every
@@ -40,14 +40,14 @@ class AppViewModelTest {
     @Test
     fun sessionFlowIsExposed() = runTest(dispatcher) {
         val sessionFlow = MutableStateFlow<Session?>(null)
-        val observeSession = mockk<ObserveSessionUseCase> {
-            every { this@mockk.invoke() } returns sessionFlow
+        val sessionRepository = mockk<SessionRepository> {
+            every { session } returns sessionFlow
         }
-        val observeSettings = mockk<ObserveSettingsUseCase> {
-            every { this@mockk.invoke() } returns MutableStateFlow(mockk<UserSettings>(relaxed = true))
+        val settingsRepository = mockk<SettingsRepository> {
+            every { settings } returns MutableStateFlow(mockk<UserSettings>(relaxed = true))
         }
 
-        val viewModel = AppViewModel(observeSession, observeSettings)
+        val viewModel = AppViewModel(sessionRepository, settingsRepository)
         
         val job = backgroundScope.launch { viewModel.session.collect {} }
         val expectedSession = Session("user", "token", null, Instant.now(), false, Instant.now(), Instant.now())
@@ -62,14 +62,14 @@ class AppViewModelTest {
     fun settingsFlowIsExposed() = runTest(dispatcher) {
         val expectedSettings = mockk<UserSettings>(relaxed = true)
         val settingsFlow = MutableStateFlow<UserSettings>(expectedSettings)
-        val observeSession = mockk<ObserveSessionUseCase> {
-            every { this@mockk.invoke() } returns MutableStateFlow(null)
+        val sessionRepository = mockk<SessionRepository> {
+            every { session } returns MutableStateFlow(null)
         }
-        val observeSettings = mockk<ObserveSettingsUseCase> {
-            every { this@mockk.invoke() } returns settingsFlow
+        val settingsRepository = mockk<SettingsRepository> {
+            every { settings } returns settingsFlow
         }
 
-        val viewModel = AppViewModel(observeSession, observeSettings)
+        val viewModel = AppViewModel(sessionRepository, settingsRepository)
         val job = backgroundScope.launch { viewModel.settings.collect {} }
         
         advanceUntilIdle()

@@ -2,12 +2,12 @@ package com.elg.studly.adapters.primary.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.elg.studly.application.usecase.CalendarAccountsUseCase
+import com.elg.studly.application.ports.CalendarSyncPort
+import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.application.usecase.ClearCacheUseCase
 import com.elg.studly.application.usecase.LogoutUseCase
-import com.elg.studly.application.usecase.ObserveSettingsUseCase
-import com.elg.studly.application.usecase.UpdateSettingsUseCase
 import com.elg.studly.application.usecase.RescheduleSyncUseCase
+import com.elg.studly.application.usecase.UpdateReminderLeadUseCase
 import com.elg.studly.domain.model.SyncFeature
 import com.elg.studly.domain.model.AgendaColorMode
 import com.elg.studly.domain.model.AppError
@@ -32,11 +32,11 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    observeSettings: ObserveSettingsUseCase,
-    private val updateSettingsUseCase: UpdateSettingsUseCase,
+    private val settingsRepository: SettingsRepository,
+    private val updateReminderLeadUseCase: UpdateReminderLeadUseCase,
     private val clearCacheUseCase: ClearCacheUseCase,
     private val logoutUseCase: LogoutUseCase,
-    private val calendarAccountsUseCase: CalendarAccountsUseCase,
+    private val calendarSyncPort: CalendarSyncPort,
     private val rescheduleSyncUseCase: RescheduleSyncUseCase
 ) : ViewModel() {
     private val loading = MutableStateFlow(false)
@@ -51,8 +51,8 @@ class SettingsViewModel @Inject constructor(
     fun loadCalendars() {
         viewModelScope.launch {
             runCatching {
-                _calendars.value = calendarAccountsUseCase.available()
-                _selectedCalendarId.value = calendarAccountsUseCase.selected()
+                _calendars.value = calendarSyncPort.availableCalendars()
+                _selectedCalendarId.value = calendarSyncPort.selectedCalendarId()
             }.onFailure { error.value = it.toAppError() }
         }
     }
@@ -60,14 +60,14 @@ class SettingsViewModel @Inject constructor(
     fun selectCalendar(id: Long) {
         viewModelScope.launch {
             runCatching {
-                calendarAccountsUseCase.select(id)
+                calendarSyncPort.selectCalendar(id)
                 _selectedCalendarId.value = id
             }.onFailure { error.value = it.toAppError() }
         }
     }
 
     val state: StateFlow<SettingsUiState> = combine(
-        observeSettings(),
+        settingsRepository.settings,
         loading,
         error
     ) { settings, isLoading, currentError ->
@@ -75,60 +75,60 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState(null, false, null))
 
     fun setLanguage(languageTag: String?) = launchSettingChange {
-        updateSettingsUseCase.language(languageTag)
+        settingsRepository.setLanguageTag(languageTag)
     }
 
     fun setThemeMode(themeMode: ThemeMode) = launchSettingChange {
-        updateSettingsUseCase.themeMode(themeMode)
+        settingsRepository.setThemeMode(themeMode)
     }
 
     fun setDynamicColor(enabled: Boolean) = launchSettingChange {
-        updateSettingsUseCase.dynamicColor(enabled)
+        settingsRepository.setDynamicColorEnabled(enabled)
     }
 
     fun setAgendaColorMode(mode: AgendaColorMode) = launchSettingChange {
-        updateSettingsUseCase.agendaColorMode(mode)
+        settingsRepository.setAgendaColorMode(mode)
     }
 
     fun setCalendarSync(enabled: Boolean) = launchSettingChange {
-        updateSettingsUseCase.calendarSync(enabled)
+        settingsRepository.setCalendarSyncEnabled(enabled)
     }
 
     fun setBiometricEnabled(enabled: Boolean) = launchSettingChange {
-        updateSettingsUseCase.biometric(enabled)
+        settingsRepository.setBiometricEnabled(enabled)
     }
 
     fun setGradeNotifications(enabled: Boolean) = launchSettingChange {
-        updateSettingsUseCase.gradeNotifications(enabled)
+        settingsRepository.setGradeNotificationsEnabled(enabled)
     }
 
     fun setAbsenceNotifications(enabled: Boolean) = launchSettingChange {
-        updateSettingsUseCase.absenceNotifications(enabled)
+        settingsRepository.setAbsenceNotificationsEnabled(enabled)
     }
 
     fun setAgendaNotifications(enabled: Boolean) = launchSettingChange {
-        updateSettingsUseCase.agendaNotifications(enabled)
+        settingsRepository.setAgendaNotificationsEnabled(enabled)
     }
 
     fun setProjectNotifications(enabled: Boolean) = launchSettingChange {
-        updateSettingsUseCase.projectNotifications(enabled)
+        settingsRepository.setProjectNotificationsEnabled(enabled)
     }
 
     fun setDocumentNotifications(enabled: Boolean) = launchSettingChange {
-        updateSettingsUseCase.documentNotifications(enabled)
+        settingsRepository.setDocumentNotificationsEnabled(enabled)
     }
 
     fun setRefreshInterval(feature: SyncFeature, minutes: Int) = launchSettingChange {
-        updateSettingsUseCase.refreshInterval(feature, minutes)
+        settingsRepository.setRefreshInterval(feature, minutes)
         rescheduleSyncUseCase()
     }
 
     fun setClassReminderLead(minutes: Int) = launchSettingChange {
-        updateSettingsUseCase.classReminderLead(minutes)
+        updateReminderLeadUseCase.classReminderLead(minutes)
     }
 
     fun setDeadlineReminderLead(minutes: Int) = launchSettingChange {
-        updateSettingsUseCase.deadlineReminderLead(minutes)
+        updateReminderLeadUseCase.deadlineReminderLead(minutes)
     }
 
     fun clearCache() = launchSettingChange {

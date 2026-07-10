@@ -21,7 +21,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elg.studly.adapters.primary.navigation.MygesApp
 import com.elg.studly.adapters.secondary.play.AndroidPlayQualityManager
-import com.elg.studly.application.usecase.ObserveSettingsUseCase
+import com.elg.studly.application.ports.SettingsRepository
 import com.elg.studly.domain.model.ThemeMode
 import com.elg.studly.ui.theme.MygesTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -30,7 +30,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     @Inject lateinit var playQualityManager: AndroidPlayQualityManager
-    @Inject lateinit var observeSettings: ObserveSettingsUseCase
+    @Inject lateinit var settingsRepository: SettingsRepository
 
     private var oauthCallbackUri by mutableStateOf<Uri?>(null)
     private var notificationRoute by mutableStateOf<String?>(null)
@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
         requestNotificationPermissionIfNeeded()
         handleIntent(intent)
         setContent {
-            val settings by observeSettings().collectAsStateWithLifecycle(initialValue = null)
+            val settings by settingsRepository.settings.collectAsStateWithLifecycle(initialValue = null)
             val darkTheme = when (settings?.themeMode) {
                 ThemeMode.Light -> false
                 ThemeMode.Dark -> true

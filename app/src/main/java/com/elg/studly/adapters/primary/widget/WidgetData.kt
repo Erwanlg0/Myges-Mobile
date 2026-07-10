@@ -3,11 +3,7 @@ package com.elg.studly.adapters.primary.widget
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
-import com.elg.studly.application.usecase.ObserveAbsencesUseCase
-import com.elg.studly.application.usecase.ObserveAgendaUseCase
-import com.elg.studly.application.usecase.ObserveDashboardUseCase
-import com.elg.studly.application.usecase.ObserveGradesUseCase
-import com.elg.studly.application.usecase.ObserveNewsUseCase
+import com.elg.studly.application.ports.StudentDataRepository
 import com.elg.studly.domain.model.toGradeSummary
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -22,11 +18,7 @@ import java.util.Locale
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface WidgetEntryPoint {
-    fun observeDashboard(): ObserveDashboardUseCase
-    fun observeGrades(): ObserveGradesUseCase
-    fun observeAbsences(): ObserveAbsencesUseCase
-    fun observeNews(): ObserveNewsUseCase
-    fun observeAgenda(): ObserveAgendaUseCase
+    fun studentDataRepository(): StudentDataRepository
 }
 
 data class WidgetSnapshot(
@@ -57,17 +49,18 @@ object WidgetData {
     private val newsFormat = DateTimeFormatter.ofPattern("dd/MM", Locale.getDefault())
     private val agendaItemFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
 
-    private fun useCases(context: Context): WidgetEntryPoint =
+    private fun repository(context: Context): StudentDataRepository =
         EntryPointAccessors
             .fromApplication(context.applicationContext, WidgetEntryPoint::class.java)
+            .studentDataRepository()
 
     suspend fun load(context: Context): WidgetSnapshot {
-        val useCases = useCases(context)
+        val repository = repository(context)
 
-        val dashboard = useCases.observeDashboard().invoke().first()
-        val grades = useCases.observeGrades().invoke().first()
-        val absences = useCases.observeAbsences().invoke().first()
-        val news = useCases.observeNews().invoke().first()
+        val dashboard = repository.observeDashboard().first()
+        val grades = repository.observeGrades().first()
+        val absences = repository.observeAbsences().first()
+        val news = repository.observeNews().first()
         val zone = ZoneId.systemDefault()
         val now = Instant.now()
 
@@ -113,7 +106,7 @@ object WidgetData {
     suspend fun loadTodayAgenda(context: Context): List<AgendaItem> {
         val zone = ZoneId.systemDefault()
         val today = java.time.LocalDate.now(zone)
-        return useCases(context).observeAgenda().invoke().first()
+        return repository(context).observeAgenda().first()
             .filter { it.startsAt.atZone(zone).toLocalDate() == today }
             .sortedBy { it.startsAt }
             .map { event ->
