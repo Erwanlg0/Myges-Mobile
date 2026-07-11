@@ -29,7 +29,7 @@ class CompleteOAuthLoginUseCaseTest {
         val useCase = CompleteOAuthLoginUseCase(sessionRepository, StubSettingsRepository(), notificationScheduler)
         val expiresAt = Instant.parse("2026-06-12T12:00:00Z")
 
-        useCase("oauth-token", expiresAt, false)
+        useCase("oauth-token", expiresAt)
 
         assertEquals("oauth-token", sessionRepository.accessToken)
         assertEquals(expiresAt, sessionRepository.expiresAt)

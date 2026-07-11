@@ -44,10 +44,7 @@ data class AgendaItem(
 object WidgetData {
     val EMPTY = WidgetSnapshot(null, null, null, null, null, 0, null, null)
 
-    private val timeFormat = DateTimeFormatter.ofPattern("EEE dd/MM HH:mm", Locale.getDefault())
-    private val deadlineFormat = DateTimeFormatter.ofPattern("dd/MM HH:mm", Locale.getDefault())
-    private val newsFormat = DateTimeFormatter.ofPattern("dd/MM", Locale.getDefault())
-    private val agendaItemFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
+    private fun formatter(pattern: String) = DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
 
     private fun repository(context: Context): StudentDataRepository =
         EntryPointAccessors
@@ -90,28 +87,29 @@ object WidgetData {
 
         return WidgetSnapshot(
             nextCourseTitle = event?.title,
-            nextCourseWhen = event?.startsAt?.atZone(zone)?.format(timeFormat),
+            nextCourseWhen = event?.startsAt?.atZone(zone)?.format(formatter("EEE dd/MM HH:mm")),
             nextCourseRoom = event?.room?.takeIf(String::isNotBlank),
             averageLabel = currentPeriod,
             averageValue = summary.weightedAverage?.let { String.format(Locale.getDefault(), "%.2f", it) },
             gradedCount = summary.gradedCount,
             deadlineTitle = project?.name?.takeIf(String::isNotBlank),
-            deadlineWhen = deadline?.atZone(zone)?.format(deadlineFormat),
+            deadlineWhen = deadline?.atZone(zone)?.format(formatter("dd/MM HH:mm")),
             unjustifiedAbsences = periodAbsences.count { !it.justified },
             newsTitle = latestNews?.title?.takeIf(String::isNotBlank),
-            newsWhen = latestNews?.publishedAt?.atZone(zone)?.format(newsFormat)
+            newsWhen = latestNews?.publishedAt?.atZone(zone)?.format(formatter("dd/MM"))
         )
     }
 
     suspend fun loadTodayAgenda(context: Context): List<AgendaItem> {
         val zone = ZoneId.systemDefault()
         val today = java.time.LocalDate.now(zone)
+        val timeFormat = formatter("HH:mm")
         return repository(context).observeAgenda().first()
             .filter { it.startsAt.atZone(zone).toLocalDate() == today }
             .sortedBy { it.startsAt }
             .map { event ->
                 AgendaItem(
-                    time = event.startsAt.atZone(zone).format(agendaItemFormat),
+                    time = event.startsAt.atZone(zone).format(timeFormat),
                     title = event.title,
                     room = event.room?.takeIf(String::isNotBlank)
                 )

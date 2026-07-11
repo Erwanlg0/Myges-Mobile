@@ -17,7 +17,7 @@ internal fun purgeExpiredDocumentCache(
             if (file.isFile && file.lastModified() < expiresBefore) {
                 file.delete()
             }
-            if (file.isDirectory && file.listFiles().isEmpty()) {
+            if (file.isDirectory && file.listFiles().isNullOrEmpty()) {
                 file.delete()
             }
         }

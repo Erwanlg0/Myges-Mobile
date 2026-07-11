@@ -20,7 +20,7 @@ class CompleteOAuthLoginUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val notificationScheduler: NotificationScheduler
 ) {
-    suspend operator fun invoke(accessToken: String, expiresAt: Instant?, enableBiometric: Boolean) {
+    suspend operator fun invoke(accessToken: String, expiresAt: Instant?) {
         val settings = settingsRepository.settings.first()
         sessionRepository.authenticateWithToken(accessToken, expiresAt, settings.biometricEnabled)
         notificationScheduler.ensureChannels()

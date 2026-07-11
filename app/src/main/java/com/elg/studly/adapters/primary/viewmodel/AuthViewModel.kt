@@ -82,7 +82,7 @@ class AuthViewModel @Inject constructor(
             loading.value = true
             error.value = null
             runCatching {
-                completeOAuthLoginUseCase(authorizationToken, expiresAt, false)
+                completeOAuthLoginUseCase(authorizationToken, expiresAt)
             }.onFailure {
                 error.value = it.toAppError()
             }

@@ -182,7 +182,6 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
     val elements = if (isSingleStructuredCourse) listOf(this) else arrayOrNested("grades", "items", "data")
     return elements.flatMap { element ->
         val root = element.objectOrData()
-        val baseId = root.text("id", "gradeId", "uid", "rc_id") ?: stableId(root)
 
         if (!root.containsKey("grades") && !root.containsKey("exam") &&
             (!root.containsKey("course") || listOf("grade", "value", "note").any { root.containsKey(it) })) {
@@ -196,7 +195,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
         
         
         val nestedGrades = root.array("grades")
-        val ccGrades = nestedGrades.mapIndexedNotNull { index, gradeElement ->
+        val ccGrades = nestedGrades.mapNotNull { gradeElement ->
             val value = when (gradeElement) {
                 is JsonPrimitive -> gradeElement.doubleOrNull ?: gradeElement.contentOrNull?.replace(',', '.')?.toDoubleOrNull()
                 is JsonObject -> gradeElement.number("value", "grade", "note")
