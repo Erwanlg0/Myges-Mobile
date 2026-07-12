@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import com.elg.studly.adapters.secondary.pdf.PdfGenerator
 import com.elg.studly.adapters.secondary.api.MyGesApiService
+import com.elg.studly.adapters.secondary.api.htmlToPlainText
 import com.elg.studly.adapters.secondary.api.toAbsences
 import com.elg.studly.adapters.secondary.api.toAgendaEvents
 import com.elg.studly.adapters.secondary.api.toClassIds
@@ -588,14 +589,18 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             } else {
                 val errorBody = runCatching { response()?.errorBody()?.string() }.getOrNull()
                 val parsedMessage = errorBody?.let { body ->
-                    runCatching {
-                        val json = Json.parseToJsonElement(body).jsonObject
-                        json["message"]?.jsonPrimitive?.content
-                            ?: json["error"]?.jsonPrimitive?.content
-                            ?: json["detail"]?.jsonPrimitive?.content
-                            ?: body.take(100)
-                    }.getOrElse {
-                        body.take(100)
+                    if (body.trimStart().startsWith("<")) {
+                        body.htmlErrorSummary()
+                    } else {
+                        runCatching {
+                            val json = Json.parseToJsonElement(body).jsonObject
+                            json["message"]?.jsonPrimitive?.content
+                                ?: json["error"]?.jsonPrimitive?.content
+                                ?: json["detail"]?.jsonPrimitive?.content
+                                ?: body.take(100)
+                        }.getOrElse {
+                            body.take(100)
+                        }
                     }
                 }?.takeIf { it.isNotBlank() } ?: message()
                 AppException(AppError.Remote(code(), parsedMessage))
@@ -603,6 +608,15 @@ class OfflineFirstStudentDataRepository @Inject constructor(
             is IOException -> AppException(AppError.Network)
             else -> AppException(AppError.Unexpected(message))
         }
+    }
+
+    // ponytail: title tag or first text line is enough for maintenance pages; full HTML viewer if someone asks
+    internal fun String.htmlErrorSummary(): String? {
+        val title = Regex("(?is)<title[^>]*>(.*?)</title>")
+            .find(this)?.groupValues?.get(1)?.htmlToPlainText()
+        val summary = title?.takeIf { it.isNotBlank() }
+            ?: htmlToPlainText().lineSequence().firstOrNull { it.isNotBlank() }
+        return summary?.take(100)
     }
 
     internal fun String.sanitizedFileName(): String {

@@ -32,6 +32,7 @@
     <string name="error_storage">Le stockage local est indisponible.</string>
     <string name="error_document_unavailable">Document indisponible : le lien de téléchargement a expiré ou nécessite une reconnexion.</string>
     <string name="error_unauthorized">La session a expiré. Reconnectez-vous.</string>
+    <string name="error_login_failed">La connexion n’a pas abouti : MyGES n’a pas renvoyé de jeton. Le site est peut-être en maintenance, réessayez dans quelques minutes.</string>
     <string name="error_unexpected">Une erreur inattendue est survenue.</string>
 
     <string name="auth_title">Connexion Studly</string>

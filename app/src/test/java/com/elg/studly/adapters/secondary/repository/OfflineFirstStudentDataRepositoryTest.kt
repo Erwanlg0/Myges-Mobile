@@ -420,7 +420,19 @@ class OfflineFirstStudentDataRepositoryTest {
             assertEquals(AppError.Remote(400, "boom"), httpError(400, """{"error":"boom"}""").toRepositoryException().error)
             assertEquals(AppError.Remote(400, "bad field"), httpError(400, """{"detail":"bad field"}""").toRepositoryException().error)
             assertEquals(AppError.Remote(422, """{"foo":"bar"}"""), httpError(422, """{"foo":"bar"}""").toRepositoryException().error)
-            assertEquals(AppError.Remote(500, "<html>nope</html>"), httpError(500, "<html>nope</html>").toRepositoryException().error)
+            assertEquals(AppError.Remote(500, "nope"), httpError(500, "<html>nope</html>").toRepositoryException().error)
+            assertEquals(
+                AppError.Remote(502, "Site en maintenance"),
+                httpError(
+                    502,
+                    "<!DOCTYPE html><html><head><title>Site en maintenance</title></head><body><h1>Le site est en maintenance</h1></body></html>"
+                ).toRepositoryException().error
+            )
+            // HTML body with nothing extractable falls back to the HTTP status message
+            assertEquals(
+                AppError.Remote(502, "Response.error()"),
+                httpError(502, "<html><head></head><body></body></html>").toRepositoryException().error
+            )
         }
     }
 

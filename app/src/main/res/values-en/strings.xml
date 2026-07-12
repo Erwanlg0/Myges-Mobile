@@ -32,6 +32,7 @@
     <string name="error_storage">Local storage is unavailable.</string>
     <string name="error_document_unavailable">Document unavailable: the download link has expired or requires signing in again.</string>
     <string name="error_unauthorized">The session expired. Sign in again.</string>
+    <string name="error_login_failed">Sign-in did not complete: MyGES did not return a token. The site may be under maintenance, try again in a few minutes.</string>
     <string name="error_unexpected">An unexpected error occurred.</string>
 
     <string name="auth_title">Studly sign in</string>

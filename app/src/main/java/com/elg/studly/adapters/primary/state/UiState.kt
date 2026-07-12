@@ -23,6 +23,7 @@ fun AppError.messageRes(): Int {
         AppError.Storage -> R.string.error_storage
         AppError.DocumentUnavailable -> R.string.error_document_unavailable
         AppError.Unauthorized -> R.string.error_unauthorized
+        AppError.LoginFailed -> R.string.error_login_failed
         is AppError.Unexpected -> R.string.error_unexpected
     }
 }

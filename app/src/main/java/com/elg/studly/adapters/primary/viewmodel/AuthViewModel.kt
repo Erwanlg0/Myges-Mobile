@@ -64,13 +64,13 @@ class AuthViewModel @Inject constructor(
         val expectedState = savedStateHandle.get<String>(OAUTH_STATE_KEY)
         val callbackState = uri.oauthParameter("state")
         if (expectedState.isNullOrBlank() || callbackState != expectedState) {
-            error.value = AppError.Unauthorized
+            error.value = AppError.LoginFailed
             return
         }
         savedStateHandle.remove<String>(OAUTH_STATE_KEY)
         val accessToken = uri.oauthParameter("access_token")
         if (accessToken.isNullOrBlank()) {
-            error.value = AppError.Unauthorized
+            error.value = AppError.LoginFailed
             return
         }
         val authorizationToken = accessToken.withAuthorizationScheme(uri.oauthParameter("token_type"))

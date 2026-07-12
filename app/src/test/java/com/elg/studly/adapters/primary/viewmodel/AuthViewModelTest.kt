@@ -182,7 +182,7 @@ class AuthViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, sessionRepository.authenticateCount)
-        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        assertEquals(AppError.LoginFailed, viewModel.state.value.error)
         stateCollection.cancel()
     }
 
@@ -196,7 +196,7 @@ class AuthViewModelTest {
         advanceUntilIdle()
 
         assertEquals(0, sessionRepository.authenticateCount)
-        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        assertEquals(AppError.LoginFailed, viewModel.state.value.error)
         stateCollection.cancel()
     }
 
@@ -224,7 +224,7 @@ class AuthViewModelTest {
         viewModel.completeOAuthCallback(oauthUri(null))
         advanceUntilIdle()
 
-        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        assertEquals(AppError.LoginFailed, viewModel.state.value.error)
         stateCollection.cancel()
     }
 
@@ -236,7 +236,7 @@ class AuthViewModelTest {
         viewModel.completeOAuthCallback(oauthUri("error=access_denied"))
         advanceUntilIdle()
 
-        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        assertEquals(AppError.LoginFailed, viewModel.state.value.error)
         stateCollection.cancel()
     }
 
@@ -248,7 +248,7 @@ class AuthViewModelTest {
         viewModel.completeOAuthCallback(queryOauthUri("access_token" to ""))
         advanceUntilIdle()
 
-        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        assertEquals(AppError.LoginFailed, viewModel.state.value.error)
         stateCollection.cancel()
     }
 
@@ -260,7 +260,7 @@ class AuthViewModelTest {
         viewModel.completeOAuthCallback(oauthUri("access_token"))
         advanceUntilIdle()
 
-        assertEquals(AppError.Unauthorized, viewModel.state.value.error)
+        assertEquals(AppError.LoginFailed, viewModel.state.value.error)
         stateCollection.cancel()
     }
 
