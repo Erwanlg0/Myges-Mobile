@@ -82,22 +82,6 @@ class DomainModelsTest {
     }
 
     @Test
-    fun testUserSettingsLeadFor() {
-        val prefs = NotificationPreferences(true, true, true, true, true)
-        val settings = UserSettings(
-            languageTag = null,
-            notifications = prefs,
-            calendarSyncEnabled = false,
-            classReminderLeadMinutes = 15,
-            deadlineReminderLeadMinutes = 60,
-            lastSyncAt = null
-        )
-        
-        assertEquals(15, settings.leadFor(ReminderKind.Class))
-        assertEquals(60, settings.leadFor(ReminderKind.Deadline))
-    }
-
-    @Test
     fun testDomainModelDefaults() {
         val now = Instant.parse("2026-06-12T08:00:00Z")
         val news = NewsItem("news-1", "News", "Body", now)
@@ -143,6 +127,5 @@ class DomainModelsTest {
         assertEquals(DEFAULT_REFRESH_MINUTES, settings.refreshIntervals.events)
         assertEquals(NO_REMINDER_MINUTES, settings.classReminderLeadMinutes)
         assertEquals(NO_REMINDER_MINUTES, settings.deadlineReminderLeadMinutes)
-        assertEquals(Feature.Notifications, Feature.valueOf("Notifications"))
     }
 }

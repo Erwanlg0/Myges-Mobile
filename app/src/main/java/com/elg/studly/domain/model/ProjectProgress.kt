@@ -12,31 +12,18 @@ data class ProjectProgress(
 private fun ProjectStep.isCompleted(now: Instant): Boolean =
     status.isCompletedStatus() || (deadline != null && deadline.isBefore(now))
 
-fun Project.progress(): ProjectProgress {
-    val now = Instant.now()
-    val total = steps.size
-    
-    
-    val projectDone = status.isCompletedStatus()
-    if (total == 0) {
-        return ProjectProgress(0, 0, if (projectDone) 1.0 else 0.0)
-    }
-    val completed = if (projectDone) total else steps.count { it.isCompleted(now) }
-    return ProjectProgress(
-        completedSteps = completed,
-        totalSteps = total,
-        fraction = completed.toDouble() / total.toDouble()
-    )
-}
+fun Project.progress(): ProjectProgress = stepsProgress(steps, status)
 
-fun Practical.progress(): ProjectProgress {
+fun Practical.progress(): ProjectProgress = stepsProgress(steps, status)
+
+private fun stepsProgress(steps: List<ProjectStep>, status: String?): ProjectProgress {
     val now = Instant.now()
     val total = steps.size
-    val practicalDone = status.isCompletedStatus()
+    val done = status.isCompletedStatus()
     if (total == 0) {
-        return ProjectProgress(0, 0, if (practicalDone) 1.0 else 0.0)
+        return ProjectProgress(0, 0, if (done) 1.0 else 0.0)
     }
-    val completed = if (practicalDone) total else steps.count { it.isCompleted(now) }
+    val completed = if (done) total else steps.count { it.isCompleted(now) }
     return ProjectProgress(
         completedSteps = completed,
         totalSteps = total,

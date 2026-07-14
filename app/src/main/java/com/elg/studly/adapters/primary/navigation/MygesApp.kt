@@ -3,18 +3,13 @@ package com.elg.studly.adapters.primary.navigation
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.widget.Toast
-import java.io.File
-import java.io.FileOutputStream
 import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -89,6 +84,7 @@ import com.elg.studly.adapters.primary.ui.PracticalsScreen
 import com.elg.studly.adapters.primary.ui.ProjectsScreen
 import com.elg.studly.adapters.primary.ui.SettingsScreen
 import com.elg.studly.adapters.primary.ui.StudentAvatar
+import com.elg.studly.adapters.secondary.pdf.writeToDownloads
 import com.elg.studly.adapters.primary.viewmodel.AppViewModel
 import com.elg.studly.adapters.primary.viewmodel.DocumentOpenRequest
 import com.elg.studly.adapters.primary.viewmodel.SettingsViewModel
@@ -110,32 +106,10 @@ private suspend fun saveToDownloads(context: Context, uri: Uri, mimeType: String
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
     }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "document"
-    runCatching {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, displayName)
-                if (!mimeType.isNullOrBlank()) put(MediaStore.Downloads.MIME_TYPE, mimeType)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                put(MediaStore.Downloads.IS_PENDING, 1)
-            }
-            val target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: return@withContext false
-            resolver.openOutputStream(target)?.use { output ->
-                resolver.openInputStream(uri)?.use { input -> input.copyTo(output) } ?: return@withContext false
-            } ?: return@withContext false
-            values.clear()
-            values.put(MediaStore.Downloads.IS_PENDING, 0)
-            resolver.update(target, values, null, null)
-        } else {
-            val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                .apply { mkdirs() }
-            val target = File(downloads, displayName)
-            FileOutputStream(target).use { output ->
-                resolver.openInputStream(uri)?.use { input -> input.copyTo(output) } ?: return@withContext false
-            }
-        }
-        true
-    }.getOrDefault(false)
+    writeToDownloads(context, displayName, mimeType) { output ->
+        resolver.openInputStream(uri)?.use { input -> input.copyTo(output) }
+            ?: error("source stream unavailable")
+    } != null
 }
 
 private val destinations = listOf(

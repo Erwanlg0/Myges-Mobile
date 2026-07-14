@@ -619,14 +619,6 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"tri_describe":"Semestre 1","tri_id":21,"tri_name":"S1","year":2026}]}"""
     )
 
-    override suspend fun cvec(): JsonElement = jsonElement("""{"result":{}}""")
-
-    override suspend fun internalRules(): JsonElement = jsonElement("""{"result":[]}""")
-
-    override suspend fun suggestions(): JsonElement = jsonElement("""{"result":[]}""")
-
-    override suspend fun submitSuggestion(suggestion: JsonElement): JsonElement = jsonElement("""{"result":{}}""")
-
     override suspend fun agenda(start: Long?, end: Long?): JsonElement {
         agendaCalls += 1
         agendaStarted?.complete(Unit)
@@ -696,15 +688,9 @@ private class RepositoryApi : MyGesApiService {
         """{"result":[{"id":"project-1","name":"Project","courseName":"Algorithms","deadline":"2026-06-30T23:59:00Z","steps":[{"id":"step-1","title":"Submit","deadline":"2026-06-30T23:59:00Z"}],"project_files":[{"pf_id":"project-doc-1","pf_title":"Project brief","pf_file":"brief.pdf","extension":"pdf"}]}]}"""
     )
 
-    override suspend fun project(projectId: String): JsonElement = jsonElement("""{"result":{}}""")
-
     override suspend fun nextProjectSteps(): JsonElement = jsonElement(
         """{"result":[{"pro_id":"project-1","pro_name":"Project","course_name":"Algorithms","psp_id":"upcoming-step-1","psp_desc":"Oral","psp_limit_date":"2026-06-25T12:00:00Z"}]}"""
     )
-
-    override suspend fun projectFile(pfId: String): JsonElement = jsonElement("""{"result":{}}""")
-
-    override suspend fun projectStepFile(psfId: String): JsonElement = jsonElement("""{"result":{}}""")
 
     override suspend fun courseProjects(rcId: String): JsonElement = jsonElement("""{"result":[]}""")
 
@@ -731,10 +717,6 @@ private class RepositoryApi : MyGesApiService {
     override suspend fun partners(): JsonElement = jsonElement(
         """{"result":[{"partner_id":"partner-1","name":"Partner","content":"Student offer"}]}"""
     )
-
-    override suspend fun notificationDelays(): JsonElement = jsonElement("""{"result":[]}""")
-
-    override suspend fun notificationDelay(notificationTypeId: String): JsonElement = jsonElement("""{"result":{}}""")
 
     override suspend fun speedMeetingAppointments(): JsonElement = jsonElement(
         """{"result":[{"ss_id":"speed-1","title":"Speed meeting","corporate_name":"Company","location":"ONLINE","appointment_start":"2026-06-03T08:00:00Z"}]}"""

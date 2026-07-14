@@ -226,12 +226,7 @@ data class UserSettings(
     
     val deadlineReminderLeadMinutes: Int = NO_REMINDER_MINUTES,
     val lastSyncAt: Instant?
-) {
-    fun leadFor(kind: ReminderKind): Int = when (kind) {
-        ReminderKind.Class -> classReminderLeadMinutes
-        ReminderKind.Deadline -> deadlineReminderLeadMinutes
-    }
-}
+)
 
 
 const val NO_REMINDER_MINUTES = 0
@@ -322,14 +317,3 @@ data class CalendarAccount(
     val displayName: String,
     val accountName: String
 )
-
-enum class Feature {
-    Agenda,
-    Grades,
-    Absences,
-    Courses,
-    Projects,
-    Practicals,
-    Documents,
-    Notifications
-}
