@@ -26,18 +26,6 @@ interface MyGesApiService {
     @GET("me/trimesterYears")
     suspend fun trimesterYears(): JsonElement?
 
-    @GET("me/cvec")
-    suspend fun cvec(): JsonElement?
-
-    @GET("me/internalrules")
-    suspend fun internalRules(): JsonElement?
-
-    @GET("me/suggestion")
-    suspend fun suggestions(): JsonElement?
-
-    @POST("me/suggestion")
-    suspend fun submitSuggestion(@Body suggestion: JsonElement): JsonElement?
-
     @GET("me/agenda")
     suspend fun agenda(
         @Query("start") start: Long?,
@@ -92,17 +80,8 @@ interface MyGesApiService {
     @GET("me/{year}/projects")
     suspend fun projects(@Path("year") year: String): JsonElement?
 
-    @GET("me/projects/{projectId}")
-    suspend fun project(@Path("projectId") projectId: String): JsonElement?
-
     @GET("me/nextProjectSteps")
     suspend fun nextProjectSteps(): JsonElement?
-
-    @GET("me/projectFiles/{pfId}")
-    suspend fun projectFile(@Path("pfId") pfId: String): JsonElement?
-
-    @GET("me/projectStepFiles/{psfId}")
-    suspend fun projectStepFile(@Path("psfId") psfId: String): JsonElement?
 
     @GET("me/courses/{rcId}/projects")
     suspend fun courseProjects(@Path("rcId") rcId: String): JsonElement?
@@ -161,12 +140,6 @@ interface MyGesApiService {
 
     @GET("me/partners")
     suspend fun partners(): JsonElement?
-
-    @GET("me/notificationsDelays")
-    suspend fun notificationDelays(): JsonElement?
-
-    @GET("me/notificationsDelays/{notificationTypeId}")
-    suspend fun notificationDelay(@Path("notificationTypeId") notificationTypeId: String): JsonElement?
 
     @GET("me/speedMeetingAppointments")
     suspend fun speedMeetingAppointments(): JsonElement?

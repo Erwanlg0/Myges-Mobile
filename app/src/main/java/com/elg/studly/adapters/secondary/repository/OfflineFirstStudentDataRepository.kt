@@ -6,6 +6,7 @@ import androidx.core.content.FileProvider
 import com.elg.studly.adapters.secondary.pdf.PdfGenerator
 import com.elg.studly.adapters.secondary.api.MyGesApiService
 import com.elg.studly.adapters.secondary.api.htmlToPlainText
+import com.elg.studly.adapters.secondary.api.mimeTypeToFileExtension
 import com.elg.studly.adapters.secondary.api.toAbsences
 import com.elg.studly.adapters.secondary.api.toAgendaEvents
 import com.elg.studly.adapters.secondary.api.toClassIds
@@ -619,10 +620,6 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return summary?.take(100)
     }
 
-    internal fun String.sanitizedFileName(): String {
-        return replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "document" }
-    }
-
     internal fun String.documentCacheDirectoryName(): String {
         return Base64.getUrlEncoder().withoutPadding()
             .encodeToString(toByteArray(StandardCharsets.UTF_8))
@@ -643,26 +640,7 @@ class OfflineFirstStudentDataRepository @Inject constructor(
         return "$this.$extension"
     }
 
-    internal fun MediaType.toFileExtension(): String? {
-        return when (toString().substringBefore(';').trim().lowercase()) {
-            "application/pdf" -> "pdf"
-            "application/zip" -> "zip"
-            "text/plain" -> "txt"
-            "text/markdown" -> "md"
-            "text/csv" -> "csv"
-            "text/html" -> "html"
-            "image/png" -> "png"
-            "image/jpeg" -> "jpg"
-            "image/gif" -> "gif"
-            "application/msword" -> "doc"
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx"
-            "application/vnd.ms-excel" -> "xls"
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx"
-            "application/vnd.ms-powerpoint" -> "ppt"
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx"
-            else -> null
-        }
-    }
+    internal fun MediaType.toFileExtension(): String? = toString().mimeTypeToFileExtension()
 
     internal fun String.contentDispositionFileName(): String? {
         return split(';')
@@ -1010,6 +988,10 @@ private fun Absence.academicYearStart(): String? {
 }
 
 private const val YEAR_FALLBACK_DEPTH = 10
+
+internal fun String.sanitizedFileName(): String {
+    return replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "document" }
+}
 
 private data class DashboardLocalData(
     val profile: com.elg.studly.adapters.secondary.storage.StudentProfileEntity?,

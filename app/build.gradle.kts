@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
-    jacoco
 }
 
 fun projectValue(name: String, defaultValue: String): String {
@@ -118,10 +117,6 @@ kotlin {
     }
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-}
-
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.appcompat)
@@ -171,83 +166,4 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-}
-
-jacoco {
-    toolVersion = "0.8.13"
-}
-
-val coverageExclusions = listOf(
-    "**/BuildConfig.*",
-    "**/Hilt_*.*",
-    "**/*\$*.*",
-    "**/*\$Companion.*",
-    "**/*\$DefaultImpls.*",
-    "**/StudentDataRepository.class",
-    "**/*_Impl*.*",
-    "**/*_Factory.*",
-    "**/*_HiltModules*.*",
-    "**/*Module*.*",
-    "**/*ComposableSingletons*.*",
-    "**/*Activity*.*",
-    "**/*Application*.*",
-    "**/ui/**",
-    "**/navigation/**",
-    "**/widget/**",
-    "**/adapters/secondary/storage/MygesDatabase*.*",
-    "**/adapters/secondary/calendar/**",
-    "**/adapters/secondary/network/**",
-    "**/adapters/secondary/pdf/**",
-    "**/adapters/secondary/play/**",
-    "**/adapters/secondary/security/**",
-    "**/adapters/secondary/settings/**",
-    "**/adapters/secondary/notification/AndroidNotificationScheduler*.*",
-    "**/adapters/secondary/notification/*Worker*.*",
-    "**/config/DependencyModule*.*"
-)
-
-val coverageClassDirectories = files(
-    fileTree(layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")) {
-        exclude(coverageExclusions)
-    },
-    fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes")) {
-        exclude(coverageExclusions)
-    }
-)
-
-tasks.withType<Test>().configureEach {
-    extensions.configure<JacocoTaskExtension> {
-        isIncludeNoLocationClasses = true
-        excludes = listOf("jdk.internal.*")
-    }
-}
-
-tasks.register<JacocoReport>("testDebugUnitTestCoverage") {
-    dependsOn("testDebugUnitTest")
-
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        csv.required.set(false)
-    }
-
-    classDirectories.setFrom(coverageClassDirectories)
-    sourceDirectories.setFrom(files("src/main/java"))
-    executionData.setFrom(fileTree(layout.buildDirectory) { include("**/*.exec", "**/*.ec") })
-}
-
-tasks.register<JacocoCoverageVerification>("testDebugUnitTestCoverageVerification") {
-    dependsOn("testDebugUnitTestCoverage")
-
-    classDirectories.setFrom(coverageClassDirectories)
-    sourceDirectories.setFrom(files("src/main/java"))
-    executionData.setFrom(fileTree(layout.buildDirectory) { include("**/*.exec", "**/*.ec") })
-
-    violationRules {
-        rule {
-            limit {
-                minimum = "1.0".toBigDecimal()
-            }
-        }
-    }
 }

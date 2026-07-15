@@ -20,7 +20,7 @@ import androidx.room.RoomDatabase
         StudentEventEntity::class
     ],
     version = 12,
-    exportSchema = true
+    exportSchema = false
 )
 abstract class MygesDatabase : RoomDatabase() {
     abstract fun studentDao(): StudentDao

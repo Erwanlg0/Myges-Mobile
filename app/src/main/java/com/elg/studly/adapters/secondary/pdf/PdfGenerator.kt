@@ -12,41 +12,50 @@ import android.provider.MediaStore
 import android.text.StaticLayout
 import android.text.TextPaint
 import androidx.core.content.FileProvider
+import com.elg.studly.adapters.secondary.repository.sanitizedFileName
 import java.io.File
 import java.io.OutputStream
 
+fun writeToDownloads(
+    context: Context,
+    displayName: String,
+    mimeType: String?,
+    write: (OutputStream) -> Unit
+): Uri? {
+    return runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+                if (!mimeType.isNullOrBlank()) put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val resolver = context.contentResolver
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: return null
+            resolver.openOutputStream(uri)?.use(write)
+                ?: return null
+            values.clear()
+            values.put(MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            uri
+        } else {
+            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                .apply { mkdirs() }
+            val file = File(dir, displayName)
+            file.outputStream().use(write)
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        }
+    }.getOrNull()
+}
+
 object PdfGenerator {
 
-    
     fun savePdfToDownloads(context: Context, text: String, title: String, fileName: String): Uri? {
-        val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "document" }.let {
+        val safeName = fileName.sanitizedFileName().let {
             if (it.endsWith(".pdf", ignoreCase = true)) it else "$it.pdf"
         }
-        return runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, safeName)
-                    put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
-                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                    put(MediaStore.Downloads.IS_PENDING, 1)
-                }
-                val resolver = context.contentResolver
-                val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                    ?: return null
-                resolver.openOutputStream(uri)?.use { generatePdfFromText(text, title, it) }
-                    ?: return null
-                values.clear()
-                values.put(MediaStore.Downloads.IS_PENDING, 0)
-                resolver.update(uri, values, null, null)
-                uri
-            } else {
-                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    .apply { mkdirs() }
-                val file = File(dir, safeName)
-                file.outputStream().use { generatePdfFromText(text, title, it) }
-                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            }
-        }.getOrNull()
+        return writeToDownloads(context, safeName, "application/pdf") { generatePdfFromText(text, title, it) }
     }
 
 

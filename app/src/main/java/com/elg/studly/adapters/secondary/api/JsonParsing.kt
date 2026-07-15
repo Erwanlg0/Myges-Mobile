@@ -707,25 +707,33 @@ private fun academicYearFromProfile(value: String): String {
     return (startYear..(startYear + 3)).joinToString(", ")
 }
 
+// ponytail: table locale plutôt que MimeTypeMap pour garder le parsing testable en JVM pur
+private val MIME_BY_EXTENSION = linkedMapOf(
+    "pdf" to "application/pdf",
+    "doc" to "application/msword",
+    "docx" to "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xls" to "application/vnd.ms-excel",
+    "xlsx" to "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "ppt" to "application/vnd.ms-powerpoint",
+    "pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "zip" to "application/zip",
+    "txt" to "text/plain",
+    "md" to "text/markdown",
+    "csv" to "text/csv",
+    "html" to "text/html",
+    "htm" to "text/html",
+    "png" to "image/png",
+    "jpg" to "image/jpeg",
+    "jpeg" to "image/jpeg",
+    "gif" to "image/gif"
+)
+
+private val EXTENSION_BY_MIME: Map<String, String> = buildMap {
+    MIME_BY_EXTENSION.forEach { (extension, mime) -> putIfAbsent(mime, extension) }
+}
+
 private fun String.toMimeType(): String? {
-    return when (trim().lowercase().removePrefix(".")) {
-        "pdf" -> "application/pdf"
-        "doc" -> "application/msword"
-        "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        "xls" -> "application/vnd.ms-excel"
-        "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        "ppt" -> "application/vnd.ms-powerpoint"
-        "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        "zip" -> "application/zip"
-        "txt" -> "text/plain"
-        "md" -> "text/markdown"
-        "csv" -> "text/csv"
-        "html", "htm" -> "text/html"
-        "png" -> "image/png"
-        "jpg", "jpeg" -> "image/jpeg"
-        "gif" -> "image/gif"
-        else -> takeIf { it.contains('/') }
-    }
+    return MIME_BY_EXTENSION[trim().lowercase().removePrefix(".")] ?: takeIf { it.contains('/') }
 }
 
 private fun JsonObject.text(vararg keys: String): String? {
@@ -808,25 +816,8 @@ private fun JsonObject.directoryDisplayName(): String? {
         ).joinToString(" ").ifBlank { text("name", "email", "mail") }
 }
 
-private fun String.mimeTypeToFileExtension(): String? {
-    return when (trim().lowercase().substringBefore(';')) {
-        "application/pdf" -> "pdf"
-        "application/msword" -> "doc"
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx"
-        "application/vnd.ms-excel" -> "xls"
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx"
-        "application/vnd.ms-powerpoint" -> "ppt"
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx"
-        "application/zip" -> "zip"
-        "text/plain" -> "txt"
-        "text/markdown" -> "md"
-        "text/csv" -> "csv"
-        "text/html" -> "html"
-        "image/png" -> "png"
-        "image/jpeg" -> "jpg"
-        "image/gif" -> "gif"
-        else -> null
-    }
+internal fun String.mimeTypeToFileExtension(): String? {
+    return EXTENSION_BY_MIME[substringBefore(';').trim().lowercase()]
 }
 
 private fun JsonObject.toDocument(

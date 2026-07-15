@@ -133,12 +133,12 @@ fun LoadingState(firstSync: Boolean = false) {
 }
 
 @Composable
-private fun StatusScreen(
+private fun CenteredState(
     icon: ImageVector,
     title: String,
     body: String,
     onRetry: () -> Unit,
-    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     filledButton: Boolean = false
 ) {
     Box(
@@ -155,7 +155,7 @@ private fun StatusScreen(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = tint
+                tint = iconTint
             )
             Text(
                 text = title,
@@ -181,38 +181,72 @@ private fun StatusScreen(
 }
 
 @Composable
-private fun ErrorState(error: AppError, onRetry: () -> Unit) {
+fun OfflineState(onRetry: () -> Unit) {
+    CenteredState(
+        icon = Icons.Rounded.WifiOff,
+        title = stringResource(R.string.state_offline_empty_title),
+        body = stringResource(R.string.state_offline_empty_body),
+        onRetry = onRetry
+    )
+}
+
+@Composable
+fun EmptyState(
+    @StringRes title: Int,
+    @StringRes body: Int,
+    onRetry: () -> Unit
+) {
+    CenteredState(
+        icon = Icons.Rounded.Inbox,
+        title = stringResource(title),
+        body = stringResource(body),
+        onRetry = onRetry
+    )
+}
+
+@Composable
+fun ErrorState(
+    error: AppError,
+    onRetry: () -> Unit
+) {
     val haptic = LocalHapticFeedback.current
     LaunchedEffect(error) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
     }
-    StatusScreen(
+    CenteredState(
         icon = Icons.Rounded.ErrorOutline,
         title = stringResource(R.string.state_error_title),
-        body = error.displayMessage(),
+        body = error.displayText(),
         onRetry = onRetry,
-        tint = MaterialTheme.colorScheme.error,
+        iconTint = MaterialTheme.colorScheme.error,
+        filledButton = true
+    )
         filledButton = true
     )
 }
 
 @Composable
-private fun AppError.displayMessage(): String {
-    return when (this) {
-        is AppError.Remote -> {
-            val base = stringResource(R.string.error_remote)
-            val detail = listOfNotNull(
-                code?.let { "HTTP $it" },
-                message?.takeIf { it.isNotBlank() }
-            ).joinToString(": ")
-            if (detail.isNotEmpty()) "$base ($detail)" else base
-        }
-        is AppError.Unexpected -> {
-            val base = stringResource(R.string.error_unexpected)
-            if (!message.isNullOrBlank()) "$base ($message)" else base
-        }
-        else -> stringResource(messageRes())
+fun AppError.displayText(): String = when (this) {
+    is AppError.Remote -> {
+        val base = stringResource(R.string.error_remote)
+        val detail = listOfNotNull(
+            code?.let { "HTTP $it" },
+            message?.takeIf { it.isNotBlank() }
+        ).joinToString(": ")
+        if (detail.isNotEmpty()) "$base ($detail)" else base
     }
+    is AppError.Unexpected -> {
+        val base = stringResource(R.string.error_unexpected)
+        if (!message.isNullOrBlank()) "$base ($message)" else base
+    }
+    else -> stringResource(messageRes())
+}
+    }
+    is AppError.Unexpected -> {
+        val base = stringResource(R.string.error_unexpected)
+        if (!message.isNullOrBlank()) "$base ($message)" else base
+    }
+    else -> stringResource(messageRes())
 }
 
 @Composable
@@ -248,7 +282,7 @@ fun StateBanner(error: AppError) {
         shape = MaterialTheme.shapes.medium
     ) {
         Text(
-            text = error.displayMessage(),
+            text = error.displayText(),
             modifier = Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodyMedium
         )

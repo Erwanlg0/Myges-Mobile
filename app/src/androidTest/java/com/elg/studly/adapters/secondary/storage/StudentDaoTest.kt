@@ -27,36 +27,9 @@ class StudentDaoTest {
     }
 
     @Test
-    fun replaceSyncedDataUpsertsNewEntitiesAndDeletesStaleOnes() = runBlocking {
-        dao.replaceSyncedData(
-            profile = profile("student-1", "Student One"),
-            agenda = listOf(agenda("agenda-old", "Old")),
-            grades = listOf(grade("grade-old", "Old")),
-            absences = listOf(absence("absence-old", "Old")),
-            courses = listOf(course("course-old", "Old")),
-            projects = listOf(project("project-old", "Old")),
-            projectGroups = listOf(projectGroup("project-old", "group-old", "Old")),
-            projectSteps = listOf(projectStep("project-old", "step-old", "Old")),
-            practicals = listOf(practical("practical-old", "Old")),
-            documents = listOf(document("document-old", "Old")),
-            directoryPeople = listOf(directoryPerson("person-old", "Old")),
-            news = listOf(news("news-old", "Old"))
-        )
-
-        dao.replaceSyncedData(
-            profile = profile("student-1", "Student Updated"),
-            agenda = listOf(agenda("agenda-new", "New")),
-            grades = listOf(grade("grade-new", "New")),
-            absences = listOf(absence("absence-new", "New")),
-            courses = listOf(course("course-new", "New")),
-            projects = listOf(project("project-new", "New")),
-            projectGroups = listOf(projectGroup("project-new", "group-new", "New")),
-            projectSteps = listOf(projectStep("project-new", "step-new", "New")),
-            practicals = listOf(practical("practical-new", "New")),
-            documents = listOf(document("document-new", "New")),
-            directoryPeople = listOf(directoryPerson("person-new", "New")),
-            news = listOf(news("news-new", "New"))
-        )
+    fun syncUpsertsNewEntitiesAndDeletesStaleOnes() = runBlocking {
+        syncAll("old", "Old")
+        syncAll("new", "Student Updated")
 
         assertEquals("Student Updated", dao.profile()?.displayName)
         assertEquals(listOf("agenda-new"), dao.agenda().map { it.id })
@@ -74,20 +47,7 @@ class StudentDaoTest {
 
     @Test
     fun clearAllRemovesEveryCachedTable() = runBlocking {
-        dao.replaceSyncedData(
-            profile = profile("student-1", "Student One"),
-            agenda = listOf(agenda("agenda-1", "Agenda")),
-            grades = listOf(grade("grade-1", "Grade")),
-            absences = listOf(absence("absence-1", "Absence")),
-            courses = listOf(course("course-1", "Course")),
-            projects = listOf(project("project-1", "Project")),
-            projectGroups = listOf(projectGroup("project-1", "group-1", "Group")),
-            projectSteps = listOf(projectStep("project-1", "step-1", "Step")),
-            practicals = listOf(practical("practical-1", "Practical")),
-            documents = listOf(document("document-1", "Document")),
-            directoryPeople = listOf(directoryPerson("person-1", "Person")),
-            news = listOf(news("news-1", "News"))
-        )
+        syncAll("1", "One")
 
         dao.clearAll()
 
@@ -103,6 +63,23 @@ class StudentDaoTest {
         assertEquals(emptyList<AcademicDocumentEntity>(), dao.documents())
         assertEquals(emptyList<DirectoryPersonEntity>(), dao.directoryPeople())
         assertEquals(emptyList<NewsEntity>(), dao.news())
+    }
+
+    private suspend fun syncAll(suffix: String, title: String) {
+        dao.syncProfile(profile("student-1", title))
+        dao.syncAgenda(listOf(agenda("agenda-$suffix", title)))
+        dao.syncGrades(listOf(grade("grade-$suffix", title)))
+        dao.syncAbsences(listOf(absence("absence-$suffix", title)))
+        dao.syncCourses(listOf(course("course-$suffix", title)))
+        dao.syncProjectsAndPracticals(
+            projects = listOf(project("project-$suffix", title)),
+            projectGroups = listOf(projectGroup("project-$suffix", "group-$suffix", title)),
+            projectSteps = listOf(projectStep("project-$suffix", "step-$suffix", title)),
+            practicals = listOf(practical("practical-$suffix", title))
+        )
+        dao.syncDocuments(listOf(document("document-$suffix", title)))
+        dao.syncDirectory(listOf(directoryPerson("person-$suffix", title)))
+        dao.syncNews(listOf(news("news-$suffix", title)))
     }
 
     private fun profile(id: String, name: String) = StudentProfileEntity(id, name, null, null, null, null, null)

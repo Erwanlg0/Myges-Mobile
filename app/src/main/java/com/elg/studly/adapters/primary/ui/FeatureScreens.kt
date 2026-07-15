@@ -745,8 +745,6 @@ private val SEMESTER_REGEX = Regex("Semestre\\s*\\d+", RegexOption.IGNORE_CASE)
 private val FOUR_DIGITS_REGEX = Regex("\\d{4}")
 private val DIGITS_REGEX = Regex("\\d+")
 
-private fun deriveMainGrades(source: List<Grade>): List<Grade> = source.mainGrades()
-
 @Composable
 fun GradesScreen(
     viewModel: StudentViewModel,
@@ -817,13 +815,13 @@ fun GradesScreen(
         (if (simulationMode) filtered.withSimulatedValues(simulatedValues) else filtered)
             .withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet())
     }
-    val mainGrades = remember(displayedGrades) { deriveMainGrades(displayedGrades) }
+    val mainGrades = remember(displayedGrades) { displayedGrades.mainGrades() }
     
     val blockMainGrades = remember(gradesList, selectedYear, simulationMode, simulatedValues) {
         val yearGrades = gradesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }
         val yearDisplayed = (if (simulationMode) yearGrades.withSimulatedValues(simulatedValues) else yearGrades)
             .withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet())
-        deriveMainGrades(yearDisplayed)
+        yearDisplayed.mainGrades()
     }
 
     LaunchedEffect(viewModel) {
@@ -3880,13 +3878,6 @@ private fun ProjectMessageRow(message: ProjectMessage) {
             }
         }
     }
-}
-
-private fun String?.isCompletedStatus(): Boolean {
-    val normalized = this?.trim()?.lowercase().orEmpty()
-    return normalized in setOf(
-        "done", "completed", "complete", "closed", "validated", "validé", "validée", "terminé", "terminée", "fini", "finie", "rendu", "rendue"
-    )
 }
 
 @Composable
