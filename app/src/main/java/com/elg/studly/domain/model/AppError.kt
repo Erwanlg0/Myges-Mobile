@@ -4,7 +4,6 @@ sealed interface AppError {
     data object Network : AppError
     data object Unauthorized : AppError
     data object LoginFailed : AppError
-    data object Offline : AppError
     data object EmptyResponse : AppError
     data object PermissionDenied : AppError
     data object Storage : AppError

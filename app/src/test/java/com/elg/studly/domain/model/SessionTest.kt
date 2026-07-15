@@ -12,7 +12,6 @@ class SessionTest {
         val session = Session(
             username = "Kordis",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = now.plusSeconds(2 * 24 * 60 * 60),
             biometricEnabled = true,
             issuedAt = now.minusSeconds(5 * 24 * 60 * 60),
@@ -29,7 +28,6 @@ class SessionTest {
         val session = Session(
             username = "Kordis",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = now.minusSeconds(1),
             biometricEnabled = true,
             issuedAt = now.minusSeconds(7 * 24 * 60 * 60),

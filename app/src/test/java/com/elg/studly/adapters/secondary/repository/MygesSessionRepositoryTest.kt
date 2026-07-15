@@ -35,7 +35,6 @@ class MygesSessionRepositoryTest {
         val session = Session(
             username = "user",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = Instant.now().plusSeconds(3600),
             biometricEnabled = false,
             issuedAt = Instant.now(),
@@ -55,7 +54,6 @@ class MygesSessionRepositoryTest {
         val session = Session(
             username = "user",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = Instant.now().minusSeconds(3600),
             biometricEnabled = false,
             issuedAt = Instant.now(),
@@ -76,7 +74,6 @@ class MygesSessionRepositoryTest {
         val session = Session(
             username = "user",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = Instant.now().plusSeconds(3600),
             biometricEnabled = true,
             issuedAt = Instant.now(),
@@ -143,7 +140,6 @@ class MygesSessionRepositoryTest {
         val session = Session(
             username = "user",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = Instant.now().plusSeconds(3600),
             biometricEnabled = false,
             issuedAt = Instant.now(),
@@ -181,7 +177,6 @@ class MygesSessionRepositoryTest {
         val session = Session(
             username = "user",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = Instant.now().plus(10, ChronoUnit.DAYS),
             biometricEnabled = true,
             issuedAt = Instant.now(),
@@ -218,7 +213,6 @@ class MygesSessionRepositoryTest {
         val session = Session(
             username = "user",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = Instant.now().minusSeconds(1),
             biometricEnabled = true,
             issuedAt = Instant.now(),
@@ -241,7 +235,6 @@ class MygesSessionRepositoryTest {
         val session = Session(
             username = "user",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = Instant.now().plusSeconds(3600),
             biometricEnabled = false,
             issuedAt = Instant.now(),
@@ -277,7 +270,6 @@ class MygesSessionRepositoryTest {
         val session = Session(
             username = "user",
             accessToken = "token",
-            refreshToken = null,
             expiresAt = Instant.now().plusSeconds(3600),
             biometricEnabled = false,
             issuedAt = Instant.now(),

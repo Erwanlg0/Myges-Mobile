@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +41,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -50,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import com.elg.studly.R
 import com.elg.studly.adapters.primary.state.FeatureUiState
 import com.elg.studly.adapters.primary.state.messageRes
+import com.elg.studly.domain.model.AppError
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,9 +73,19 @@ fun <T> FeatureStateContent(
     ) {
         when {
             (state.loading || state.refreshing) && empty(state.data) -> LoadingState(firstSync = true)
-            !state.online && empty(state.data) -> OfflineState(onRetry)
+            !state.online && empty(state.data) -> StatusScreen(
+                icon = Icons.Rounded.WifiOff,
+                title = stringResource(R.string.state_offline_empty_title),
+                body = stringResource(R.string.state_offline_empty_body),
+                onRetry = onRetry
+            )
             state.error != null && empty(state.data) -> ErrorState(state.error, onRetry)
-            empty(state.data) -> EmptyState(emptyTitle, emptyBody, onRetry)
+            empty(state.data) -> StatusScreen(
+                icon = Icons.Rounded.Inbox,
+                title = stringResource(emptyTitle),
+                body = stringResource(emptyBody),
+                onRetry = onRetry
+            )
             else -> LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -119,46 +133,13 @@ fun LoadingState(firstSync: Boolean = false) {
 }
 
 @Composable
-fun OfflineState(onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.WifiOff,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = stringResource(R.string.state_offline_empty_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = stringResource(R.string.state_offline_empty_body),
-                style = MaterialTheme.typography.bodyMedium
-            )
-            OutlinedButton(onClick = onRetry) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.action_retry))
-            }
-        }
-    }
-}
-
-@Composable
-fun EmptyState(
-    @StringRes title: Int,
-    @StringRes body: Int,
-    onRetry: () -> Unit
+private fun StatusScreen(
+    icon: ImageVector,
+    title: String,
+    body: String,
+    onRetry: () -> Unit,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    filledButton: Boolean = false
 ) {
     Box(
         modifier = Modifier
@@ -171,127 +152,66 @@ fun EmptyState(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Icon(
-                imageVector = Icons.Rounded.Inbox,
+                imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = tint
             )
             Text(
-                text = stringResource(title),
+                text = title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = stringResource(body),
+                text = body,
                 style = MaterialTheme.typography.bodyMedium
             )
-            OutlinedButton(onClick = onRetry) {
+            val retryContent: @Composable RowScope.() -> Unit = {
                 Icon(Icons.Rounded.Refresh, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.action_retry))
+            }
+            if (filledButton) {
+                Button(onClick = onRetry, content = retryContent)
+            } else {
+                OutlinedButton(onClick = onRetry, content = retryContent)
             }
         }
     }
 }
 
 @Composable
-fun ErrorState(
-    @StringRes message: Int,
-    onRetry: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    LaunchedEffect(message) {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.ErrorOutline,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.error
-            )
-            Text(
-                text = stringResource(R.string.state_error_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = stringResource(message),
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Button(onClick = onRetry) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.action_retry))
-            }
-        }
-    }
-}
-
-@Composable
-fun ErrorState(
-    error: com.elg.studly.domain.model.AppError,
-    onRetry: () -> Unit
-) {
+private fun ErrorState(error: AppError, onRetry: () -> Unit) {
     val haptic = LocalHapticFeedback.current
     LaunchedEffect(error) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
     }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.ErrorOutline,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.error
-            )
-            Text(
-                text = stringResource(R.string.state_error_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            val text = when (error) {
-                is com.elg.studly.domain.model.AppError.Remote -> {
-                    val base = stringResource(R.string.error_remote)
-                    val detail = listOfNotNull(
-                        error.code?.let { "HTTP $it" },
-                        error.message?.takeIf { it.isNotBlank() }
-                    ).joinToString(": ")
-                    if (detail.isNotEmpty()) "$base ($detail)" else base
-                }
-                is com.elg.studly.domain.model.AppError.Unexpected -> {
-                    val base = stringResource(R.string.error_unexpected)
-                    if (!error.message.isNullOrBlank()) "$base (${error.message})" else base
-                }
-                else -> stringResource(error.messageRes())
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Button(onClick = onRetry) {
-                Icon(Icons.Rounded.Refresh, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.action_retry))
-            }
+    StatusScreen(
+        icon = Icons.Rounded.ErrorOutline,
+        title = stringResource(R.string.state_error_title),
+        body = error.displayMessage(),
+        onRetry = onRetry,
+        tint = MaterialTheme.colorScheme.error,
+        filledButton = true
+    )
+}
+
+@Composable
+private fun AppError.displayMessage(): String {
+    return when (this) {
+        is AppError.Remote -> {
+            val base = stringResource(R.string.error_remote)
+            val detail = listOfNotNull(
+                code?.let { "HTTP $it" },
+                message?.takeIf { it.isNotBlank() }
+            ).joinToString(": ")
+            if (detail.isNotEmpty()) "$base ($detail)" else base
         }
+        is AppError.Unexpected -> {
+            val base = stringResource(R.string.error_unexpected)
+            if (!message.isNullOrBlank()) "$base ($message)" else base
+        }
+        else -> stringResource(messageRes())
     }
 }
 
@@ -316,7 +236,7 @@ fun StateBanner(@StringRes text: Int) {
 }
 
 @Composable
-fun StateBanner(error: com.elg.studly.domain.model.AppError) {
+fun StateBanner(error: AppError) {
     val haptic = LocalHapticFeedback.current
     LaunchedEffect(error) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -327,23 +247,8 @@ fun StateBanner(error: com.elg.studly.domain.model.AppError) {
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         shape = MaterialTheme.shapes.medium
     ) {
-        val text = when (error) {
-            is com.elg.studly.domain.model.AppError.Remote -> {
-                val base = stringResource(R.string.error_remote)
-                val detail = listOfNotNull(
-                    error.code?.let { "HTTP $it" },
-                    error.message?.takeIf { it.isNotBlank() }
-                ).joinToString(": ")
-                if (detail.isNotEmpty()) "$base ($detail)" else base
-            }
-            is com.elg.studly.domain.model.AppError.Unexpected -> {
-                val base = stringResource(R.string.error_unexpected)
-                if (!error.message.isNullOrBlank()) "$base (${error.message})" else base
-            }
-            else -> stringResource(error.messageRes())
-        }
         Text(
-            text = text,
+            text = error.displayMessage(),
             modifier = Modifier.padding(12.dp),
             style = MaterialTheme.typography.bodyMedium
         )
@@ -363,16 +268,6 @@ fun RefreshingRow() {
             style = MaterialTheme.typography.bodyMedium
         )
     }
-}
-
-@Composable
-fun SectionTitle(@StringRes title: Int) {
-    Text(
-        text = stringResource(title),
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(top = 8.dp)
-    )
 }
 
 @Composable

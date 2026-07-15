@@ -180,7 +180,6 @@ data class DashboardSummary(
 data class Session(
     val username: String,
     val accessToken: String,
-    val refreshToken: String?,
     val expiresAt: Instant?,
     val biometricEnabled: Boolean,
     val issuedAt: Instant,

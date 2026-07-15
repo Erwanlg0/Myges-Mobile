@@ -22,7 +22,6 @@ class SecureSessionStore @Inject constructor(
             val username = preferences.getString(KEY_USERNAME, null) ?: return null
             val encryptedToken = preferences.getString(KEY_ACCESS_TOKEN, null) ?: return null
             val accessToken = decrypt(encryptedToken)
-            val refreshToken = preferences.getString(KEY_REFRESH_TOKEN, null)?.let(::decrypt)
             val expiresAt = preferences.getLong(KEY_EXPIRES_AT, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli)
             val issuedAt = preferences.getLong(KEY_ISSUED_AT, 0L).takeIf { it > 0L }?.let(Instant::ofEpochMilli)
                 ?: expiresAt?.minusSeconds(TOKEN_VALIDITY_SECONDS)
@@ -30,7 +29,6 @@ class SecureSessionStore @Inject constructor(
             val session = Session(
                 username = username,
                 accessToken = accessToken,
-                refreshToken = refreshToken,
                 expiresAt = expiresAt,
                 biometricEnabled = preferences.getBoolean(KEY_BIOMETRIC, false),
                 issuedAt = issuedAt,
@@ -52,7 +50,6 @@ class SecureSessionStore @Inject constructor(
             preferences.edit()
                 .putString(KEY_USERNAME, session.username)
                 .putString(KEY_ACCESS_TOKEN, encrypt(session.accessToken))
-                .putString(KEY_REFRESH_TOKEN, session.refreshToken?.let(::encrypt))
                 .putLong(KEY_EXPIRES_AT, session.expiresAt?.toEpochMilli() ?: 0L)
                 .putBoolean(KEY_BIOMETRIC, session.biometricEnabled)
                 .putLong(KEY_ISSUED_AT, session.issuedAt.toEpochMilli())
@@ -85,7 +82,6 @@ class SecureSessionStore @Inject constructor(
         const val KEY_ISSUED_AT = "issued_at"
         const val KEY_NEEDS_ROTATION = "needs_rotation"
         const val KEY_REFRESH_AFTER = "refresh_after"
-        const val KEY_REFRESH_TOKEN = "refresh_token"
         const val KEY_USERNAME = "username"
         const val TOKEN_REFRESH_SECONDS = 5L * 24L * 60L * 60L
         const val TOKEN_VALIDITY_SECONDS = 7L * 24L * 60L * 60L

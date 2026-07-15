@@ -26,7 +26,6 @@
 
     <string name="error_empty_response">La réponse reçue est vide.</string>
     <string name="error_network">Connexion impossible. Vérifiez votre réseau.</string>
-    <string name="error_offline">Aucune connexion disponible.</string>
     <string name="error_permission_denied">L’autorisation nécessaire a été refusée.</string>
     <string name="error_remote">Le service Studly a refusé la requête.</string>
     <string name="error_storage">Le stockage local est indisponible.</string>

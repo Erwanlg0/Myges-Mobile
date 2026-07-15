@@ -45,7 +45,6 @@ class MygesSessionRepository @Inject constructor(
             val session = Session(
                 username = KORDIS_SESSION_USERNAME,
                 accessToken = accessToken,
-                refreshToken = null,
                 expiresAt = resolvedExpiresAt,
                 biometricEnabled = enableBiometric,
                 issuedAt = issuedAt,

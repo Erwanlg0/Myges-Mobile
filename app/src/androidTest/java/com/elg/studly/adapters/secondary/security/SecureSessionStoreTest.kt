@@ -32,7 +32,6 @@ class SecureSessionStoreTest {
         val session = Session(
             username = "Kordis",
             accessToken = "secret-access-token",
-            refreshToken = "secret-refresh-token",
             expiresAt = Instant.parse("2026-06-20T12:00:00Z"),
             biometricEnabled = true,
             issuedAt = Instant.parse("2026-06-13T12:00:00Z"),
@@ -46,7 +45,7 @@ class SecureSessionStoreTest {
             .all
             .values
             .map { it.toString() }
-        assertFalse(persistedValues.any { it == "secret-access-token" || it == "secret-refresh-token" })
+        assertFalse(persistedValues.any { it == "secret-access-token" })
     }
 
     @Test
@@ -55,7 +54,6 @@ class SecureSessionStoreTest {
             Session(
                 username = "Kordis",
                 accessToken = "token",
-                refreshToken = null,
                 expiresAt = null,
                 biometricEnabled = false,
                 issuedAt = Instant.parse("2026-06-13T12:00:00Z"),

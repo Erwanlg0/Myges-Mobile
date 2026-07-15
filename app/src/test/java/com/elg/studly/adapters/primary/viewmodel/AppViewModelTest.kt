@@ -50,7 +50,7 @@ class AppViewModelTest {
         val viewModel = AppViewModel(sessionRepository, settingsRepository)
         
         val job = backgroundScope.launch { viewModel.session.collect {} }
-        val expectedSession = Session("user", "token", null, Instant.now(), false, Instant.now(), Instant.now())
+        val expectedSession = Session("user", "token", Instant.now(), false, Instant.now(), Instant.now())
         sessionFlow.value = expectedSession
         
         advanceUntilIdle()

@@ -26,7 +26,6 @@
 
     <string name="error_empty_response">The received response is empty.</string>
     <string name="error_network">Unable to connect. Check your network.</string>
-    <string name="error_offline">No connection available.</string>
     <string name="error_permission_denied">The required permission was denied.</string>
     <string name="error_remote">The Studly service rejected the request.</string>
     <string name="error_storage">Local storage is unavailable.</string>

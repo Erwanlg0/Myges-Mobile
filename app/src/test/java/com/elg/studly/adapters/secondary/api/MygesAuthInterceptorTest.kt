@@ -241,7 +241,6 @@ private fun sampleSession(
     return Session(
         username = "Kordis",
         accessToken = token,
-        refreshToken = null,
         expiresAt = expiresAt,
         biometricEnabled = false,
         issuedAt = now,
