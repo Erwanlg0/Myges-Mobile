@@ -205,7 +205,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
                 is JsonPrimitive -> gradeElement.contentOrNull?.trim()?.uppercase()?.takeIf {
                     it in listOf("A+", "A", "A-", "B+", "B", "B-", "C", "C-", "D+", "D", "F")
                 }
-                is JsonObject -> (gradeElement.text("gradeLetter", "letter", "grade_letter", "grade", "value", "note"))
+                is JsonObject -> (gradeElement.text("gradeLetter", "letter", "grade_letter", "letter_mark", "grade", "value", "note"))
                     ?.trim()?.uppercase()?.takeIf {
                         it in listOf("A+", "A", "A-", "B+", "B", "B-", "C", "C-", "D+", "D", "F")
                     }
@@ -232,7 +232,7 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
 
         val finalAverage = calculatedAverage ?: root.number("average", "moyenne")?.takeIf { it != 0.0 }
 
-        val rootGradeLetter = (root.text("gradeLetter", "letter", "grade_letter") ?: root.text("grade", "value", "note"))
+        val rootGradeLetter = (root.text("gradeLetter", "letter", "grade_letter", "letter_mark") ?: root.text("grade", "value", "note"))
             ?.trim()?.uppercase()?.takeIf {
                 it in listOf("A+", "A", "A-", "B+", "B", "B-", "C", "C-", "D+", "D", "F")
             }
@@ -999,7 +999,7 @@ private fun JsonObject.toGrade(
         "update_date", "date_note", "dateNote", "published_at", "created_at"
     )
     val rawGrade = text("grade", "value", "note")
-    val parsedGradeLetter = gradeLetter ?: (text("gradeLetter", "letter", "grade_letter") ?: rawGrade)
+    val parsedGradeLetter = gradeLetter ?: (text("gradeLetter", "letter", "grade_letter", "letter_mark") ?: rawGrade)
         ?.trim()?.uppercase()?.takeIf {
             it in listOf("A+", "A", "A-", "B+", "B", "B-", "C", "C-", "D+", "D", "F")
         }

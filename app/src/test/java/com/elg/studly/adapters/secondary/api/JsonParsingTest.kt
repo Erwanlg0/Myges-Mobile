@@ -290,6 +290,91 @@ class JsonParsingTest {
     }
 
     @Test
+    fun gradesParseLetterMarkOnly() {
+        val grades = json.parseToJsonElement(
+            """
+            {
+              "response_code": 200,
+              "result": [
+                {
+                  "rc_id": 353221,
+                  "course": "T3 - mission entreprise",
+                  "grades": [],
+                  "exam": null,
+                  "coef": "2.0",
+                  "trimester_name": "Semestre 3",
+                  "letter_mark": "A+"
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toGrades()
+
+        assertEquals(1, grades.size)
+        val main = grades[0]
+        assertEquals("353221", main.id)
+        assertEquals("T3 - mission entreprise", main.courseName)
+        assertEquals(null, main.value)
+        assertEquals("A+", main.gradeLetter)
+    }
+
+    @Test
+    fun gradesParseLetterMarkFWhenNoNumericValue() {
+        val grades = json.parseToJsonElement(
+            """
+            {
+              "response_code": 200,
+              "result": [
+                {
+                  "rc_id": 338004,
+                  "course": "T1 - programme open lab",
+                  "grades": [],
+                  "exam": null,
+                  "coef": "2.0",
+                  "trimester_name": "Semestre 1",
+                  "letter_mark": "F"
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toGrades()
+
+        assertEquals(1, grades.size)
+        val main = grades[0]
+        assertEquals(null, main.value)
+        assertEquals("F", main.gradeLetter)
+    }
+
+    @Test
+    fun gradesKeepLetterMarkFWhenNumericValueIsPresent() {
+        val grades = json.parseToJsonElement(
+            """
+            {
+              "response_code": 200,
+              "result": [
+                {
+                  "rc_id": 338004,
+                  "course": "T1 - programme open lab",
+                  "grades": [],
+                  "exam": 5.0,
+                  "coef": "2.0",
+                  "trimester_name": "Semestre 1",
+                  "letter_mark": "F"
+                }
+              ]
+            }
+            """.trimIndent()
+        ).toGrades()
+
+        assertEquals(2, grades.size)
+        val main = grades[0]
+        assertEquals(5.0, main.value)
+        assertEquals("F", main.gradeLetter)
+    }
+
+
+
+    @Test
     fun absencesParseKordisDatePayload() {
         val absences = json.parseToJsonElement(
             """

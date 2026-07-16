@@ -2912,7 +2912,7 @@ private fun GradeCard(
                 style = MaterialTheme.typography.titleLarge,
                 color = gradeColor(grade.value, grade.scale)
             )
-        } else if (grade.gradeLetter != null && (showGradeLetters || estimateGrades)) {
+        } else if (grade.gradeLetter != null) {
             val estimation = if (estimateGrades) {
                 getEstimationRangeFromLetter(grade.gradeLetter)?.let { " (estimation : $it)" } ?: ""
             } else ""
@@ -3219,10 +3219,12 @@ private fun GradeDetailsDialog(
                 }
                 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                LabelValue(
-                    R.string.grades_general_average,
-                    if (grade.value != null) stringResource(R.string.grades_value_format, formatNumber(grade.value), formatNumber(grade.scale)) else stringResource(R.string.grades_no_grade)
-                )
+                val averageText = when {
+                    grade.value != null -> stringResource(R.string.grades_value_format, formatNumber(grade.value), formatNumber(grade.scale))
+                    grade.gradeLetter != null -> grade.gradeLetter
+                    else -> stringResource(R.string.grades_no_grade)
+                }
+                LabelValue(R.string.grades_general_average, averageText)
                 LabelValue(R.string.grades_coefficient, if (grade.isNotCounted()) stringResource(R.string.grades_not_counted) else formatNumber(grade.coefficient))
                 LabelValue(R.string.common_date, formatDate(grade.date))
             }

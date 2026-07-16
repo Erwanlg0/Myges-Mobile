@@ -128,7 +128,96 @@ class StudentDaoTest {
 
         assertEquals(listOf("kept", "new"), dao.projectGroupRows.map { it.id })
     }
+
+    @Test
+    fun syncGrades_ignoresFGradeLetter_whenNoPreviousGradeExists() = runTest {
+        val dao = TestStudentDao()
+        val incoming = GradeEntity(
+            id = "course-1",
+            courseName = "Course 1",
+            subject = "Subject 1",
+            value = null,
+            scale = 20.0,
+            coefficient = 2.0,
+            average = null,
+            dateIso = null,
+            period = null,
+            gradeLetter = "F"
+        )
+        dao.syncGrades(listOf(incoming))
+        assertEquals(1, dao.gradeRows.size)
+        assertNull(dao.gradeRows.first().gradeLetter)
+    }
+
+    @Test
+    fun syncGrades_ignoresFGradeLetter_whenPreviousGradeWasAlreadyF() = runTest {
+        val existing = GradeEntity(
+            id = "course-1",
+            courseName = "Course 1",
+            subject = "Subject 1",
+            value = null,
+            scale = 20.0,
+            coefficient = 2.0,
+            average = null,
+            dateIso = null,
+            period = null,
+            gradeLetter = null
+        )
+        val dao = TestStudentDao().apply {
+            gradeRows = listOf(existing)
+        }
+        val incoming = GradeEntity(
+            id = "course-1",
+            courseName = "Course 1",
+            subject = "Subject 1",
+            value = null,
+            scale = 20.0,
+            coefficient = 2.0,
+            average = null,
+            dateIso = null,
+            period = null,
+            gradeLetter = "F"
+        )
+        dao.syncGrades(listOf(incoming))
+        assertEquals(1, dao.gradeRows.size)
+        assertNull(dao.gradeRows.first().gradeLetter)
+    }
+
+    @Test
+    fun syncGrades_keepsFGradeLetter_whenPreviousGradeWasNonF() = runTest {
+        val existing = GradeEntity(
+            id = "course-1",
+            courseName = "Course 1",
+            subject = "Subject 1",
+            value = null,
+            scale = 20.0,
+            coefficient = 2.0,
+            average = null,
+            dateIso = null,
+            period = null,
+            gradeLetter = "C"
+        )
+        val dao = TestStudentDao().apply {
+            gradeRows = listOf(existing)
+        }
+        val incoming = GradeEntity(
+            id = "course-1",
+            courseName = "Course 1",
+            subject = "Subject 1",
+            value = null,
+            scale = 20.0,
+            coefficient = 2.0,
+            average = null,
+            dateIso = null,
+            period = null,
+            gradeLetter = "F"
+        )
+        dao.syncGrades(listOf(incoming))
+        assertEquals(1, dao.gradeRows.size)
+        assertEquals("F", dao.gradeRows.first().gradeLetter)
+    }
 }
+
 
 private class TestStudentDao : StudentDao() {
     var profileRow: StudentProfileEntity? = null

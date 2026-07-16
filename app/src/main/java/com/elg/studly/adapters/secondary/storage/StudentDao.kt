@@ -316,7 +316,21 @@ abstract class StudentDao {
     }
 
     private suspend fun replaceGrades(incoming: List<GradeEntity>) {
-        val plan = entitySyncPlan(grades(), incoming, GradeEntity::id)
+        val existingGrades = grades().associateBy { it.id }
+        val adjustedIncoming = incoming.map { grade ->
+            if (grade.value == null && grade.gradeLetter == "F") {
+                val existing = existingGrades[grade.id]
+                val wasNonF = existing != null && (existing.value != null || (existing.gradeLetter != null && existing.gradeLetter != "F"))
+                if (wasNonF) {
+                    grade
+                } else {
+                    grade.copy(gradeLetter = null)
+                }
+            } else {
+                grade
+            }
+        }
+        val plan = entitySyncPlan(grades(), adjustedIncoming, GradeEntity::id)
         if (plan.deletes.isNotEmpty()) deleteGrades(plan.deletes)
         if (plan.upserts.isNotEmpty()) upsertGrades(plan.upserts)
     }
