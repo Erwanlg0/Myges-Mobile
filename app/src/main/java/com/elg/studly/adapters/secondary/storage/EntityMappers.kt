@@ -75,7 +75,8 @@ fun Grade.toEntity() = GradeEntity(
     coefficient = coefficient,
     average = average,
     dateIso = date?.toString(),
-    period = period
+    period = period,
+    gradeLetter = gradeLetter
 )
 
 fun GradeEntity.toDomain() = Grade(
@@ -87,7 +88,8 @@ fun GradeEntity.toDomain() = Grade(
     coefficient = coefficient,
     average = average,
     date = dateIso?.let { LocalDate.parse(it) },
-    period = period
+    period = period,
+    gradeLetter = gradeLetter
 ).let { if (it.isToeicExcluded()) it.copy(scale = 990.0) else it }
 
 fun Absence.toEntity() = AbsenceEntity(

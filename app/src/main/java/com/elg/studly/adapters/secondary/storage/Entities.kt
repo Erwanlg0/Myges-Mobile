@@ -39,7 +39,8 @@ data class GradeEntity(
     val coefficient: Double?,
     val average: Double?,
     val dateIso: String?,
-    val period: String?
+    val period: String?,
+    val gradeLetter: String? = null
 )
 
 @Entity(tableName = "absences")

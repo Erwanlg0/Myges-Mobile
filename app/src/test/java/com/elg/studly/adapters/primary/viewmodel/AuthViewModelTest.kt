@@ -119,6 +119,17 @@ class AuthViewModelTest {
     }
 
     @Test
+    fun completeOAuthCallbackAcceptsProviderWithoutReturnedState() = runTest(dispatcher) {
+        val sessionRepository = AuthRecordingSessionRepository()
+        val viewModel = authViewModel(sessionRepository)
+
+        viewModel.completeOAuthCallback(oauthUri("access_token=token-1", state = null))
+        advanceUntilIdle()
+
+        assertEquals("token-1", sessionRepository.accessToken)
+    }
+
+    @Test
     fun completeOAuthCallbackWithInvalidExpiresInStoresNoExpiry() = runTest(dispatcher) {
         val sessionRepository = AuthRecordingSessionRepository()
         val viewModel = authViewModel(sessionRepository)
@@ -427,4 +438,6 @@ private class AuthStubSettingsRepository : SettingsRepository {
     override suspend fun markFeatureFetched(feature: SyncFeature) = Unit
     override suspend fun markSynced() = Unit
     override suspend fun clearSyncMetadata() = Unit
+    override suspend fun setShowGradeLetters(enabled: Boolean) = Unit
+    override suspend fun setEstimateGrades(enabled: Boolean) = Unit
 }

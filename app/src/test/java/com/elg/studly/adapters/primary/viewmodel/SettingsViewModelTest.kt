@@ -385,6 +385,16 @@ private class RecordingSettingsRepository(
     override suspend fun clearSyncMetadata() {
         events += "clearSyncMetadata"
     }
+
+    override suspend fun setShowGradeLetters(enabled: Boolean) {
+        val current = settings.value
+        settings.value = current.copy(showGradeLetters = enabled)
+    }
+
+    override suspend fun setEstimateGrades(enabled: Boolean) {
+        val current = settings.value
+        settings.value = current.copy(estimateGrades = enabled)
+    }
 }
 
 private class RecordingStudentDataRepository(

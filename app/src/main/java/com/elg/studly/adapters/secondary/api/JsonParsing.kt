@@ -201,11 +201,25 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
                 is JsonObject -> gradeElement.number("value", "grade", "note")
                 else -> null
             }
+            val letter = when (gradeElement) {
+                is JsonPrimitive -> gradeElement.contentOrNull?.trim()?.uppercase()?.takeIf {
+                    it in listOf("A+", "A", "A-", "B+", "B", "B-", "C", "C-", "D+", "D", "F")
+                }
+                is JsonObject -> (gradeElement.text("gradeLetter", "letter", "grade_letter", "grade", "value", "note"))
+                    ?.trim()?.uppercase()?.takeIf {
+                        it in listOf("A+", "A", "A-", "B+", "B", "B-", "C", "C-", "D+", "D", "F")
+                    }
+                else -> null
+            }
             val dateVal = when (gradeElement) {
                 is JsonObject -> gradeElement.localDate(*dateKeys)
                 else -> null
             }
-            value?.let { Pair(it, dateVal) }
+            if (value != null || letter != null) {
+                Triple(value, letter, dateVal)
+            } else {
+                null
+            }
         }
 
         
@@ -213,10 +227,16 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
         val examDate = root.localDate("date_exam", "exam_date")
 
         
-        val ccAverage = if (ccGrades.isNotEmpty()) ccGrades.map { it.first }.average() else null
+        val ccAverage = ccGrades.mapNotNull { it.first }.takeIf { it.isNotEmpty() }?.average()
         val calculatedAverage = combineCcExam(ccAverage, examValue)
 
         val finalAverage = calculatedAverage ?: root.number("average", "moyenne")?.takeIf { it != 0.0 }
+
+        val rootGradeLetter = (root.text("gradeLetter", "letter", "grade_letter") ?: root.text("grade", "value", "note"))
+            ?.trim()?.uppercase()?.takeIf {
+                it in listOf("A+", "A", "A-", "B+", "B", "B-", "C", "C-", "D+", "D", "F")
+            }
+        val finalGradeLetter = rootGradeLetter ?: ccGrades.singleOrNull()?.second
 
         val resultList = mutableListOf<Grade>()
 
@@ -228,20 +248,22 @@ fun JsonElement.toGrades(year: String? = null): List<Grade> {
                 value = finalAverage,
                 scale = root.number("scale", "outOf", "bareme"),
                 date = root.localDate(*dateKeys),
-                year = year
+                year = year,
+                gradeLetter = finalGradeLetter
             )
         )
 
         
-        ccGrades.forEachIndexed { index, pair ->
+        ccGrades.forEachIndexed { index, triple ->
             resultList.add(
                 root.toGrade(
                     idSuffix = "cc-$index",
                     subject = "CC${index + 1}",
-                    value = pair.first,
+                    value = triple.first,
                     scale = root.number("scale", "outOf", "bareme"),
-                    date = pair.second ?: root.localDate(*dateKeys),
-                    year = year
+                    date = triple.third ?: root.localDate(*dateKeys),
+                    year = year,
+                    gradeLetter = triple.second
                 )
             )
         }
@@ -955,7 +977,8 @@ private fun JsonObject.toGrade(
     value: Double? = null,
     scale: Double? = null,
     date: LocalDate? = null,
-    year: String? = null
+    year: String? = null,
+    gradeLetter: String? = null
 ): Grade {
     val baseId = text("id", "gradeId", "uid", "rc_id") ?: stableId(this)
     val rawPeriod = text("period", "trimester_name", "semester", "trimester")
@@ -975,6 +998,11 @@ private fun JsonObject.toGrade(
         "publishDate", "publish_date", "published", "updatedAt", 
         "update_date", "date_note", "dateNote", "published_at", "created_at"
     )
+    val rawGrade = text("grade", "value", "note")
+    val parsedGradeLetter = gradeLetter ?: (text("gradeLetter", "letter", "grade_letter") ?: rawGrade)
+        ?.trim()?.uppercase()?.takeIf {
+            it in listOf("A+", "A", "A-", "B+", "B", "B-", "C", "C-", "D+", "D", "F")
+        }
     return Grade(
         id = listOfNotNull(baseId, idSuffix).joinToString("-"),
         courseName = text("courseName", "course", "module", "matiere") ?: "",
@@ -984,7 +1012,8 @@ private fun JsonObject.toGrade(
         coefficient = coefficientValue(),
         average = number("average", "moyenne", "ccaverage"),
         date = date ?: localDate(*dateKeys),
-        period = resolvedPeriod
+        period = resolvedPeriod,
+        gradeLetter = parsedGradeLetter
     ).let { if (it.isToeicExcluded()) it.copy(scale = 990.0) else it }
 }
 

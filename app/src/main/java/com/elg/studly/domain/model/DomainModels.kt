@@ -36,7 +36,8 @@ data class Grade(
     val coefficient: Double?,
     val average: Double?,
     val date: LocalDate?,
-    val period: String?
+    val period: String?,
+    val gradeLetter: String? = null
 )
 
 data class Absence(
@@ -224,7 +225,9 @@ data class UserSettings(
     val classReminderLeadMinutes: Int = NO_REMINDER_MINUTES,
     
     val deadlineReminderLeadMinutes: Int = NO_REMINDER_MINUTES,
-    val lastSyncAt: Instant?
+    val lastSyncAt: Instant?,
+    val showGradeLetters: Boolean = false,
+    val estimateGrades: Boolean = false
 )
 
 

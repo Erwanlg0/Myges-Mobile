@@ -792,12 +792,12 @@ class OfflineFirstStudentDataRepository @Inject constructor(
 
     private suspend fun directoryPeople(year: String): List<DirectoryPerson> {
         val teachers = api.teachers(year)?.toDirectoryPeople(DirectoryRole.Teacher, year).orEmpty()
-        val students = api.students(year)?.toDirectoryPeople(DirectoryRole.Student, year).orEmpty()
+        val students = runCatching { api.students(year)?.toDirectoryPeople(DirectoryRole.Student, year).orEmpty() }.getOrDefault(emptyList())
         val classStudents = api.classes(year)?.toClassIds().orEmpty()
             .flatMap { classId ->
                 runCatching { api.classStudents(classId)?.toDirectoryPeople(DirectoryRole.Student, year).orEmpty() }
                     .recoverCatching { api.classStudents(classId, year)?.toDirectoryPeople(DirectoryRole.Student, year).orEmpty() }
-                    .getOrThrow()
+                    .getOrDefault(emptyList())
             }
         return (teachers + students + classStudents).distinctBy { it.id }
     }

@@ -161,6 +161,14 @@ class SettingsViewModel @Inject constructor(
         logoutUseCase()
     }
 
+    fun setShowGradeLetters(enabled: Boolean) = launchSettingChange {
+        settingsRepository.setShowGradeLetters(enabled)
+    }
+
+    fun setEstimateGrades(enabled: Boolean) = launchSettingChange {
+        settingsRepository.setEstimateGrades(enabled)
+    }
+
     private fun launchSettingChange(block: suspend () -> Unit) {
         viewModelScope.launch {
             loading.value = true

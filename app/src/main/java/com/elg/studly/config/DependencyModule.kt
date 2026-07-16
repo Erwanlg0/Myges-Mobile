@@ -90,6 +90,9 @@ object DependencyModule {
             }
         }
         return OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .cookieJar(InMemoryCookieJar())
             .addInterceptor(MygesAuthInterceptor(appConfig.userAgent, appConfig.apiBaseUrl, sessionRepository))
             .addInterceptor(ApiRetryInterceptor())

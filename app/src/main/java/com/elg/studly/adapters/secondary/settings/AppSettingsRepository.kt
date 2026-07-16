@@ -50,7 +50,9 @@ class AppSettingsRepository @Inject constructor(
             refreshIntervals = preferences.toRefreshIntervals(),
             classReminderLeadMinutes = clampReminderLeadMinutes(preferences[CLASS_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
             deadlineReminderLeadMinutes = clampReminderLeadMinutes(preferences[DEADLINE_REMINDER_LEAD] ?: NO_REMINDER_MINUTES),
-            lastSyncAt = preferences[LAST_SYNC]?.let(Instant::ofEpochMilli)
+            lastSyncAt = preferences[LAST_SYNC]?.let(Instant::ofEpochMilli),
+            showGradeLetters = preferences[SHOW_GRADE_LETTERS] ?: false,
+            estimateGrades = preferences[ESTIMATE_GRADES] ?: false
         )
     }
 
@@ -148,6 +150,14 @@ class AppSettingsRepository @Inject constructor(
         }
     }
 
+    override suspend fun setShowGradeLetters(enabled: Boolean) {
+        context.settingsDataStore.edit { preferences -> preferences[SHOW_GRADE_LETTERS] = enabled }
+    }
+
+    override suspend fun setEstimateGrades(enabled: Boolean) {
+        context.settingsDataStore.edit { preferences -> preferences[ESTIMATE_GRADES] = enabled }
+    }
+
     private companion object {
         val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         val CALENDAR_SYNC = booleanPreferencesKey("calendar_sync")
@@ -163,6 +173,8 @@ class AppSettingsRepository @Inject constructor(
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val AGENDA_COLOR_MODE = stringPreferencesKey("agenda_color_mode")
+        val SHOW_GRADE_LETTERS = booleanPreferencesKey("show_grade_letters")
+        val ESTIMATE_GRADES = booleanPreferencesKey("estimate_grades")
 
         val INTERVAL_KEYS = SyncFeature.entries.associateWith {
             intPreferencesKey("refresh_interval_${it.name.lowercase()}")

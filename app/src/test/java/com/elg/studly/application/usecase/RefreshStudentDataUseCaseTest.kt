@@ -221,6 +221,9 @@ private class RecordingSettingsRepository(
     override suspend fun clearSyncMetadata() {
         events += "clearSyncMetadata"
     }
+
+    override suspend fun setShowGradeLetters(enabled: Boolean) = Unit
+    override suspend fun setEstimateGrades(enabled: Boolean) = Unit
 }
 
 private class RecordingCalendarSyncPort(

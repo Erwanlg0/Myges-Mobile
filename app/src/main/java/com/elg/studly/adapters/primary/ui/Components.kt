@@ -73,14 +73,14 @@ fun <T> FeatureStateContent(
     ) {
         when {
             (state.loading || state.refreshing) && empty(state.data) -> LoadingState(firstSync = true)
-            !state.online && empty(state.data) -> StatusScreen(
+            !state.online && empty(state.data) -> CenteredState(
                 icon = Icons.Rounded.WifiOff,
                 title = stringResource(R.string.state_offline_empty_title),
                 body = stringResource(R.string.state_offline_empty_body),
                 onRetry = onRetry
             )
             state.error != null && empty(state.data) -> ErrorState(state.error, onRetry)
-            empty(state.data) -> StatusScreen(
+            empty(state.data) -> CenteredState(
                 icon = Icons.Rounded.Inbox,
                 title = stringResource(emptyTitle),
                 body = stringResource(emptyBody),
@@ -221,8 +221,6 @@ fun ErrorState(
         iconTint = MaterialTheme.colorScheme.error,
         filledButton = true
     )
-        filledButton = true
-    )
 }
 
 @Composable
@@ -234,13 +232,6 @@ fun AppError.displayText(): String = when (this) {
             message?.takeIf { it.isNotBlank() }
         ).joinToString(": ")
         if (detail.isNotEmpty()) "$base ($detail)" else base
-    }
-    is AppError.Unexpected -> {
-        val base = stringResource(R.string.error_unexpected)
-        if (!message.isNullOrBlank()) "$base ($message)" else base
-    }
-    else -> stringResource(messageRes())
-}
     }
     is AppError.Unexpected -> {
         val base = stringResource(R.string.error_unexpected)

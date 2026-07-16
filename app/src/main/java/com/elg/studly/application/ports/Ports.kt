@@ -80,6 +80,8 @@ interface SettingsRepository {
     suspend fun markFeatureFetched(feature: SyncFeature)
     suspend fun markSynced()
     suspend fun clearSyncMetadata()
+    suspend fun setShowGradeLetters(enabled: Boolean)
+    suspend fun setEstimateGrades(enabled: Boolean)
 }
 
 interface NetworkMonitor {

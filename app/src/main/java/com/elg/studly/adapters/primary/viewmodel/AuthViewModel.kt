@@ -63,7 +63,7 @@ class AuthViewModel @Inject constructor(
     fun completeOAuthCallback(uri: Uri) {
         val expectedState = savedStateHandle.get<String>(OAUTH_STATE_KEY)
         val callbackState = uri.oauthParameter("state")
-        if (expectedState.isNullOrBlank() || callbackState != expectedState) {
+        if (expectedState.isNullOrBlank() || callbackState != null && callbackState != expectedState) {
             error.value = AppError.LoginFailed
             return
         }

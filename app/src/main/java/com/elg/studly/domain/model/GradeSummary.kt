@@ -75,3 +75,42 @@ private data class GradeWeight(
     val coefficient: Double,
     val missingCoefficient: Boolean
 )
+
+fun Grade.getGradeLetterFromValue(): String? {
+    val val20 = value ?: return null
+    val score = if (scale != null && scale > 0.0) {
+        val20 * (20.0 / scale)
+    } else {
+        val20
+    }
+    return when {
+        score >= 18.0 -> "A+"
+        score >= 16.5 -> "A"
+        score >= 15.0 -> "A-"
+        score >= 14.5 -> "B+"
+        score >= 13.5 -> "B"
+        score >= 12.0 -> "B-"
+        score >= 10.5 -> "C"
+        score >= 9.0 -> "C-"
+        score >= 8.0 -> "D+"
+        score >= 6.0 -> "D"
+        else -> "F"
+    }
+}
+
+fun getEstimationRangeFromLetter(letter: String): String? {
+    return when (letter.uppercase().trim()) {
+        "A+" -> "entre 18 et 20"
+        "A" -> "entre 16.5 et 17.99"
+        "A-" -> "entre 15 et 16.49"
+        "B+" -> "entre 14.5 et 14.99"
+        "B" -> "entre 13.5 et 14.49"
+        "B-" -> "entre 12 et 13.49"
+        "C" -> "entre 10.5 et 11.99"
+        "C-" -> "entre 9 et 10.49"
+        "D+" -> "entre 8 et 8.99"
+        "D" -> "entre 6 et 7.99"
+        "F" -> "entre 0 et 5.99"
+        else -> null
+    }
+}

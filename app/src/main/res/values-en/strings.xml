@@ -263,6 +263,9 @@
     <string name="settings_agenda_color_mode">Agenda event color</string>
     <string name="settings_agenda_color_course">By course</string>
     <string name="settings_agenda_color_location">By location</string>
+    <string name="settings_grades_options">Grades options</string>
+    <string name="settings_show_grade_letters">Show grade letters</string>
+    <string name="settings_estimate_grades">Estimate grades without numeric value</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_french">French</string>
     <string name="settings_language_system">System</string>

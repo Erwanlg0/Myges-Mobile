@@ -163,6 +163,8 @@ import com.elg.studly.domain.model.isExcludedFromAverage
 import com.elg.studly.domain.model.isNotCounted
 import com.elg.studly.domain.model.toGradeSummary
 import com.elg.studly.domain.model.isPerfectScore
+import com.elg.studly.domain.model.getGradeLetterFromValue
+import com.elg.studly.domain.model.getEstimationRangeFromLetter
 import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -181,9 +183,13 @@ import java.time.format.FormatStyle
 @Composable
 fun DashboardScreen(
     viewModel: StudentViewModel,
+    settingsViewModel: SettingsViewModel,
     onNavigateToTab: (String) -> Unit
 ) {
     val state by viewModel.dashboard.collectAsStateWithLifecycle()
+    val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
+    val showGradeLetters = settingsState.settings?.showGradeLetters == true
+    val estimateGrades = settingsState.settings?.estimateGrades == true
     var selectedEvent by remember { mutableStateOf<AgendaEvent?>(null) }
 
     selectedEvent?.let { event ->
@@ -286,6 +292,8 @@ fun DashboardScreen(
             items(dashboard.latestGrades, key = { it.id }) { grade ->
                 GradeCard(
                     grade = grade,
+                    showGradeLetters = showGradeLetters,
+                    estimateGrades = estimateGrades,
                     onOpen = {
                         grade.period?.let { period ->
                             viewModel.navigateToGradesPeriod(period)
@@ -748,9 +756,13 @@ private val DIGITS_REGEX = Regex("\\d+")
 @Composable
 fun GradesScreen(
     viewModel: StudentViewModel,
+    settingsViewModel: SettingsViewModel,
     highlightedGradeId: String? = null
 ) {
     val state by viewModel.grades.collectAsStateWithLifecycle()
+    val settingsState by settingsViewModel.state.collectAsStateWithLifecycle()
+    val showGradeLetters = settingsState.settings?.showGradeLetters == true
+    val estimateGrades = settingsState.settings?.estimateGrades == true
     var selectedGrade by remember { mutableStateOf<Grade?>(null) }
     val context = LocalContext.current
     val simulationPrefs = remember(context) {
@@ -1040,7 +1052,12 @@ fun GradesScreen(
                     GradeGroupHeader(stringResource(R.string.grades_block_prefix, block), blockGrades)
                 }
                 items(blockGrades, key = { "b-${it.id}" }) { grade ->
-                    GradeCard(grade = grade, onOpen = { selectedGrade = grade })
+                    GradeCard(
+                        grade = grade,
+                        showGradeLetters = showGradeLetters,
+                        estimateGrades = estimateGrades,
+                        onOpen = { selectedGrade = grade }
+                    )
                 }
             }
             grouped[null]?.takeIf { it.isNotEmpty() }?.let { unassigned ->
@@ -1048,12 +1065,22 @@ fun GradesScreen(
                     GradeGroupHeader(stringResource(R.string.grades_block_unassigned), unassigned)
                 }
                 items(unassigned, key = { "u-${it.id}" }) { grade ->
-                    GradeCard(grade = grade, onOpen = { selectedGrade = grade })
+                    GradeCard(
+                        grade = grade,
+                        showGradeLetters = showGradeLetters,
+                        estimateGrades = estimateGrades,
+                        onOpen = { selectedGrade = grade }
+                    )
                 }
             }
         } else {
             items(mainGrades, key = { it.id }) { grade ->
-                GradeCard(grade = grade, onOpen = { selectedGrade = grade })
+                GradeCard(
+                    grade = grade,
+                    showGradeLetters = showGradeLetters,
+                    estimateGrades = estimateGrades,
+                    onOpen = { selectedGrade = grade }
+                )
             }
         }
     }
@@ -2180,6 +2207,25 @@ fun SettingsScreen(
         item {
             DataCard {
                 Text(
+                    text = stringResource(R.string.settings_grades_options),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                SwitchRow(
+                    title = R.string.settings_show_grade_letters,
+                    checked = settings.showGradeLetters,
+                    onCheckedChange = settingsViewModel::setShowGradeLetters
+                )
+                SwitchRow(
+                    title = R.string.settings_estimate_grades,
+                    checked = settings.estimateGrades,
+                    onCheckedChange = settingsViewModel::setEstimateGrades
+                )
+            }
+        }
+        item {
+            DataCard {
+                Text(
                     text = stringResource(R.string.settings_session),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
@@ -2839,6 +2885,8 @@ internal fun AgendaEventDetailsDialog(
 @Composable
 private fun GradeCard(
     grade: Grade,
+    showGradeLetters: Boolean = false,
+    estimateGrades: Boolean = false,
     onOpen: () -> Unit
 ) {
     CompactCard(modifier = Modifier.clickable(onClick = onOpen)) {
@@ -2852,14 +2900,26 @@ private fun GradeCard(
             Text(grade.subject)
         }
         if (grade.value != null) {
+            val letterSuffix = if (showGradeLetters) {
+                grade.getGradeLetterFromValue()?.let { " ($it)" } ?: ""
+            } else ""
             Text(
                 text = stringResource(
                     R.string.grades_value_format,
                     formatNumber(grade.value),
                     formatNumber(grade.scale)
-                ),
+                ) + letterSuffix,
                 style = MaterialTheme.typography.titleLarge,
                 color = gradeColor(grade.value, grade.scale)
+            )
+        } else if (grade.gradeLetter != null && (showGradeLetters || estimateGrades)) {
+            val estimation = if (estimateGrades) {
+                getEstimationRangeFromLetter(grade.gradeLetter)?.let { " (estimation : $it)" } ?: ""
+            } else ""
+            Text(
+                text = grade.gradeLetter + estimation,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary
             )
         } else {
             Text(

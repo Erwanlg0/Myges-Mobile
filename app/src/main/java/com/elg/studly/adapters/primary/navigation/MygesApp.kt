@@ -382,12 +382,12 @@ private fun StudentScaffold(
             startDestination = destinations.first().route,
             modifier = Modifier.padding(padding)
         ) {
-            composable("dashboard") { DashboardScreen(studentViewModel, onNavigateToTab = { route -> navController.navigateTo(route) }) }
+            composable("dashboard") { DashboardScreen(studentViewModel, settingsViewModel, onNavigateToTab = { route -> navController.navigateTo(route) }) }
             composable("agenda?id={id}") { backStackEntry ->
                 AgendaScreen(studentViewModel, settingsViewModel, highlightedEventId = backStackEntry.arguments?.getString("id"))
             }
             composable("grades?id={id}") { backStackEntry ->
-                GradesScreen(studentViewModel, highlightedGradeId = backStackEntry.arguments?.getString("id"))
+                GradesScreen(studentViewModel, settingsViewModel, highlightedGradeId = backStackEntry.arguments?.getString("id"))
             }
             composable("absences?id={id}") { backStackEntry ->
                 AbsencesScreen(studentViewModel, highlightedAbsenceId = backStackEntry.arguments?.getString("id"))

@@ -287,6 +287,8 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun markFeatureFetched(feature: SyncFeature) = Unit
     override suspend fun markSynced() = Unit
     override suspend fun clearSyncMetadata() = Unit
+    override suspend fun setShowGradeLetters(enabled: Boolean) = Unit
+    override suspend fun setEstimateGrades(enabled: Boolean) = Unit
 }
 
 private class FakeCalendarSyncPort : CalendarSyncPort {
