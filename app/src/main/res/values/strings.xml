@@ -106,6 +106,7 @@
     <string name="grades_exam_title">Examen</string>
     <string name="grades_simulation_label">Libellé</string>
     <string name="grades_simulation_add">Ajouter</string>
+    <string name="grades_add_cc">Ajouter un CC</string>
     <string name="grades_simulation_average">Moyenne simulée</string>
     <string name="grades_simulation_coefficient">Coefficient simulé</string>
     <string name="grades_simulation_mode">Mode simulation</string>
@@ -117,6 +118,19 @@
     <string name="grades_summary_title">Moyenne générale</string>
     <string name="grades_value_format">%1$s/%2$s</string>
     <string name="grades_weighted_average">Moyenne pondérée</string>
+    <string name="grades_academic_rules_title">Règles académiques</string>
+    <string name="grades_academic_rules_toggle">Vérifier les conditions de validation</string>
+    <string name="grades_academic_status_validated">Année validée (sous réserve entreprise/projet)</string>
+    <string name="grades_academic_status_rattrapage">Conditions non remplies - Rattrapage possible</string>
+    <string name="grades_academic_status_redoublement">Conditions non remplies - Risque de redoublement</string>
+    <string name="grades_academic_warning_elearning">!!! Note e-learning &lt; 06/20 en %1$s (%2$s/20) : risque de rattrapage ou redoublement !</string>
+    <string name="grades_academic_warning_zero">!!! Note de 0/20 en %1$s : aucune moyenne de matière ne doit être égale à 0/20 pour valider le bloc.</string>
+    <string name="grades_academic_warning_two_under_six">!!! Attention : %1$d matières sont &lt; 6/20 dans le bloc %2$s (2 matières &lt; 6/20 dans un même bloc entraînent le rattrapage) !</string>
+    <string name="grades_mandatory_course">Matière validante (obligatoire &gt;= 10/20)</string>
+    <string name="grades_academic_warning_mandatory_failed">!!! Matière validante non validée en %1$s (%2$s/20) : note &lt; 10/20 empêche la validation de l\'année !</string>
+    <string name="grades_academic_warning_block_under_ten">!!! Moyenne du bloc %1$s &lt; 10/20 (%2$s/20) : bloc non validé.</string>
+    <string name="grades_academic_warning_annual_under_ten">!!! Moyenne générale &lt; 10/20 (%1$s/20) : accès aux épreuves de rattrapage.</string>
+    <string name="grades_academic_warning_annual_under_eight">!!! Moyenne générale &lt; 08/20 (%1$s/20) : proposition de redoublement.</string>
     <string name="action_delete">Supprimer</string>
     <string name="projects_detail_title">Détail du projet</string>
     <string name="projects_steps_title">Étapes</string>

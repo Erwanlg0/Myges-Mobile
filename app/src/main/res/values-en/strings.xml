@@ -106,6 +106,7 @@
     <string name="grades_exam_title">Exam</string>
     <string name="grades_simulation_label">Label</string>
     <string name="grades_simulation_add">Add</string>
+    <string name="grades_add_cc">Add CC</string>
     <string name="grades_simulation_average">Simulated average</string>
     <string name="grades_simulation_coefficient">Simulated coefficient</string>
     <string name="grades_simulation_mode">Simulation mode</string>

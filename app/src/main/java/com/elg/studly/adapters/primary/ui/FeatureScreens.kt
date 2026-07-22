@@ -40,6 +40,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Shield
@@ -141,6 +145,10 @@ import com.elg.studly.domain.model.Course
 import com.elg.studly.domain.model.DashboardSummary
 import com.elg.studly.domain.model.DirectoryPerson
 import com.elg.studly.domain.model.DirectoryRole
+import com.elg.studly.domain.model.AcademicEvaluation
+import com.elg.studly.domain.model.AcademicStatus
+import com.elg.studly.domain.model.WarningType
+import com.elg.studly.domain.model.evaluateAcademicRules
 import com.elg.studly.domain.model.Grade
 import com.elg.studly.domain.model.combineCcExam
 import com.elg.studly.domain.model.mainGrades
@@ -812,27 +820,34 @@ fun GradesScreen(
     var simulatedValues by remember(gradesList) {
         mutableStateOf(loadGradeSimulations(simulationPrefs, gradesList.map { it.id }.toSet()))
     }
+    var extraCcCounts by remember(gradesList) {
+        mutableStateOf(loadExtraCcCounts(simulationPrefs, gradesList.map { it.id }.toSet()))
+    }
     var blockAssignments by remember(gradesList) {
         mutableStateOf(loadGradeBlocks(simulationPrefs, gradesList.map { it.blockKey() }.toSet()))
     }
+    var mandatoryCourses by remember(gradesList) {
+        mutableStateOf(loadMandatoryCourses(simulationPrefs, gradesList.map { it.blockKey() }.toSet()))
+    }
     var groupByBlock by remember { mutableStateOf(simulationPrefs.getBoolean("group_by_block", false)) }
+    var academicRulesEnabled by remember { mutableStateOf(simulationPrefs.getBoolean("academic_rules_enabled", true)) }
     val hasBlocks = remember(blockAssignments) { blockAssignments.values.any { it.isNotBlank() } }
     LaunchedEffect(hasBlocks) { if (!hasBlocks) groupByBlock = false }
 
-    val displayedGrades = remember(gradesList, selectedYear, selectedSemester, simulationMode, simulatedValues) {
+    val displayedGrades = remember(gradesList, selectedYear, selectedSemester, simulationMode, simulatedValues, extraCcCounts) {
         val filtered = gradesList.filter { grade ->
             (selectedYear == null || grade.academicYearLabel() == selectedYear) &&
                 (selectedSemester == null || grade.semesterLabel() == selectedSemester)
         }
         (if (simulationMode) filtered.withSimulatedValues(simulatedValues) else filtered)
-            .withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet())
+            .withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet(), simulatedValues, extraCcCounts)
     }
     val mainGrades = remember(displayedGrades) { displayedGrades.mainGrades() }
     
-    val blockMainGrades = remember(gradesList, selectedYear, simulationMode, simulatedValues) {
+    val blockMainGrades = remember(gradesList, selectedYear, simulationMode, simulatedValues, extraCcCounts) {
         val yearGrades = gradesList.filter { selectedYear == null || it.academicYearLabel() == selectedYear }
         val yearDisplayed = (if (simulationMode) yearGrades.withSimulatedValues(simulatedValues) else yearGrades)
-            .withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet())
+            .withRecomputedMainGrades(if (simulationMode) simulatedValues.keys else emptySet(), simulatedValues, extraCcCounts)
         yearDisplayed.mainGrades()
     }
 
@@ -855,16 +870,47 @@ fun GradesScreen(
     }
 
     selectedGrade?.let { grade ->
-        val components = remember(grade, gradesList, simulatedValues, simulationMode) {
-            gradesList.filter { it.courseName == grade.courseName && it.period == grade.period }
-                .let { if (simulationMode) it.withSimulatedValues(simulatedValues) else it }
+        val mainGrade = gradesList.firstOrNull { it.courseName == grade.courseName && it.period == grade.period && !it.id.contains("-cc-") && !it.id.contains("-exam") } ?: grade
+        val courseId = mainGrade.id
+        val extraCount = extraCcCounts[courseId] ?: 0
+
+        val components = remember(grade, gradesList, simulatedValues, simulationMode, extraCcCounts) {
+            val list = gradesList.filter { it.courseName == grade.courseName && it.period == grade.period }
+            if (simulationMode) {
+                list.withSimulatedValues(simulatedValues)
+                    .withRecomputedMainGrades(simulatedValues.keys, simulatedValues, extraCcCounts)
+            } else list
         }
+        val currentGrade = if (simulationMode) {
+            components.firstOrNull { it.id == grade.id }
+                ?: grade.withSimulatedValue(simulatedValues[grade.id])
+        } else grade
+        val key = currentGrade.blockKey()
+        val isMandatory = key in mandatoryCourses
         GradeDetailsDialog(
-            grade = if (simulationMode) grade.withSimulatedValue(simulatedValues[grade.id]) else grade,
+            grade = currentGrade,
             components = components,
-            block = blockAssignments[grade.blockKey()].orEmpty(),
+            block = blockAssignments[key].orEmpty(),
+            isMandatory = isMandatory,
             simulationMode = simulationMode,
             resetVersion = simulationResetVersion,
+            extraCcCount = extraCount,
+            onAddCc = {
+                val newCount = extraCount + 1
+                val updatedCounts = extraCcCounts + (courseId to newCount)
+                extraCcCounts = updatedCounts
+                saveExtraCcCounts(simulationPrefs, updatedCounts)
+            },
+            onDeleteCc = { ccId ->
+                val updatedValues = simulatedValues - ccId
+                simulatedValues = updatedValues
+                if (extraCount > 0) {
+                    val updatedCounts = extraCcCounts + (courseId to (extraCount - 1))
+                    extraCcCounts = updatedCounts
+                    saveExtraCcCounts(simulationPrefs, updatedCounts)
+                }
+                saveGradeSimulations(simulationPrefs, updatedValues)
+            },
             onValueChange = { gradeId, value ->
                 val updatedValues = if (value == null) {
                     simulatedValues - gradeId
@@ -875,7 +921,6 @@ fun GradesScreen(
                 saveGradeSimulations(simulationPrefs, updatedValues)
             },
             onBlockChange = { block ->
-                val key = grade.blockKey()
                 val updatedBlocks = if (block.isBlank()) {
                     blockAssignments - key
                 } else {
@@ -883,6 +928,11 @@ fun GradesScreen(
                 }
                 blockAssignments = updatedBlocks
                 saveGradeBlocks(simulationPrefs, updatedBlocks)
+            },
+            onMandatoryToggle = { mandatory ->
+                val updated = if (mandatory) mandatoryCourses + key else mandatoryCourses - key
+                mandatoryCourses = updated
+                saveMandatoryCourses(simulationPrefs, updated)
             },
             onDismiss = { selectedGrade = null }
         )
@@ -978,6 +1028,19 @@ fun GradesScreen(
         }
 
         item { GradeSummaryCard(mainGrades, displayedGrades) }
+        item {
+            val academicEvaluation = remember(blockMainGrades, blockAssignments, mandatoryCourses) {
+                blockMainGrades.evaluateAcademicRules(blockAssignments, mandatoryCourses)
+            }
+            GradeAcademicRulesCard(
+                evaluation = academicEvaluation,
+                enabled = academicRulesEnabled,
+                onToggle = { enabled ->
+                    academicRulesEnabled = enabled
+                    simulationPrefs.edit().putBoolean("academic_rules_enabled", enabled).apply()
+                }
+            )
+        }
         if (!groupByBlock && blockAssignments.isNotEmpty()) {
             item { GradeBlockAveragesCard(mainGrades, blockAssignments) }
         }
@@ -1006,7 +1069,9 @@ fun GradesScreen(
                     TextButton(
                         onClick = {
                             simulatedValues = emptyMap()
+                            extraCcCounts = emptyMap()
                             blockAssignments = emptyMap()
+                            mandatoryCourses = emptySet()
                             clearGradeSimulations(simulationPrefs)
                             simulationResetVersion++
                         },
@@ -3031,6 +3096,118 @@ private fun GradeBlockAveragesCard(
 }
 
 @Composable
+private fun GradeAcademicRulesCard(
+    evaluation: AcademicEvaluation,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    DataCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.grades_academic_rules_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle
+            )
+        }
+        if (enabled) {
+            val statusColor = when (evaluation.status) {
+                AcademicStatus.VALIDATED -> MaterialTheme.colorScheme.primary
+                AcademicStatus.RATTRAPAGE -> MaterialTheme.colorScheme.tertiary
+                AcademicStatus.REDOUBLEMENT -> MaterialTheme.colorScheme.error
+            }
+            val statusTextRes = when (evaluation.status) {
+                AcademicStatus.VALIDATED -> R.string.grades_academic_status_validated
+                AcademicStatus.RATTRAPAGE -> R.string.grades_academic_status_rattrapage
+                AcademicStatus.REDOUBLEMENT -> R.string.grades_academic_status_redoublement
+            }
+
+            androidx.compose.material3.Surface(
+                color = statusColor.copy(alpha = 0.12f),
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = when (evaluation.status) {
+                            AcademicStatus.VALIDATED -> Icons.Rounded.CheckCircle
+                            AcademicStatus.RATTRAPAGE -> Icons.Rounded.Warning
+                            AcademicStatus.REDOUBLEMENT -> Icons.Rounded.Error
+                        },
+                        contentDescription = null,
+                        tint = statusColor
+                    )
+                    Text(
+                        text = stringResource(statusTextRes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = statusColor
+                    )
+                }
+            }
+
+            if (evaluation.warnings.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                evaluation.warnings.forEach { warning ->
+                    val message = when (warning.type) {
+                        WarningType.E_LEARNING_LOW -> stringResource(
+                            R.string.grades_academic_warning_elearning,
+                            warning.subjectOrBlockName,
+                            formatNumber(warning.numericValue)
+                        )
+                        WarningType.ZERO_GRADE -> stringResource(
+                            R.string.grades_academic_warning_zero,
+                            warning.subjectOrBlockName
+                        )
+                        WarningType.TWO_GRADES_BELOW_SIX -> stringResource(
+                            R.string.grades_academic_warning_two_under_six,
+                            warning.numericValue?.toInt() ?: 2,
+                            warning.subjectOrBlockName
+                        )
+                        WarningType.BLOCK_AVERAGE_LOW -> stringResource(
+                            R.string.grades_academic_warning_block_under_ten,
+                            warning.subjectOrBlockName,
+                            formatNumber(warning.numericValue)
+                        )
+                        WarningType.MANDATORY_COURSE_FAILED -> stringResource(
+                            R.string.grades_academic_warning_mandatory_failed,
+                            warning.subjectOrBlockName,
+                            formatNumber(warning.numericValue)
+                        )
+                        WarningType.ANNUAL_AVERAGE_RATTRAPAGE -> stringResource(
+                            R.string.grades_academic_warning_annual_under_ten,
+                            formatNumber(warning.numericValue)
+                        )
+                        WarningType.ANNUAL_AVERAGE_REDOUBLEMENT -> stringResource(
+                            R.string.grades_academic_warning_annual_under_eight,
+                            formatNumber(warning.numericValue)
+                        )
+                    }
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun GradeSimulationEditCard(
     grade: Grade,
     resetVersion: Int,
@@ -3097,7 +3274,7 @@ private fun GradeValueEditor(
             valueText = value
             onValueChange(value.toGradeNumber())
         },
-        label = { Text(grade.subject.ifBlank { stringResource(R.string.grades_general_average) }) },
+        label = { Text(grade.subject.ifBlank { stringResource(R.string.grades_average) }) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
@@ -3109,16 +3286,55 @@ private fun GradeDetailsDialog(
     grade: Grade,
     components: List<Grade>,
     block: String,
+    isMandatory: Boolean,
     simulationMode: Boolean,
     resetVersion: Int,
+    extraCcCount: Int = 0,
+    onAddCc: () -> Unit = {},
+    onDeleteCc: (String) -> Unit = {},
     onValueChange: (String, Double?) -> Unit,
     onBlockChange: (String) -> Unit,
+    onMandatoryToggle: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     val isComponent = grade.id.contains("-cc-") || grade.id.contains("-exam")
-    val ccComponents = if (isComponent) emptyList() else components.filter { it.id.contains("-cc-") }
-    val examComponent = if (isComponent) null else components.firstOrNull { it.id.contains("-exam") }
-    val editableGrades = if (ccComponents.isEmpty() && examComponent == null) listOf(grade) else ccComponents + listOfNotNull(examComponent)
+    val mainGradeId = if (isComponent) grade.id.substringBefore("-cc-").substringBefore("-exam") else grade.id
+
+    val existingCcList = if (isComponent) emptyList() else components.filter { it.id.contains("-cc-") && !it.id.contains("-cc-sim-") }
+    val extraCcList = if (isComponent) emptyList() else (0 until extraCcCount).map { i ->
+        val simCcId = "$mainGradeId-cc-sim-$i"
+        val existing = components.firstOrNull { it.id == simCcId }
+        existing ?: Grade(
+            id = simCcId,
+            courseName = grade.courseName,
+            subject = "CC ${existingCcList.size + i + 1}",
+            value = null,
+            scale = grade.scale ?: 20.0,
+            coefficient = 1.0,
+            average = null,
+            date = grade.date,
+            period = grade.period,
+            gradeLetter = null
+        )
+    }
+    val allCcGrades = existingCcList + extraCcList
+
+    val existingExam = if (isComponent) null else components.firstOrNull { it.id.contains("-exam") }
+    val examGrade = if (isComponent) null else (existingExam ?: Grade(
+        id = "$mainGradeId-exam",
+        courseName = grade.courseName,
+        subject = stringResource(R.string.grades_exam_title),
+        value = null,
+        scale = grade.scale ?: 20.0,
+        coefficient = 1.0,
+        average = null,
+        date = grade.date,
+        period = grade.period,
+        gradeLetter = null
+    ))
+
+    val ccComponents = allCcGrades
+    val examComponent = existingExam
     
     val ccValues = ccComponents.mapNotNull { it.value }
     val ccAverage = if (ccValues.isNotEmpty()) ccValues.average() else null
@@ -3147,15 +3363,83 @@ private fun GradeDetailsDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onMandatoryToggle(!isMandatory) }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.grades_mandatory_course),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        androidx.compose.material3.Checkbox(
+                            checked = isMandatory,
+                            onCheckedChange = onMandatoryToggle
+                        )
+                    }
                 }
                 
                 if (simulationMode) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    editableGrades.forEach { editableGrade ->
+                    if (!isComponent) {
+                        if (allCcGrades.isNotEmpty()) {
+                            Text(
+                                text = stringResource(R.string.grades_cc_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            allCcGrades.forEach { ccGrade ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        GradeValueEditor(
+                                            grade = ccGrade,
+                                            resetVersion = resetVersion,
+                                            onValueChange = { value -> onValueChange(ccGrade.id, value) }
+                                        )
+                                    }
+                                    if (ccGrade.id.contains("-cc-sim-")) {
+                                        IconButton(
+                                            onClick = { onDeleteCc(ccGrade.id) }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Delete,
+                                                contentDescription = stringResource(R.string.action_delete),
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        examGrade?.let { exam ->
+                            GradeValueEditor(
+                                grade = exam,
+                                resetVersion = resetVersion,
+                                onValueChange = { value -> onValueChange(exam.id, value) }
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = onAddCc,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.grades_add_cc))
+                        }
+                    } else {
                         GradeValueEditor(
-                            grade = editableGrade,
+                            grade = grade,
                             resetVersion = resetVersion,
-                            onValueChange = { value -> onValueChange(editableGrade.id, value) }
+                            onValueChange = { value -> onValueChange(grade.id, value) }
                         )
                     }
                 } else if (ccComponents.isNotEmpty()) {
@@ -3224,7 +3508,7 @@ private fun GradeDetailsDialog(
                     grade.gradeLetter != null -> grade.gradeLetter
                     else -> stringResource(R.string.grades_no_grade)
                 }
-                LabelValue(R.string.grades_general_average, averageText)
+                LabelValue(R.string.grades_average, averageText)
                 LabelValue(R.string.grades_coefficient, if (grade.isNotCounted()) stringResource(R.string.grades_not_counted) else formatNumber(grade.coefficient))
                 LabelValue(R.string.common_date, formatDate(grade.date))
             }
@@ -4701,17 +4985,29 @@ private fun List<Grade>.withSimulatedValues(values: Map<String, Double>): List<G
     return map { it.withSimulatedValue(values[it.id]) }
 }
 
-private fun List<Grade>.withRecomputedMainGrades(mainOverrides: Set<String>): List<Grade> {
+private fun List<Grade>.withRecomputedMainGrades(
+    mainOverrides: Set<String>,
+    simulatedValues: Map<String, Double> = emptyMap(),
+    extraCcCounts: Map<String, Int> = emptyMap()
+): List<Grade> {
     val componentsByCourse = groupBy { it.courseName to it.period }
     return map { grade ->
         if (grade.id.contains("-cc-") || grade.id.contains("-exam") || grade.id in mainOverrides) {
             grade
         } else {
             val components = componentsByCourse[grade.courseName to grade.period].orEmpty()
-            val ccValues = components.filter { it.id.contains("-cc-") }.mapNotNull { it.value }
-            val examValue = components.firstOrNull { it.id.contains("-exam") }?.value
-            val ccAverage = ccValues.takeIf { it.isNotEmpty() }?.average()
-            grade.copy(value = combineCcExam(ccAverage, examValue) ?: grade.value)
+            val existingCcValues = components.filter { it.id.contains("-cc-") }.mapNotNull { it.value }
+            val extraCount = extraCcCounts[grade.id] ?: 0
+            val extraCcValues = (0 until extraCount).mapNotNull { i ->
+                simulatedValues["${grade.id}-cc-sim-$i"]
+            }
+            val allCcValues = existingCcValues + extraCcValues
+            val existingExam = components.firstOrNull { it.id.contains("-exam") }?.value
+            val simulatedExam = simulatedValues["${grade.id}-exam"]
+            val examValue = existingExam ?: simulatedExam
+            val ccAverage = allCcValues.takeIf { it.isNotEmpty() }?.average()
+            val combined = combineCcExam(ccAverage, examValue)
+            grade.copy(value = combined ?: grade.value)
         }
     }
 }
@@ -4732,9 +5028,36 @@ private fun loadGradeSimulations(
             if (separator <= 0) return@mapNotNull null
             val id = line.substring(0, separator)
             val value = line.substring(separator + 1).toDoubleOrNull()
-            if (id in allowedIds && value != null) id to value else null
+            val isValidId = id in allowedIds || id.contains("-cc-") || id.contains("-exam")
+            if (isValidId && value != null) id to value else null
         }
         .toMap()
+}
+
+private fun loadExtraCcCounts(
+    preferences: SharedPreferences,
+    allowedIds: Set<String>
+): Map<String, Int> {
+    return preferences.getString("extra_ccs", null)
+        .orEmpty()
+        .lineSequence()
+        .mapNotNull { line ->
+            val separator = line.indexOf('=')
+            if (separator <= 0) return@mapNotNull null
+            val id = line.substring(0, separator)
+            val count = line.substring(separator + 1).toIntOrNull()
+            if (id in allowedIds && count != null && count > 0) id to count else null
+        }
+        .toMap()
+}
+
+private fun saveExtraCcCounts(
+    preferences: SharedPreferences,
+    counts: Map<String, Int>
+) {
+    preferences.edit()
+        .putString("extra_ccs", counts.entries.joinToString("\n") { "${it.key}=${it.value}" })
+        .apply()
 }
 
 private fun saveGradeSimulations(
@@ -4747,7 +5070,21 @@ private fun saveGradeSimulations(
 }
 
 private fun clearGradeSimulations(preferences: SharedPreferences) {
-    preferences.edit().remove("values").remove("blocks").apply()
+    preferences.edit().remove("values").remove("blocks").remove("mandatory").remove("extra_ccs").apply()
+}
+
+private fun loadMandatoryCourses(
+    preferences: SharedPreferences,
+    allowedKeys: Set<String>
+): Set<String> {
+    return preferences.getStringSet("mandatory", null).orEmpty().filterTo(mutableSetOf()) { it in allowedKeys }
+}
+
+private fun saveMandatoryCourses(
+    preferences: SharedPreferences,
+    courses: Set<String>
+) {
+    preferences.edit().putStringSet("mandatory", courses).apply()
 }
 
 private fun loadGradeBlocks(

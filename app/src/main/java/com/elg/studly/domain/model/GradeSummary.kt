@@ -76,6 +76,183 @@ private data class GradeWeight(
     val missingCoefficient: Boolean
 )
 
+data class AcademicWarning(
+    val type: WarningType,
+    val subjectOrBlockName: String = "",
+    val numericValue: Double? = null
+)
+
+enum class WarningType {
+    E_LEARNING_LOW,
+    ZERO_GRADE,
+    TWO_GRADES_BELOW_SIX,
+    BLOCK_AVERAGE_LOW,
+    MANDATORY_COURSE_FAILED,
+    ANNUAL_AVERAGE_RATTRAPAGE,
+    ANNUAL_AVERAGE_REDOUBLEMENT
+}
+
+enum class AcademicStatus {
+    VALIDATED,
+    RATTRAPAGE,
+    REDOUBLEMENT
+}
+
+data class AcademicEvaluation(
+    val status: AcademicStatus,
+    val warnings: List<AcademicWarning>
+)
+
+fun Grade.blockKey(): String {
+    return "${academicYearLabel()}|$courseName"
+}
+
+private fun Grade.academicYearLabel(): String {
+    val regex = Regex("\\d{4}-\\d{4}")
+    regex.find(period.orEmpty())?.value?.replace(" ", "")?.let { return it }
+    val gradeDate = date ?: return ""
+    val startYear = if (gradeDate.monthValue >= 9) gradeDate.year else gradeDate.year - 1
+    return "$startYear-${startYear + 1}"
+}
+
+fun List<Grade>.evaluateAcademicRules(
+    blockAssignments: Map<String, String>,
+    mandatoryCourses: Set<String> = emptySet()
+): AcademicEvaluation {
+    val mainGradesList = this.mainGrades()
+    val warnings = mutableListOf<AcademicWarning>()
+
+    val summary = mainGradesList.toGradeSummary()
+    val annualAvg = summary.weightedAverage
+
+    // 1. Check e-learning grades
+    val elearningGrades = mainGradesList.filter { grade ->
+        grade.courseName.contains("e-learning", ignoreCase = true) ||
+        grade.courseName.contains("elearning", ignoreCase = true) ||
+        grade.courseName.contains("e learning", ignoreCase = true) ||
+        grade.subject.contains("e-learning", ignoreCase = true) ||
+        grade.subject.contains("elearning", ignoreCase = true)
+    }
+
+    for (grade in elearningGrades) {
+        val valOn20 = grade.value?.let { v ->
+            val s = grade.scale ?: 20.0
+            if (s > 0) v / s * 20.0 else v
+        }
+        if (valOn20 != null && valOn20 < 6.0) {
+            warnings.add(
+                AcademicWarning(
+                    type = WarningType.E_LEARNING_LOW,
+                    subjectOrBlockName = grade.courseName,
+                    numericValue = valOn20
+                )
+            )
+        }
+    }
+
+    // 2. Check 0/20 in any UV
+    for (grade in mainGradesList) {
+        val valOn20 = grade.value?.let { v ->
+            val s = grade.scale ?: 20.0
+            if (s > 0) v / s * 20.0 else v
+        }
+        if (valOn20 != null && valOn20 == 0.0) {
+            warnings.add(
+                AcademicWarning(
+                    type = WarningType.ZERO_GRADE,
+                    subjectOrBlockName = grade.courseName,
+                    numericValue = 0.0
+                )
+            )
+        }
+    }
+
+    // 3. Check blocks
+    val groupedByBlock = mainGradesList.groupBy { blockAssignments[it.blockKey()]?.takeIf { b -> b.isNotBlank() } }
+
+    for ((blockName, blockGrades) in groupedByBlock) {
+        if (blockName == null) continue
+
+        val uvsBelowSix = blockGrades.count { grade ->
+            val valOn20 = grade.value?.let { v ->
+                val s = grade.scale ?: 20.0
+                if (s > 0) v / s * 20.0 else v
+            }
+            valOn20 != null && valOn20 < 6.0
+        }
+        if (uvsBelowSix >= 2) {
+            warnings.add(
+                AcademicWarning(
+                    type = WarningType.TWO_GRADES_BELOW_SIX,
+                    subjectOrBlockName = blockName,
+                    numericValue = uvsBelowSix.toDouble()
+                )
+            )
+        }
+
+        val blockSummary = blockGrades.toGradeSummary()
+        val blockAvg = blockSummary.weightedAverage
+        if (blockAvg != null && blockAvg < 10.0) {
+            warnings.add(
+                AcademicWarning(
+                    type = WarningType.BLOCK_AVERAGE_LOW,
+                    subjectOrBlockName = blockName,
+                    numericValue = blockAvg
+                )
+            )
+        }
+    }
+
+    // 4. Check mandatory courses (< 10/20)
+    for (grade in mainGradesList) {
+        val key = grade.blockKey()
+        if (key in mandatoryCourses) {
+            val valOn20 = grade.value?.let { v ->
+                val s = grade.scale ?: 20.0
+                if (s > 0) v / s * 20.0 else v
+            }
+            if (valOn20 != null && valOn20 < 10.0) {
+                warnings.add(
+                    AcademicWarning(
+                        type = WarningType.MANDATORY_COURSE_FAILED,
+                        subjectOrBlockName = grade.courseName,
+                        numericValue = valOn20
+                    )
+                )
+            }
+        }
+    }
+
+    // 4. Annual average check
+    if (annualAvg != null) {
+        if (annualAvg < 8.0) {
+            warnings.add(
+                AcademicWarning(
+                    type = WarningType.ANNUAL_AVERAGE_REDOUBLEMENT,
+                    numericValue = annualAvg
+                )
+            )
+        } else if (annualAvg < 10.0) {
+            warnings.add(
+                AcademicWarning(
+                    type = WarningType.ANNUAL_AVERAGE_RATTRAPAGE,
+                    numericValue = annualAvg
+                )
+            )
+        }
+    }
+
+    val status = when {
+        annualAvg != null && annualAvg < 8.0 -> AcademicStatus.REDOUBLEMENT
+        warnings.any { it.type == WarningType.ANNUAL_AVERAGE_REDOUBLEMENT } -> AcademicStatus.REDOUBLEMENT
+        warnings.isNotEmpty() || (annualAvg != null && annualAvg < 10.0) -> AcademicStatus.RATTRAPAGE
+        annualAvg != null && annualAvg >= 10.0 -> AcademicStatus.VALIDATED
+        else -> AcademicStatus.VALIDATED
+    }
+
+    return AcademicEvaluation(status = status, warnings = warnings)
+}
+
 fun Grade.getGradeLetterFromValue(): String? {
     val val20 = value ?: return null
     val score = if (scale != null && scale > 0.0) {
@@ -114,3 +291,4 @@ fun getEstimationRangeFromLetter(letter: String): String? {
         else -> null
     }
 }
+

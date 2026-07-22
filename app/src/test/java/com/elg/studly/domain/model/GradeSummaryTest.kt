@@ -122,6 +122,53 @@ class GradeSummaryTest {
         assertEquals(listOf("math-label"), grades.mainGrades().map { it.id })
     }
 
+    @Test
+    fun evaluateAcademicRulesDetectsElearningWarning() {
+        val grades = listOf(
+            grade("1", courseName = "E-Learning Python", subject = "", value = 5.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
+        )
+        val eval = grades.evaluateAcademicRules(emptyMap())
+        assertTrue(eval.warnings.any { it.type == WarningType.E_LEARNING_LOW })
+        assertEquals(AcademicStatus.RATTRAPAGE, eval.status)
+    }
+
+    @Test
+    fun evaluateAcademicRulesDetectsZeroGrade() {
+        val grades = listOf(
+            grade("1", courseName = "Math", subject = "", value = 0.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
+        )
+        val eval = grades.evaluateAcademicRules(emptyMap())
+        assertTrue(eval.warnings.any { it.type == WarningType.ZERO_GRADE })
+        assertEquals(AcademicStatus.RATTRAPAGE, eval.status)
+    }
+
+    @Test
+    fun evaluateAcademicRulesDetectsTwoGradesBelowSixInSameBlock() {
+        val g1 = grade("1", courseName = "Math", subject = "", value = 5.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
+        val g2 = grade("2", courseName = "Physics", subject = "", value = 4.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
+        val blocks = mapOf(g1.blockKey() to "Block 1", g2.blockKey() to "Block 1")
+        val eval = listOf(g1, g2).evaluateAcademicRules(blocks)
+        assertTrue(eval.warnings.any { it.type == WarningType.TWO_GRADES_BELOW_SIX })
+    }
+
+    @Test
+    fun evaluateAcademicRulesValidatesWhenAllConditionsMet() {
+        val g1 = grade("1", courseName = "Math", subject = "", value = 14.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
+        val g2 = grade("2", courseName = "Physics", subject = "", value = 12.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
+        val blocks = mapOf(g1.blockKey() to "Block 1", g2.blockKey() to "Block 1")
+        val eval = listOf(g1, g2).evaluateAcademicRules(blocks)
+        assertTrue(eval.warnings.isEmpty())
+        assertEquals(AcademicStatus.VALIDATED, eval.status)
+    }
+
+    @Test
+    fun evaluateAcademicRulesDetectsMandatoryCourseFailed() {
+        val g1 = grade("1", courseName = "Mandatory Project", subject = "", value = 8.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
+        val mandatory = setOf(g1.blockKey())
+        val eval = listOf(g1).evaluateAcademicRules(emptyMap(), mandatory)
+        assertTrue(eval.warnings.any { it.type == WarningType.MANDATORY_COURSE_FAILED })
+    }
+
     private fun grade(
         id: String,
         courseName: String = "Course",
