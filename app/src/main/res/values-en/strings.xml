@@ -118,6 +118,19 @@
     <string name="grades_summary_title">Overall average</string>
     <string name="grades_value_format">%1$s/%2$s</string>
     <string name="grades_weighted_average">Weighted average</string>
+    <string name="grades_academic_rules_title">Academic rules</string>
+    <string name="grades_academic_rules_toggle">Check validation requirements</string>
+    <string name="grades_academic_status_validated">Year validated (subject to company/project)</string>
+    <string name="grades_academic_status_rattrapage">Conditions not met - Retake possible</string>
+    <string name="grades_academic_status_redoublement">Conditions not met - Repeating year risk</string>
+    <string name="grades_academic_warning_elearning">!!! E-learning grade &lt; 06/20 in %1$s (%2$s/20): risk of retake or repeating year!</string>
+    <string name="grades_academic_warning_zero">!!! Grade of 0/20 in %1$s: no course grade must equal 0/20 to validate the block.</string>
+    <string name="grades_academic_warning_two_under_six">!!! Warning: %1$d courses are &lt; 6/20 in block %2$s (2 courses &lt; 6/20 in the same block lead to retakes)!</string>
+    <string name="grades_mandatory_course">Mandatory course (required &gt;= 10/20)</string>
+    <string name="grades_academic_warning_mandatory_failed">!!! Mandatory course not validated in %1$s (%2$s/20): grade &lt; 10/20 prevents year validation!</string>
+    <string name="grades_academic_warning_block_under_ten">!!! Block average for %1$s &lt; 10/20 (%2$s/20): block not validated.</string>
+    <string name="grades_academic_warning_annual_under_ten">!!! Overall average &lt; 10/20 (%1$s/20): access to retake exams.</string>
+    <string name="grades_academic_warning_annual_under_eight">!!! Overall average &lt; 08/20 (%1$s/20): proposal for repeating year.</string>
     <string name="action_delete">Delete</string>
     <string name="projects_detail_title">Project Details</string>
     <string name="projects_steps_title">Steps</string>

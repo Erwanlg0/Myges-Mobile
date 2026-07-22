@@ -125,7 +125,8 @@ class GradeSummaryTest {
     @Test
     fun evaluateAcademicRulesDetectsElearningWarning() {
         val grades = listOf(
-            grade("1", courseName = "E-Learning Python", subject = "", value = 5.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
+            grade("1", courseName = "E-Learning Python", subject = "", value = 5.0, scale = 20.0, coefficient = 1.0, period = "2024-2025"),
+            grade("2", courseName = "Math", subject = "", value = 15.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
         )
         val eval = grades.evaluateAcademicRules(emptyMap())
         assertTrue(eval.warnings.any { it.type == WarningType.E_LEARNING_LOW })
@@ -135,7 +136,8 @@ class GradeSummaryTest {
     @Test
     fun evaluateAcademicRulesDetectsZeroGrade() {
         val grades = listOf(
-            grade("1", courseName = "Math", subject = "", value = 0.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
+            grade("1", courseName = "Math", subject = "", value = 0.0, scale = 20.0, coefficient = 1.0, period = "2024-2025"),
+            grade("2", courseName = "Physics", subject = "", value = 16.0, scale = 20.0, coefficient = 1.0, period = "2024-2025")
         )
         val eval = grades.evaluateAcademicRules(emptyMap())
         assertTrue(eval.warnings.any { it.type == WarningType.ZERO_GRADE })
